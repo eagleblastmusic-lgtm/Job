@@ -1,0 +1,332 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
+import { rm } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { JobDatabase } from './db.js';
+import { loadConfig, type AppConfig } from './config.js';
+import { AppStore, type UserRecord } from './store.js';
+import { assertEmail, assertPassword, hashPassword, hashSessionToken, newSessionToken, normalizeEmail, parseCookies, verifyPassword } from './auth.js';
+import { deleteStoredFile, storeCvUpload } from './files.js';
+import { cvToPdf } from './pdf.js';
+import { HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringArrayField, stringField } from './http.js';
+import { inferCareerFactsFromText } from '../domain/careerTruth.js';
+import { normalizeText } from '../domain/ontology.js';
+import { parseJobText } from '../domain/jobParser.js';
+import { decideJob } from '../domain/decisionEngine.js';
+import { buildApplicationPackage, buildCvDocument } from '../domain/cvEngine.js';
+import { assertApplicationTransition } from '../domain/statusTransitions.js';
+import type { ApplicationStatus, CareerFactStatus, CareerProfile } from '../domain/types.js';
+import { AiGateway } from './aiGateway.js';
+
+interface AppRuntime {
+  server: Server;
+  db: JobDatabase;
+  store: AppStore;
+  config: AppConfig;
+  close: () => Promise<void>;
+}
+
+interface RateEntry { count: number; resetAt: number }
+const rateMap = new Map<string, RateEntry>();
+
+function securityHeaders(res: ServerResponse): void {
+  res.setHeader('x-content-type-options', 'nosniff');
+  res.setHeader('x-frame-options', 'DENY');
+  res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
+  res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('cross-origin-opener-policy', 'same-origin');
+  res.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+}
+
+function clientIp(req: IncomingMessage): string {
+  return req.socket.remoteAddress ?? 'unknown';
+}
+
+function enforceRate(key: string, limit: number, windowMs: number): void {
+  const time = Date.now();
+  const current = rateMap.get(key);
+  if (!current || current.resetAt <= time) {
+    rateMap.set(key, { count: 1, resetAt: time + windowMs });
+    return;
+  }
+  current.count += 1;
+  if (current.count > limit) throw new HttpError(429, 'Za dużo prób. Spróbuj ponownie później.', 'RATE_LIMITED');
+}
+
+function enforceOrigin(req: IncomingMessage, config: AppConfig): void {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method ?? 'GET')) return;
+  const origin = req.headers.origin;
+  if (origin && origin !== config.appOrigin) throw new HttpError(403, 'Nieprawidłowe źródło żądania.', 'ORIGIN_REJECTED');
+}
+
+function cookieForSession(raw: string, config: AppConfig): string {
+  const parts = [`job_session=${encodeURIComponent(raw)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${config.sessionDays * 86400}`];
+  if (config.nodeEnv === 'production') parts.push('Secure');
+  return parts.join('; ');
+}
+
+function clearSessionCookie(config: AppConfig): string {
+  return `job_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${config.nodeEnv === 'production' ? '; Secure' : ''}`;
+}
+
+function currentUser(req: IncomingMessage, store: AppStore): UserRecord | null {
+  const raw = parseCookies(req.headers.cookie).job_session;
+  if (!raw) return null;
+  return store.getUserBySession(hashSessionToken(raw));
+}
+
+function requireUser(req: IncomingMessage, store: AppStore): UserRecord {
+  const user = currentUser(req, store);
+  if (!user) throw new HttpError(401, 'Zaloguj się, aby kontynuować.', 'UNAUTHENTICATED');
+  return user;
+}
+
+function requireAdmin(req: IncomingMessage, store: AppStore): UserRecord {
+  const user = requireUser(req, store);
+  if (user.role !== 'ADMIN') throw new HttpError(403, 'Brak uprawnień administratora.', 'FORBIDDEN');
+  return user;
+}
+
+function parseProfile(body: Record<string, unknown>): CareerProfile {
+  const shiftsRaw = body.shiftPreferences;
+  const shifts = shiftsRaw && typeof shiftsRaw === 'object' && !Array.isArray(shiftsRaw) ? shiftsRaw as Record<string, unknown> : {};
+  return {
+    desiredRoles: stringArrayField(body, 'desiredRoles'),
+    location: stringField(body, 'location', false),
+    commuteKm: nullableNumberField(body, 'commuteKm'),
+    remotePreferences: stringArrayField(body, 'remotePreferences'),
+    salaryMin: nullableNumberField(body, 'salaryMin'),
+    contractPreferences: stringArrayField(body, 'contractPreferences'),
+    shiftPreferences: {
+      nights: nullableBooleanField(shifts, 'nights'),
+      weekends: nullableBooleanField(shifts, 'weekends')
+    },
+    availability: stringField(body, 'availability', false)
+  };
+}
+
+function recommendationLabel(value: string): string {
+  return ({ APPLY_NOW: 'APLIKUJ TERAZ', APPLY: 'WARTO APLIKOWAĆ', CONSIDER: 'ROZWAŻ', PROBABLY_SKIP: 'RACZEJ ODPUŚĆ', LOW_FIT: 'NISKIE DOPASOWANIE' } as Record<string, string>)[value] ?? value;
+}
+
+async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, config: AppConfig, _ai: AiGateway): Promise<boolean> {
+  if (!pathname.startsWith('/api/')) return false;
+  enforceOrigin(req, config);
+  const method = req.method ?? 'GET';
+
+  if (method === 'GET' && pathname === '/api/health') {
+    sendJson(res, 200, { ok: true, service: 'job', version: '0.1.0', now: new Date().toISOString() }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/auth/register') {
+    enforceRate(`register:${clientIp(req)}`, 15, 15 * 60_000);
+    const body = await readJson(req);
+    const email = normalizeEmail(stringField(body, 'email') ?? '');
+    const password = stringField(body, 'password') ?? '';
+    const name = stringField(body, 'name') ?? '';
+    assertEmail(email); assertPassword(password);
+    if (name.length < 2 || name.length > 80) throw new HttpError(400, 'Imię powinno mieć od 2 do 80 znaków.');
+    if (store.getUserByEmail(email)) throw new HttpError(409, 'Konto z tym adresem już istnieje.', 'EMAIL_EXISTS');
+    const role = config.adminEmails.has(email) ? 'ADMIN' : 'USER';
+    const user = store.createUser({ email, passwordHash: hashPassword(password), name, role });
+    const token = newSessionToken();
+    const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
+    store.createSession(user.id, token.hash, expires);
+    store.analytics(user.id, 'signup_completed'); store.audit(user.id, 'ACCOUNT_CREATED', 'user', user.id);
+    res.setHeader('set-cookie', cookieForSession(token.raw, config));
+    sendJson(res, 201, { user: { id: user.id, email: user.email, name: user.name, role: user.role } }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/auth/login') {
+    enforceRate(`login:${clientIp(req)}`, 20, 15 * 60_000);
+    const body = await readJson(req);
+    const email = normalizeEmail(stringField(body, 'email') ?? '');
+    const password = stringField(body, 'password') ?? '';
+    const user = store.getUserByEmail(email);
+    if (!user || !verifyPassword(password, user.passwordHash)) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
+    const token = newSessionToken();
+    const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
+    store.createSession(user.id, token.hash, expires);
+    store.audit(user.id, 'LOGIN', 'user', user.id);
+    res.setHeader('set-cookie', cookieForSession(token.raw, config));
+    sendJson(res, 200, { user: { id: user.id, email: user.email, name: user.name, role: user.role } }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/auth/logout') {
+    const raw = parseCookies(req.headers.cookie).job_session;
+    if (raw) store.deleteSession(hashSessionToken(raw));
+    res.setHeader('set-cookie', clearSessionCookie(config));
+    sendJson(res, 200, { ok: true }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/me') {
+    const user = requireUser(req, store);
+    sendJson(res, 200, { user: { id: user.id, email: user.email, name: user.name, role: user.role, locale: user.locale, timezone: user.timezone }, profile: store.getProfile(user.id), subscription: store.getSubscription(user.id) }); return true;
+  }
+
+  if (method === 'PUT' && pathname === '/api/profile') {
+    const user = requireUser(req, store); const body = await readJson(req); const profile = parseProfile(body);
+    store.updateProfile(user.id, profile); store.analytics(user.id, 'onboarding_completed');
+    sendJson(res, 200, { profile }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/career-truth') {
+    const user = requireUser(req, store);
+    sendJson(res, 200, { facts: store.listFacts(user.id), experiences: store.listExperiences(user.id), education: store.listEducation(user.id) }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/career-truth/facts') {
+    const user = requireUser(req, store); const body = await readJson(req);
+    const value = stringField(body, 'value') ?? ''; const type = stringField(body, 'type') ?? 'SKILL';
+    const fact = store.insertFact(user.id, { type, value, normalizedValue: normalizeText(value), level: stringField(body, 'level', false), source: 'USER', status: 'CONFIRMED', confidence: 1, evidence: 'Dodane i potwierdzone przez użytkownika.', allowedForCv: true });
+    store.analytics(user.id, 'career_fact_confirmed'); sendJson(res, 201, { fact }); return true;
+  }
+
+  const factStatusMatch = pathname.match(/^\/api\/career-truth\/facts\/([^/]+)\/status$/);
+  if (method === 'PATCH' && factStatusMatch) {
+    const user = requireUser(req, store); const body = await readJson(req);
+    const status = stringField(body, 'status') as CareerFactStatus;
+    if (!['CONFIRMED','INFERRED','UNKNOWN','NOT_POSSESSED','EXPIRED','CONFLICTING'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status faktu.');
+    const fact = store.updateFactStatus(user.id, factStatusMatch[1] ?? '', status, status === 'CONFIRMED');
+    store.analytics(user.id, status === 'CONFIRMED' ? 'career_fact_confirmed' : 'career_fact_corrected');
+    sendJson(res, 200, { fact }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/experiences') {
+    const user = requireUser(req, store); const body = await readJson(req);
+    const employer = stringField(body, 'employer') ?? ''; const title = stringField(body, 'title') ?? '';
+    const experience = store.addExperience(user.id, {
+      employer, title, normalizedTitle: normalizeText(title), startDate: stringField(body, 'startDate', false), endDate: stringField(body, 'endDate', false),
+      current: body.current === true, description: stringField(body, 'description', false), achievements: stringArrayField(body, 'achievements')
+    });
+    sendJson(res, 201, { experience }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/cv/upload') {
+    const user = requireUser(req, store); const body = await readJson(req, config.maxUploadBytes * 2);
+    const upload = await storeCvUpload({ dataDir: config.dataDir, userId: user.id, filename: stringField(body, 'filename') ?? 'cv', mimeType: stringField(body, 'mimeType') ?? 'application/octet-stream', base64: stringField(body, 'base64') ?? '', maxBytes: config.maxUploadBytes });
+    store.recordUpload(user.id, upload);
+    const inferred = upload.extractedText ? inferCareerFactsFromText(upload.extractedText, `CV:${upload.id}`) : [];
+    const created = store.upsertInferredFacts(user.id, inferred.map(f => ({ ...f, level: null })));
+    store.analytics(user.id, 'cv_uploaded'); if (upload.extractedText) store.analytics(user.id, 'cv_parsed');
+    store.audit(user.id, 'CV_UPLOADED', 'uploaded_file', upload.id, { mimeType: upload.mimeType, sizeBytes: upload.sizeBytes });
+    sendJson(res, 201, { upload: { id: upload.id, originalName: upload.originalName, mimeType: upload.mimeType, sizeBytes: upload.sizeBytes, extracted: Boolean(upload.extractedText) }, inferredFacts: created }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/jobs/parse') {
+    const user = requireUser(req, store); enforceRate(`jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req);
+    const text = stringField(body, 'text') ?? ''; const parsed = parseJobText(text); const jobId = store.createJob(user.id, text, parsed);
+    store.analytics(user.id, 'job_added'); store.analytics(user.id, 'job_parsed');
+    sendJson(res, 201, { jobId, job: parsed }); return true;
+  }
+
+  const decisionMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/decide$/);
+  if (method === 'POST' && decisionMatch) {
+    const user = requireUser(req, store); const found = store.getJob(user.id, decisionMatch[1] ?? '');
+    if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
+    const decision = decideJob(store.getProfile(user.id), store.listFacts(user.id), found.job); const decisionId = store.saveDecision(user.id, found.id, decision);
+    store.analytics(user.id, 'decision_viewed', { recommendation: decision.recommendation });
+    sendJson(res, 200, { decisionId, decision: { ...decision, label: recommendationLabel(decision.recommendation) } }); return true;
+  }
+
+  const overrideMatch = pathname.match(/^\/api\/decisions\/([^/]+)\/override$/);
+  if (method === 'POST' && overrideMatch) {
+    const user = requireUser(req, store); const body = await readJson(req); const override = stringField(body, 'override') ?? '';
+    store.setDecisionOverride(user.id, overrideMatch[1] ?? '', override, stringField(body, 'reason', false));
+    store.analytics(user.id, 'decision_overridden', { override }); sendJson(res, 200, { ok: true }); return true;
+  }
+
+  const packageMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/application-package$/);
+  if (method === 'POST' && packageMatch) {
+    const user = requireUser(req, store); const found = store.getJob(user.id, packageMatch[1] ?? ''); if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
+    const cv = buildCvDocument({ name: user.name, profile: store.getProfile(user.id), facts: store.listFacts(user.id), experiences: store.listExperiences(user.id), education: store.listEducation(user.id) });
+    const pack = buildApplicationPackage(cv, found.job); store.analytics(user.id, 'application_package_created'); store.analytics(user.id, 'cv_generated');
+    sendJson(res, 200, { package: pack, pdfUrl: `/api/cv/base.pdf?jobId=${encodeURIComponent(found.id)}` }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/cv/base.pdf') {
+    const user = requireUser(req, store);
+    const cv = buildCvDocument({ name: user.name, profile: store.getProfile(user.id), facts: store.listFacts(user.id), experiences: store.listExperiences(user.id), education: store.listEducation(user.id) });
+    const pdf = await cvToPdf(cv, config.pdfRendererBin);
+    store.analytics(user.id, 'cv_exported'); res.statusCode = 200; res.setHeader('content-type', 'application/pdf'); res.setHeader('content-disposition', 'attachment; filename="cv.pdf"'); res.setHeader('content-length', pdf.length); res.end(pdf); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/applications') {
+    const user = requireUser(req, store); sendJson(res, 200, { applications: store.listApplications(user.id) }); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/applications') {
+    const user = requireUser(req, store); const body = await readJson(req); const jobId = stringField(body, 'jobId') ?? ''; const statusRaw = (stringField(body, 'status', false) ?? 'SAVED') as ApplicationStatus;
+    if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(statusRaw)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
+    if (!store.getJob(user.id, jobId)) throw new HttpError(404, 'Nie znaleziono oferty.');
+    const applicationId = store.createApplication(user.id, jobId, statusRaw); store.analytics(user.id, 'application_created', { status: statusRaw });
+    sendJson(res, 201, { applicationId }); return true;
+  }
+
+  const applicationStatusMatch = pathname.match(/^\/api\/applications\/([^/]+)\/status$/);
+  if (method === 'PATCH' && applicationStatusMatch) {
+    const user = requireUser(req, store); const body = await readJson(req); const status = stringField(body, 'status') as ApplicationStatus;
+    if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
+    const application = store.getApplication(user.id, applicationStatusMatch[1] ?? ''); if (!application) throw new HttpError(404, 'Nie znaleziono aplikacji.');
+    assertApplicationTransition(application.status, status); store.updateApplicationStatus(user.id, application.id, status); sendJson(res, 200, { ok: true }); return true;
+  }
+
+  const outcomeMatch = pathname.match(/^\/api\/applications\/([^/]+)\/outcomes$/);
+  if (method === 'POST' && outcomeMatch) {
+    const user = requireUser(req, store); const body = await readJson(req); const outcomeType = stringField(body, 'outcomeType') ?? '';
+    const allowed = ['NO_RESPONSE','CONTACTED','INTERVIEW','REJECTED','OFFER','WAITING']; if (!allowed.includes(outcomeType)) throw new HttpError(400, 'Nieprawidłowy wynik rekrutacji.');
+    const outcome = store.addOutcome(user.id, outcomeMatch[1] ?? '', outcomeType); store.analytics(user.id, 'outcome_recorded', { outcomeType }); sendJson(res, 201, { outcome }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/billing') {
+    const user = requireUser(req, store); sendJson(res, 200, { subscription: store.getSubscription(user.id), products: [{ key: 'FREE', label: 'Free' }, { key: 'TRIAL', label: '7 dni premium' }, { key: 'PRO_MONTHLY', label: 'Pro miesięczny', price: null }, { key: 'JOB_SPRINT_90', label: '90-dniowy Job Sprint', price: null }], checkoutConfigured: false }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/export') {
+    const user = requireUser(req, store); store.audit(user.id, 'DATA_EXPORTED', 'user', user.id); sendJson(res, 200, store.exportUserData(user.id)); return true;
+  }
+
+  if (method === 'DELETE' && pathname === '/api/account') {
+    const user = requireUser(req, store); const body = await readJson(req); const confirmation = stringField(body, 'confirmation') ?? '';
+    if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
+    for (const path of store.listUploadPaths(user.id)) await deleteStoredFile(path);
+    store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id);
+    await rm(resolve(config.dataDir, 'uploads', user.id), { recursive: true, force: true });
+    res.setHeader('set-cookie', clearSessionCookie(config)); sendJson(res, 200, { ok: true }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/admin/diagnostics') {
+    requireAdmin(req, store); sendJson(res, 200, store.diagnostics()); return true;
+  }
+
+  if (method === 'POST' && pathname === '/api/events') {
+    const user = currentUser(req, store); const body = await readJson(req); const eventName = stringField(body, 'eventName') ?? '';
+    const props = body.properties && typeof body.properties === 'object' && !Array.isArray(body.properties) ? body.properties as Record<string, unknown> : {};
+    store.analytics(user?.id ?? null, eventName, props); sendJson(res, 202, { ok: true }); return true;
+  }
+
+  sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Nie znaleziono endpointu.' } }); return true;
+}
+
+export function createJobApp(overrides: Partial<AppConfig> = {}): AppRuntime {
+  const config = loadConfig(overrides); const db = new JobDatabase(config.databasePath); const store = new AppStore(db); const ai = new AiGateway(db, config);
+  store.purgeExpiredSessions();
+  const publicDir = resolve(process.cwd(), 'dist/public');
+  const server = createServer(async (req, res) => {
+    const requestId = randomUUID(); securityHeaders(res); res.setHeader('x-request-id', requestId);
+    try {
+      const url = new URL(req.url ?? '/', config.appOrigin);
+      if (await handleApi(req, res, url.pathname, store, config, ai)) return;
+      if (await serveStatic(res, publicDir, url.pathname)) return;
+      if (!url.pathname.includes('.')) {
+        if (await serveStatic(res, publicDir, '/index.html')) return;
+      }
+      sendText(res, 404, 'Nie znaleziono strony.');
+    } catch (error) {
+      const http = error instanceof HttpError ? error : new HttpError(500, 'Wystąpił błąd serwera.', 'INTERNAL_ERROR');
+      if (!(error instanceof HttpError)) console.error(`[${requestId}]`, error);
+      if (!res.headersSent) sendJson(res, http.status, { error: { code: http.code, message: http.message, requestId } }); else res.end();
+    }
+  });
+  return { server, db, store, config, close: async () => { await new Promise<void>((resolveClose, reject) => server.close(err => err ? reject(err) : resolveClose())); db.close(); } };
+}
