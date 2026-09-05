@@ -8,7 +8,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +20,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run validate:migrations
       - run: npm test
+      - name: Install Chromium for browser E2E
+        run: npx playwright install --with-deps chromium
+      - name: Browser E2E — mobile and desktop
+        run: npm run test:browser
       - name: Build production container
         run: docker build -t job-mvp:${{ github.sha }} .
       - name: Production container smoke test
