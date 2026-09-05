@@ -5,6 +5,8 @@
 - [x] signup/login
 - [x] onboarding/profile without CV
 - [x] Career Truth Lite
+- [x] user-entered experience and education
+- [x] education carried into Application Package, CV and data export
 - [x] CV upload
 - [x] paste-job workflow
 - [x] deterministic Job Parser
@@ -27,13 +29,15 @@
 - [x] strict TypeScript configuration
 - [x] unit tests
 - [x] critical API E2E test
+- [x] critical API E2E verifies education through Career Truth, Application Package and export
 - [x] production build command
 - [x] responsive mobile-first UI
 - [x] browser-level Playwright E2E on desktop and mobile Chromium profiles
+- [x] browser critical flow enters education and verifies persisted UI rendering
 - [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
-- [x] API payload/field boundary regression tests for oversized JSON, job text, profile, Career Truth, experience and analytics inputs
+- [x] API payload/field boundary regression tests for oversized JSON, job text, profile, Career Truth, experience, education and analytics inputs
 - [x] resource error-contract tests for foreign/nonexistent records and invalid application transitions
 - [ ] manual WCAG 2.2 AA review with assistive technology
 
@@ -45,7 +49,7 @@
 - [x] password re-authentication and rate limiting before irreversible account deletion
 - [x] ordinary JSON request bodies capped at 64 KiB unless an endpoint has a documented larger requirement
 - [x] paste-job endpoint capped at 256 KiB JSON / 100,000 characters of job text, with minimum useful-length validation before parsing
-- [x] bounded profile, Career Truth, experience, decision override, application/outcome and analytics fields/lists before persistence
+- [x] bounded profile, Career Truth, experience, education, decision override, application/outcome and analytics fields/lists before persistence
 - [x] analytics event properties capped by property count and serialized size before sanitization/storage
 - [x] foreign and nonexistent user-owned Career Truth facts, decisions and applications expose the same stable 404 contract
 - [x] invalid application status transitions return controlled 400 errors and are verified not to mutate stored status
