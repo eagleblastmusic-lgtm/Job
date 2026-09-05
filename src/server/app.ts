@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -29,22 +30,30 @@ interface AppRuntime {
 }
 
 interface RateEntry { count: number; resetAt: number }
-const rateMap = new Map<string, RateEntry>();
+type RateMap = Map<string, RateEntry>;
 
-function securityHeaders(res: ServerResponse): void {
+function securityHeaders(res: ServerResponse, config: AppConfig): void {
   res.setHeader('x-content-type-options', 'nosniff');
   res.setHeader('x-frame-options', 'DENY');
   res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
   res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('cross-origin-opener-policy', 'same-origin');
+  res.setHeader('cross-origin-resource-policy', 'same-origin');
   res.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  if (config.nodeEnv === 'production') res.setHeader('strict-transport-security', 'max-age=31536000');
 }
 
-function clientIp(req: IncomingMessage): string {
+function clientIp(req: IncomingMessage, config: AppConfig): string {
+  if (config.trustProxy) {
+    const header = req.headers['x-forwarded-for'];
+    const forwarded = Array.isArray(header) ? header[0] : header;
+    const candidate = forwarded?.split(',')[0]?.trim();
+    if (candidate && isIP(candidate)) return candidate;
+  }
   return req.socket.remoteAddress ?? 'unknown';
 }
 
-function enforceRate(key: string, limit: number, windowMs: number): void {
+function enforceRate(rateMap: RateMap, key: string, limit: number, windowMs: number): void {
   const time = Date.now();
   const current = rateMap.get(key);
   if (!current || current.resetAt <= time) {
@@ -57,6 +66,10 @@ function enforceRate(key: string, limit: number, windowMs: number): void {
 
 function enforceOrigin(req: IncomingMessage, config: AppConfig): void {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method ?? 'GET')) return;
+  const fetchSite = req.headers['sec-fetch-site'];
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    throw new HttpError(403, 'Nieprawidłowe źródło żądania.', 'ORIGIN_REJECTED');
+  }
   const origin = req.headers.origin;
   if (origin && origin !== config.appOrigin) throw new HttpError(403, 'Nieprawidłowe źródło żądania.', 'ORIGIN_REJECTED');
 }
@@ -111,7 +124,7 @@ function recommendationLabel(value: string): string {
   return ({ APPLY_NOW: 'APLIKUJ TERAZ', APPLY: 'WARTO APLIKOWAĆ', CONSIDER: 'ROZWAŻ', PROBABLY_SKIP: 'RACZEJ ODPUŚĆ', LOW_FIT: 'NISKIE DOPASOWANIE' } as Record<string, string>)[value] ?? value;
 }
 
-async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, config: AppConfig, _ai: AiGateway): Promise<boolean> {
+async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, config: AppConfig, _ai: AiGateway, rateMap: RateMap): Promise<boolean> {
   if (!pathname.startsWith('/api/')) return false;
   enforceOrigin(req, config);
   const method = req.method ?? 'GET';
@@ -132,7 +145,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/auth/register') {
-    enforceRate(`register:${clientIp(req)}`, 15, 15 * 60_000);
+    enforceRate(rateMap, `register:${clientIp(req, config)}`, 15, 15 * 60_000);
     const body = await readJson(req);
     const email = normalizeEmail(stringField(body, 'email') ?? '');
     const password = stringField(body, 'password') ?? '';
@@ -155,7 +168,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/auth/login') {
-    enforceRate(`login:${clientIp(req)}`, 20, 15 * 60_000);
+    enforceRate(rateMap, `login:${clientIp(req, config)}`, 20, 15 * 60_000);
     const body = await readJson(req);
     const email = normalizeEmail(stringField(body, 'email') ?? '');
     const password = stringField(body, 'password') ?? '';
@@ -247,7 +260,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/jobs/parse') {
-    const user = requireUser(req, store); enforceRate(`jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req);
+    const user = requireUser(req, store); enforceRate(rateMap, `jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req);
     const text = stringField(body, 'text') ?? ''; const parsed = parseJobText(text); const jobId = store.createJob(user.id, text, parsed);
     store.analytics(user.id, 'job_added'); store.analytics(user.id, 'job_parsed');
     sendJson(res, 201, { jobId, job: parsed }); return true;
@@ -320,7 +333,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'DELETE' && pathname === '/api/account') {
-    const user = requireUser(req, store); enforceRate(`account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
+    const user = requireUser(req, store); enforceRate(rateMap, `account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
     const confirmation = stringField(body, 'confirmation') ?? '';
     if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
     const password = stringField(body, 'password', false) ?? '';
@@ -348,14 +361,18 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 }
 
 export function createJobApp(overrides: Partial<AppConfig> = {}): AppRuntime {
-  const config = loadConfig(overrides); const db = new JobDatabase(config.databasePath); const store = new AppStore(db); const ai = new AiGateway(db, config);
+  const config = loadConfig(overrides); const db = new JobDatabase(config.databasePath); const store = new AppStore(db); const ai = new AiGateway(db, config); const rateMap: RateMap = new Map();
   store.purgeExpiredSessions();
   const publicDir = resolve(process.cwd(), 'dist/public');
   const server = createServer(async (req, res) => {
-    const requestId = randomUUID(); securityHeaders(res); res.setHeader('x-request-id', requestId);
+    const requestId = randomUUID(); securityHeaders(res, config); res.setHeader('x-request-id', requestId);
+    if ((req.url ?? '/').startsWith('/api/')) {
+      res.setHeader('cache-control', 'no-store');
+      res.setHeader('pragma', 'no-cache');
+    }
     try {
       const url = new URL(req.url ?? '/', config.appOrigin);
-      if (await handleApi(req, res, url.pathname, store, config, ai)) return;
+      if (await handleApi(req, res, url.pathname, store, config, ai, rateMap)) return;
       if (await serveStatic(res, publicDir, url.pathname)) return;
       if (!url.pathname.includes('.')) {
         if (await serveStatic(res, publicDir, '/index.html')) return;

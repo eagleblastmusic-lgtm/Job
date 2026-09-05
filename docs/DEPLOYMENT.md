@@ -16,6 +16,16 @@ docker run -d --name job-app \
 
 Put an HTTPS reverse proxy/load balancer in front of port 3000. Set `APP_ORIGIN=https://your-domain.example` and run `NODE_ENV=production`.
 
+### Trusted proxy rule
+
+`TRUST_PROXY` defaults to `false`. In that mode, rate limiting uses the socket peer address and ignores client-supplied `X-Forwarded-For` values.
+
+Set `TRUST_PROXY=true` **only** when the application is reachable exclusively through a reverse proxy/load balancer that provides the real client address as the first `X-Forwarded-For` entry. When enabled, the application validates that first entry as an IPv4/IPv6 address before using it; invalid/missing forwarded addresses fall back to the socket peer address.
+
+Do not enable `TRUST_PROXY` on a service that can also be reached directly by untrusted clients, because forwarded headers are meaningful only at an established trust boundary.
+
+Production responses include HSTS, and all API responses are emitted with `Cache-Control: no-store` plus `Pragma: no-cache`. Browser mutations also reject Fetch Metadata requests classified as cross-site or same-site; non-browser clients without Fetch Metadata remain supported and are still subject to the existing Origin check when they send an `Origin` header.
+
 ## Render test staging blueprint
 
 `render.yaml` defines a **free, disposable test environment only**. It is not the target production architecture and must not be treated as durable storage.
@@ -29,6 +39,7 @@ The Blueprint uses:
 - HTTP health check at `/api/health`,
 - SQLite at `/app/data/job.sqlite`,
 - private uploads below `/app/data/uploads`,
+- `TRUST_PROXY=true` because the web service is reached through Render's ingress proxy,
 - no persistent disk.
 
 The application automatically uses Render's `RENDER_EXTERNAL_URL` as its same-origin security value when `APP_ORIGIN` is not explicitly set. A custom domain can still override it with `APP_ORIGIN`.
@@ -57,7 +68,8 @@ For each staging acceptance run:
 4. exercise one browser flow from registration through Decision Card on mobile and desktop widths,
 5. inspect recent service logs for uncaught errors,
 6. confirm synthetic CV/raw job text is not emitted to product analytics or general logs,
-7. treat synthetic records remaining after the run as expendable and never use persistence across Render lifecycle events as an acceptance requirement.
+7. confirm rate limiting distinguishes synthetic requests with different platform-forwarded client addresses rather than collapsing all clients onto the proxy socket address,
+8. treat synthetic records remaining after the run as expendable and never use persistence across Render lifecycle events as an acceptance requirement.
 
 The repository CI already exercises lint, strict TypeScript, migration validation, API/unit tests, semantic backup/restore to another filesystem root, Chromium E2E on desktop/mobile, production container build and container smoke test. Render staging is an additional real-host/network gate, not a replacement for CI.
 

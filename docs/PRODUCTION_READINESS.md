@@ -46,7 +46,12 @@
 - [x] portable relative upload storage keys with traversal-safe resolution
 - [x] legacy Linux/Windows absolute upload path migration
 - [x] rate limiting on vulnerable endpoints
+- [x] instance-local rate-limit state with explicit trusted-proxy client-IP handling
+- [x] spoofed forwarded IP ignored unless `TRUST_PROXY` is explicitly enabled
 - [x] security headers and same-origin mutation guard
+- [x] Fetch Metadata rejection for cross-site/same-site browser mutations
+- [x] `Cache-Control: no-store` / `Pragma: no-cache` on API responses
+- [x] production HSTS and same-origin resource isolation header
 - [x] sensitive analytics minimization
 - [x] analytics storage blocked when optional analytics consent is not active
 - [x] versioned database migrations with CI validation
