@@ -8,7 +8,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,5 +16,22 @@ jobs:
           node-version: 22
       - run: sudo apt-get update && sudo apt-get install -y python3-reportlab fonts-dejavu-core poppler-utils unzip
       - run: npm install --no-audit --no-fund
+      - run: npm run lint
       - run: npm run typecheck
+      - run: npm run validate:migrations
       - run: npm test
+      - name: Build production container
+        run: docker build -t job-mvp:${{ github.sha }} .
+      - name: Production container smoke test
+        run: |
+          docker run -d --name job-mvp -p 3000:3000 -e APP_ORIGIN=http://127.0.0.1:3000 job-mvp:${{ github.sha }}
+          trap 'docker rm -f job-mvp >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health >/tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs job-mvp
+          exit 1
