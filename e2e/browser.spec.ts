@@ -64,6 +64,36 @@ test('critical user flow reaches Decision Card, application and outcome', async 
   await expect(page.locator('#educationList')).toContainText('Zespół Szkół Logistycznych');
 });
 
+test('Career Truth can be corrected and current employment is represented without an end date', async ({ page }) => {
+  await register(page, uniqueEmail('career-corrections'), 'Kasia Korekta');
+  await page.locator('[data-view="profile"]:visible').first().click();
+
+  await page.locator('#factForm input[name="value"]').fill('Błędny fakt');
+  await page.locator('#factForm').getByRole('button', { name: 'Dodaj jako potwierdzone' }).click();
+  await expect(page.locator('#factsList')).toContainText('Błędny fakt');
+  await page.getByRole('button', { name: 'Usuń fakt Błędny fakt' }).click();
+  await expect(page.locator('#factsList')).not.toContainText('Błędny fakt');
+
+  await page.locator('#experienceForm input[name="employer"]').fill('Firma Obecna');
+  await page.locator('#experienceForm input[name="title"]').fill('Specjalista');
+  await page.locator('#experienceForm input[name="startDate"]').fill('2025-01');
+  await page.locator('#experienceForm input[name="endDate"]').fill('2026-01');
+  await page.locator('#experienceForm input[name="current"]').check();
+  await expect(page.locator('#experienceForm input[name="endDate"]')).toBeDisabled();
+  await page.locator('#experienceForm').getByRole('button', { name: 'Dodaj doświadczenie' }).click();
+  await expect(page.locator('#experiencesList')).toContainText('Firma Obecna');
+  await expect(page.locator('#experiencesList')).toContainText('obecnie');
+  await page.getByRole('button', { name: 'Usuń doświadczenie Specjalista w Firma Obecna' }).click();
+  await expect(page.locator('#experiencesList')).not.toContainText('Firma Obecna');
+
+  await page.locator('#educationForm input[name="institution"]').fill('Błędna Szkoła');
+  await page.locator('#educationForm').getByRole('button', { name: 'Dodaj wykształcenie' }).click();
+  await expect(page.locator('#educationList')).toContainText('Błędna Szkoła');
+  await page.getByRole('button', { name: 'Usuń wykształcenie Błędna Szkoła' }).click();
+  await expect(page.locator('#educationMessage')).toContainText('Wykształcenie usunięte');
+  await expect(page.locator('#educationList')).not.toContainText('Błędna Szkoła');
+});
+
 test('required consents block registration until explicitly accepted and optional analytics can be changed', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
