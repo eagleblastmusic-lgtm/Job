@@ -8,6 +8,8 @@ async function register(page: import('@playwright/test').Page, email: string, na
   await page.locator('#registerForm input[name="name"]').fill(name);
   await page.locator('#registerForm input[name="email"]').fill(email);
   await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
+  await page.locator('#registerForm input[name="acceptTerms"]').check();
+  await page.locator('#registerForm input[name="acceptPrivacy"]').check();
   await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
   await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
   await expect(page.locator('#welcomeTitle')).toContainText(name);
@@ -45,6 +47,28 @@ test('critical user flow reaches Decision Card, application and outcome', async 
   const outcome = page.locator('[data-outcome]').first();
   await outcome.selectOption('INTERVIEW');
   await expect(page.locator('#toast')).toContainText('Wynik zapisany');
+});
+
+test('required consents block registration until explicitly accepted and optional analytics can be changed', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
+  await page.locator('#registerForm input[name="name"]').fill('Zofia Zgoda');
+  await page.locator('#registerForm input[name="email"]').fill(uniqueEmail('consent'));
+  await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
+  await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
+  await expect(page.locator('#appView')).toHaveClass(/hidden/);
+  await page.locator('#registerForm input[name="acceptTerms"]').check();
+  await page.locator('#registerForm input[name="acceptPrivacy"]').check();
+  await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
+  await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
+
+  await page.locator('[data-view="privacy"]:visible').first().click();
+  await expect(page.locator('#consentStatus')).toContainText('Warunki: zaakceptowane');
+  await expect(page.locator('#consentStatus')).toContainText('Prywatność: potwierdzona');
+  await page.locator('#analyticsConsent').check();
+  await page.getByRole('button', { name: 'Zapisz zgodę analityczną' }).click();
+  await expect(page.locator('#toast')).toContainText('Zgoda została zapisana');
+  await expect(page.locator('#analyticsConsent')).toBeChecked();
 });
 
 test('layout does not overflow the viewport', async ({ page }) => {

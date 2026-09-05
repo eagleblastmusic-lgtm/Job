@@ -17,7 +17,7 @@ async function withApp(run: (base: string) => Promise<void>): Promise<void> {
 
 async function register(base: string, email: string): Promise<string> {
   const response = await fetch(`${base}/api/auth/register`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Test User', email, password: 'Bezpieczne123' })
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Test User', email, password: 'Bezpieczne123', acceptTerms: true, acceptPrivacy: true, analyticsConsent: false })
   });
   assert.equal(response.status, 201);
   return response.headers.get('set-cookie')?.split(';')[0] ?? '';
@@ -35,7 +35,7 @@ test('security headers and same-origin guard are enforced', async () => {
     const blocked = await fetch(`${base}/api/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
-      body: JSON.stringify({ name: 'Evil User', email: 'evil@example.pl', password: 'Bezpieczne123' })
+      body: JSON.stringify({ name: 'Evil User', email: 'evil@example.pl', password: 'Bezpieczne123', acceptTerms: true, acceptPrivacy: true })
     });
     assert.equal(blocked.status, 403);
   });

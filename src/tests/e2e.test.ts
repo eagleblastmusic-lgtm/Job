@@ -26,7 +26,7 @@ test('critical API flow: signup → profile → Career Truth → job → Decisio
   const address = app.server.address() as AddressInfo;
   const base = `http://127.0.0.1:${address.port}`;
   try {
-    const registered = await jsonRequest<{ user: { id: string } }>(base, '/api/auth/register', { method: 'POST', body: { name: 'Jan Kowalski', email: 'jan@example.pl', password: 'Bezpieczne123' } });
+    const registered = await jsonRequest<{ user: { id: string } }>(base, '/api/auth/register', { method: 'POST', body: { name: 'Jan Kowalski', email: 'jan@example.pl', password: 'Bezpieczne123', acceptTerms: true, acceptPrivacy: true, analyticsConsent: false } });
     assert.ok(registered.cookie);
     const cookie = registered.cookie ?? '';
 
@@ -55,6 +55,7 @@ test('critical API flow: signup → profile → Career Truth → job → Decisio
     const exported = await jsonRequest<Record<string, unknown>>(base, '/api/export', { cookie });
     assert.ok(Array.isArray(exported.data.applications));
     assert.ok(Array.isArray(exported.data.outcomes));
+    assert.ok(Array.isArray(exported.data.consents));
   } finally {
     await app.close();
     await rm(dir, { recursive: true, force: true });
