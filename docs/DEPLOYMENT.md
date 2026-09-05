@@ -47,17 +47,17 @@ After the service is created from the Blueprint, run the disposable automated sm
 STAGING_URL=https://job-mvp-staging.onrender.com npm run smoke:staging
 ```
 
-The smoke command checks health/legal surfaces, creates a temporary account with analytics disabled, exercises profile → Career Truth → job parser → Decision Engine → application → outcome → export, and then deletes the temporary account.
+The smoke command checks health/legal surfaces, creates a unique synthetic account with analytics disabled, exercises profile → Career Truth → job parser → Decision Engine → application → outcome → export, and finally logs out the synthetic session. It intentionally does not bypass the password re-authentication required by the real account-deletion flow. Synthetic records may remain until the disposable Render filesystem is recycled.
 
 For each staging acceptance run:
 
 1. confirm the deployed commit is the intended `main` revision,
 2. confirm `/api/health` returns HTTP 200 and reports `database: "ok"`,
-3. confirm the smoke command ends with `STAGING_SMOKE_OK` and `STAGING_SMOKE_CLEANUP_OK`,
+3. confirm the smoke command ends with `STAGING_SMOKE_OK` and `STAGING_SMOKE_SESSION_CLEANUP_OK`,
 4. exercise one browser flow from registration through Decision Card on mobile and desktop widths,
 5. inspect recent service logs for uncaught errors,
 6. confirm synthetic CV/raw job text is not emitted to product analytics or general logs,
-7. treat any data remaining after the run as expendable and never use persistence across Render lifecycle events as an acceptance requirement.
+7. treat synthetic records remaining after the run as expendable and never use persistence across Render lifecycle events as an acceptance requirement.
 
 The repository CI already exercises lint, strict TypeScript, migration validation, API/unit tests, semantic backup/restore to another filesystem root, Chromium E2E on desktop/mobile, production container build and container smoke test. Render staging is an additional real-host/network gate, not a replacement for CI.
 

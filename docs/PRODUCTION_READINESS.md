@@ -37,6 +37,9 @@
 ## Security / operations
 
 - [x] secure password hashing and HttpOnly sessions
+- [x] controlled 4xx registration validation with bounded e-mail/password input sizes
+- [x] generic login failure contract with dummy scrypt verification for unknown accounts
+- [x] password re-authentication and rate limiting before irreversible account deletion
 - [x] private local uploads
 - [x] upload extension/MIME/signature/size validation
 - [x] portable relative upload storage keys with traversal-safe resolution
@@ -64,7 +67,7 @@
 
 - [x] test-version privacy and terms surfaces
 - [x] versioned consent history in the database
-- [x] data export and account deletion path
+- [x] data export and re-authenticated account deletion path
 - [ ] final controller/service-provider identity and contact data
 - [ ] final legal bases, processors/subprocessors and retention schedule
 - [ ] final legal review before public beta

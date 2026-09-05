@@ -71,6 +71,23 @@ test('required consents block registration until explicitly accepted and optiona
   await expect(page.locator('#analyticsConsent')).toBeChecked();
 });
 
+test('account deletion requires current password in the browser flow', async ({ page }) => {
+  await register(page, uniqueEmail('delete-browser'), 'Jan Usuwanie');
+  await page.locator('[data-view="privacy"]:visible').first().click();
+
+  await page.locator('#deleteConfirmation').fill('USUŃ KONTO');
+  await page.locator('#deletePassword').fill('Niepoprawne123');
+  await page.getByRole('button', { name: 'Usuń konto' }).click();
+  await expect(page.locator('#toast')).toContainText('Podaj poprawne aktualne hasło');
+  await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
+
+  await page.locator('#deletePassword').fill('Bezpieczne123');
+  await page.getByRole('button', { name: 'Usuń konto' }).click();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#authView')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#appView')).toHaveClass(/hidden/);
+});
+
 test('layout does not overflow the viewport', async ({ page }) => {
   await page.goto('/');
   const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));

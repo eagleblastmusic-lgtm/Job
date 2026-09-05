@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { JobDatabase } from './db.js';
 import { loadConfig, type AppConfig } from './config.js';
 import { AppStore, type UserRecord } from './store.js';
-import { assertEmail, assertPassword, hashPassword, hashSessionToken, newSessionToken, normalizeEmail, parseCookies, verifyPassword } from './auth.js';
+import { assertEmail, assertPassword, hashPassword, hashSessionToken, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, newSessionToken, normalizeEmail, parseCookies, verifyLoginPassword, verifyPassword } from './auth.js';
 import { deleteStoredFile, storeCvUpload } from './files.js';
 import { cvToPdf } from './pdf.js';
 import { HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringArrayField, stringField } from './http.js';
@@ -159,8 +159,12 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     const body = await readJson(req);
     const email = normalizeEmail(stringField(body, 'email') ?? '');
     const password = stringField(body, 'password') ?? '';
+    if (!email || email.length > MAX_EMAIL_LENGTH || !password || password.length > MAX_PASSWORD_LENGTH) {
+      throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
+    }
     const user = store.getUserByEmail(email);
-    if (!user || !verifyPassword(password, user.passwordHash)) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
+    if (!verifyLoginPassword(password, user?.passwordHash)) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
+    if (!user) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
     const token = newSessionToken();
     const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
     store.createSession(user.id, token.hash, expires);
@@ -316,8 +320,14 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'DELETE' && pathname === '/api/account') {
-    const user = requireUser(req, store); const body = await readJson(req); const confirmation = stringField(body, 'confirmation') ?? '';
+    const user = requireUser(req, store); enforceRate(`account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
+    const confirmation = stringField(body, 'confirmation') ?? '';
     if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
+    const password = stringField(body, 'password', false) ?? '';
+    if (!password || password.length > MAX_PASSWORD_LENGTH || !verifyPassword(password, user.passwordHash)) {
+      store.audit(user.id, 'ACCOUNT_DELETION_REAUTH_FAILED', 'user', user.id);
+      throw new HttpError(401, 'Podaj poprawne aktualne hasło, aby usunąć konto.', 'REAUTH_FAILED');
+    }
     for (const storageKey of store.listUploadPaths(user.id)) await deleteStoredFile(config.dataDir, storageKey);
     store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id);
     await rm(resolve(config.dataDir, 'uploads', user.id), { recursive: true, force: true });
