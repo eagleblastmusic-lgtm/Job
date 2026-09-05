@@ -28,7 +28,7 @@
         </ul>
       </div>
       <div class="auth-card card">
-        <div class="tabs" role="tablist" aria-label="Logowanie lub rejestracja">
+        <div class="tabs" role="group" aria-label="Logowanie lub rejestracja">
           <button class="tab active" data-auth-tab="login" type="button">Logowanie</button>
           <button class="tab" data-auth-tab="register" type="button">Załóż konto</button>
         </div>
@@ -113,7 +113,7 @@
                 <h3>Dodaj CV</h3>
                 <p>PDF, DOCX, TXT lub Markdown. Plik jest przechowywany prywatnie. Wykryte fakty będą oznaczone jako „do potwierdzenia”.</p>
                 <form id="cvUploadForm" class="stack">
-                  <input id="cvFile" name="cv" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+                  <label>Plik CV<input id="cvFile" name="cv" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required></label>
                   <button class="button button-secondary" type="submit">Wczytaj CV</button>
                 </form>
                 <div id="cvUploadMessage" class="message" aria-live="polite"></div>

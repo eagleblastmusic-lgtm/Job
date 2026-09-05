@@ -30,7 +30,8 @@
 - [x] production build command
 - [x] responsive mobile-first UI
 - [x] browser-level Playwright E2E on desktop and mobile Chromium profiles
-- [x] automated accessibility regression gate for labels, keyboard focus, target size and reduced motion
+- [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
+- [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [ ] manual WCAG 2.2 AA review with assistive technology
 
 ## Security / operations
