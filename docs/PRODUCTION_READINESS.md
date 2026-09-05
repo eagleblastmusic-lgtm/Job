@@ -49,8 +49,8 @@
 - [x] local backup/restore tooling
 - [x] automated backup → restore-to-different-root semantic exercise in CI
 - [x] production Docker build and container smoke test in CI
-- [x] reproducible Render staging Blueprint with persistent data disk and CI-gated deploy trigger
-- [ ] live internal staging deployment and environment-level acceptance run
+- [x] reproducible free Render Blueprint for disposable test staging with CI-gated deploy trigger
+- [ ] live disposable Render staging deployment and environment-level acceptance run
 - [ ] PostgreSQL production database
 - [ ] managed encrypted backups + restore exercise against hosted infrastructure
 - [ ] S3-compatible private storage
@@ -69,4 +69,4 @@
 - [ ] final legal bases, processors/subprocessors and retention schedule
 - [ ] final legal review before public beta
 
-Current readiness: **repository and container are ready for closed internal staging; live staging has not yet been evidenced. Not ready for broad public launch.**
+Current readiness: **repository and container are ready for disposable closed test staging; live staging has not yet been evidenced. Render is test-only and not a production durability target. Not ready for broad public launch.**
