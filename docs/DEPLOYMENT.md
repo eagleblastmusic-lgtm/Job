@@ -35,16 +35,23 @@ A persistent Render disk is required for this staging topology, so this is not a
 
 ### Staging acceptance sequence
 
-After the service is created from the Blueprint:
+After the service is created from the Blueprint, run the disposable automated smoke flow first:
 
-1. confirm `GET /api/health` returns HTTP 200,
-2. register a fresh test account and verify required legal consent is enforced,
-3. complete profile → Career Truth → pasted job → Decision Card → application → outcome,
-4. upload a small allowed CV fixture and verify it remains private,
-5. redeploy/restart the service and confirm the test account, application and upload still exist,
-6. run `npm run backup:data`, restore into an isolated copy and verify the restored database opens,
-7. inspect logs for uncaught errors and confirm no CV/raw job text is emitted to product analytics,
-8. only then mark the internal staging gate as passed.
+```bash
+STAGING_URL=https://job-mvp-staging.onrender.com npm run smoke:staging
+```
+
+The smoke command checks health/legal surfaces, creates a temporary account with analytics disabled, exercises profile → Career Truth → job parser → Decision Engine → application → outcome → export, and then deletes the temporary account.
+
+Then complete the environment-level persistence checks that require a service lifecycle event:
+
+1. confirm the smoke command ends with `STAGING_SMOKE_OK` and `STAGING_SMOKE_CLEANUP_OK`,
+2. create a fresh persistence test account and upload a small allowed CV fixture,
+3. redeploy/restart the service,
+4. confirm the account, application state and private upload still exist,
+5. run `npm run backup:data`, restore into an isolated copy and verify the restored database opens,
+6. inspect logs for uncaught errors and confirm no CV/raw job text is emitted to product analytics,
+7. only then mark the internal staging gate as passed.
 
 The repository CI already exercises lint, strict TypeScript, migration validation, API/unit tests, Chromium E2E on desktop/mobile, production container build and container smoke test. Staging is an additional environment-level gate, not a replacement for CI.
 
