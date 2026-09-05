@@ -33,14 +33,14 @@
           <button class="tab" data-auth-tab="register" type="button">Załóż konto</button>
         </div>
         <form id="loginForm" class="stack">
-          <label>E-mail<input name="email" type="email" autocomplete="email" required></label>
-          <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
+          <label>E-mail<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label>Hasło<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
           <button class="button button-primary" type="submit">Zaloguj się</button>
         </form>
         <form id="registerForm" class="stack hidden">
-          <label>Imię<input name="name" autocomplete="name" required minlength="2"></label>
-          <label>E-mail<input name="email" type="email" autocomplete="email" required></label>
-          <label>Hasło<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+          <label>Imię<input name="name" autocomplete="name" required minlength="2" maxlength="80"></label>
+          <label>E-mail<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label>Hasło<input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256" required></label>
           <p class="hint">Minimum 10 znaków, w tym litera i cyfra.</p>
           <label class="consent-row"><input name="acceptTerms" type="checkbox" required><span>Akceptuję <a href="/terms.html" target="_blank" rel="noopener">warunki wersji testowej</a>.</span></label>
           <label class="consent-row"><input name="acceptPrivacy" type="checkbox" required><span>Zapoznałem/am się z <a href="/privacy.html" target="_blank" rel="noopener">informacją o prywatności</a>.</span></label>
@@ -164,7 +164,7 @@
           <section data-screen="privacy" class="screen hidden">
             <div class="screen-heading"><p class="eyebrow">Prywatność i plan</p><h2>Masz kontrolę nad danymi</h2></div>
             <div class="grid two">
-              <div class="card"><h3>Eksport danych</h3><p>Pobierz kopię swoich danych w JSON.</p><button id="exportButton" class="button button-secondary">Pobierz dane</button></div>
+              <div class="card"><h3>Eksport danych</h3><p>Pobierz kopię swoich danych w JSON.</p><button id="exportButton" class="button button-secondary" type="button">Pobierz dane</button></div>
               <div class="card"><h3>Twój plan</h3><div id="billingStatus"></div></div>
             </div>
             <div class="card section-gap">
@@ -174,7 +174,13 @@
               <button id="saveConsentButton" class="button button-secondary" type="button">Zapisz zgodę analityczną</button>
               <p class="hint"><a href="/privacy.html" target="_blank" rel="noopener">Informacja o prywatności</a> · <a href="/terms.html" target="_blank" rel="noopener">Warunki wersji testowej</a></p>
             </div>
-            <div class="card danger-card section-gap"><h3>Usuń konto</h3><p>Usuwa konto i dane aplikacji. Operacji nie można cofnąć.</p><label>Wpisz <strong>USUŃ KONTO</strong><input id="deleteConfirmation"></label><button id="deleteAccountButton" class="button button-danger">Usuń konto</button></div>
+            <div class="card danger-card section-gap">
+              <h3>Usuń konto</h3>
+              <p>Usuwa konto i dane aplikacji. Operacji nie można cofnąć. Dla bezpieczeństwa potwierdź ją aktualnym hasłem.</p>
+              <label>Aktualne hasło<input id="deletePassword" type="password" autocomplete="current-password" maxlength="256"></label>
+              <label>Wpisz <strong>USUŃ KONTO</strong><input id="deleteConfirmation" autocomplete="off"></label>
+              <button id="deleteAccountButton" class="button button-danger" type="button">Usuń konto</button>
+            </div>
           </section>
 
           <section data-screen="admin" class="screen hidden">
