@@ -114,13 +114,10 @@ try {
 } finally {
   if (accountCreated && cookie) {
     try {
-      await request('/api/account', {
-        method: 'DELETE',
-        body: { confirmation: 'USUŃ KONTO' }
-      });
-      console.log('STAGING_SMOKE_CLEANUP_OK');
+      await request('/api/auth/logout', { method: 'POST' });
+      console.log('STAGING_SMOKE_SESSION_CLEANUP_OK');
     } catch (error) {
-      console.error('STAGING_SMOKE_CLEANUP_FAILED', error);
+      console.error('STAGING_SMOKE_SESSION_CLEANUP_FAILED', error);
       process.exitCode = 1;
     }
   }
