@@ -105,10 +105,12 @@ GitHub CI currently gates merges on:
 - Playwright Chromium browser E2E on mobile and desktop profiles,
 - axe automated WCAG 2.2 A/AA checks on public and authenticated MVP surfaces,
 - accessibility regressions for labels, keyboard focus, target sizing and reduced motion,
+- a committed npm lockfile with `npm ci` used for CI installation,
+- the same locked dependency graph used inside the Docker build,
 - production Docker image build,
 - booted production-container `/api/health` smoke test.
 
-The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation.
+The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation. Browser E2E also covers the destructive-action re-authentication path.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -183,7 +185,8 @@ The following items were listed as missing in the original status file but are n
 - semantic restore drill,
 - database-aware health endpoint,
 - production-container smoke test,
-- Render test-staging Blueprint.
+- Render test-staging Blueprint,
+- deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`.
 
 ## Phase result
 
