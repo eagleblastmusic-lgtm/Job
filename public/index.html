@@ -137,19 +137,34 @@
             <div class="card section-gap">
               <h3>Doświadczenie</h3>
               <form id="experienceForm" class="form-grid compact">
-                <label>Firma<input name="employer" required></label><label>Stanowisko<input name="title" required></label>
+                <label>Firma<input name="employer" maxlength="200" required></label><label>Stanowisko<input name="title" maxlength="200" required></label>
                 <label>Od<input name="startDate" type="month"></label><label>Do<input name="endDate" type="month"></label>
-                <label class="span-2">Opis<input name="description"></label>
+                <label class="span-2">Opis<input name="description" maxlength="10000"></label>
                 <button class="button button-secondary span-2" type="submit">Dodaj doświadczenie</button>
               </form>
               <div id="experiencesList" class="simple-list"></div>
+            </div>
+
+            <div class="card section-gap">
+              <h3>Wykształcenie</h3>
+              <p class="hint">Te informacje mogą trafić do generowanego CV. Wpisuj wyłącznie prawdziwe dane.</p>
+              <form id="educationForm" class="form-grid compact">
+                <label class="span-2">Szkoła / uczelnia<input name="institution" maxlength="200" required></label>
+                <label>Kierunek<input name="field" maxlength="200"></label>
+                <label>Poziom / tytuł<input name="degree" maxlength="120" placeholder="np. technik, licencjat, magister"></label>
+                <label>Od<input name="startDate" type="month"></label><label>Do<input name="endDate" type="month"></label>
+                <label class="span-2">Opis (opcjonalnie)<input name="description" maxlength="10000"></label>
+                <button class="button button-secondary span-2" type="submit">Dodaj wykształcenie</button>
+              </form>
+              <div id="educationMessage" class="message" aria-live="polite"></div>
+              <div id="educationList" class="simple-list"></div>
             </div>
           </section>
 
           <section data-screen="job" class="screen hidden">
             <div class="screen-heading"><p class="eyebrow">Najważniejszy przepływ MVP</p><h2>Wklej ofertę pracy</h2><p>Nie potrzebujesz agregatora ofert. Wklej tekst ogłoszenia, które naprawdę rozważasz.</p></div>
             <form id="jobForm" class="card stack">
-              <label>Treść oferty<textarea name="text" rows="14" placeholder="Wklej pełną treść ogłoszenia..." required></textarea></label>
+              <label>Treść oferty<textarea name="text" rows="14" maxlength="100000" placeholder="Wklej pełną treść ogłoszenia..." required></textarea></label>
               <button class="button button-primary" type="submit">Sprawdź, czy warto aplikować</button>
               <div id="jobMessage" class="message" aria-live="polite"></div>
             </form>
@@ -195,5 +210,6 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script type="module" src="/app.js"></script>
   <script type="module" src="/accountDeletion.js"></script>
+  <script type="module" src="/education.js"></script>
 </body>
 </html>
