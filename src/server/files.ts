@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { basename, extname, join, resolve } from 'node:path';
+import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { HttpError } from './http.js';
@@ -85,8 +85,34 @@ async function validateStoredDocx(path: string): Promise<void> {
   }
 }
 
+/**
+ * Resolve a persisted, platform-neutral upload key under DATA_DIR.
+ * Persisted keys are deliberately relative so a backup can be restored to a
+ * different filesystem root. Reject malformed/traversal keys instead of ever
+ * turning database contents into an arbitrary unlink target.
+ */
+export function resolveStoredFilePath(dataDir: string, storageKey: string): string {
+  if (storageKey.includes('\0')) throw new Error('Invalid upload storage key.');
+  const normalized = storageKey.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || /^[a-zA-Z]:\//.test(normalized) || isAbsolute(storageKey)) {
+    throw new Error('Absolute upload storage keys are not supported.');
+  }
+  const parts = normalized.split('/');
+  if (parts[0] !== 'uploads' || parts.length < 3 || parts.some(part => !part || part === '.' || part === '..')) {
+    throw new Error('Invalid upload storage key.');
+  }
+  const uploadRoot = resolve(dataDir, 'uploads');
+  const fullPath = resolve(dataDir, ...parts);
+  const relativePath = relative(uploadRoot, fullPath);
+  if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(relativePath)) {
+    throw new Error('Upload storage key escapes the private upload directory.');
+  }
+  return fullPath;
+}
+
 export async function storeCvUpload(input: { dataDir: string; userId: string; filename: string; mimeType: string; base64: string; maxBytes: number }): Promise<StoredUpload> {
   if (!ALLOWED.has(input.mimeType)) throw new HttpError(400, 'Obsługiwane formaty CV: PDF, DOCX, TXT i Markdown.', 'UNSUPPORTED_UPLOAD_TYPE');
+  if (!/^[a-zA-Z0-9_-]+$/.test(input.userId)) throw new Error('Invalid upload owner identifier.');
   const originalName = safeName(input.filename);
   const extension = extname(originalName).toLowerCase();
   if (!EXTENSIONS[input.mimeType]?.has(extension)) throw new HttpError(400, 'Rozszerzenie pliku nie pasuje do jego typu.', 'UPLOAD_EXTENSION_MISMATCH');
@@ -97,10 +123,10 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   validateSignature(buffer, input.mimeType);
 
   const id = randomUUID();
-  const userDir = resolve(input.dataDir, 'uploads', input.userId);
-  await mkdir(userDir, { recursive: true, mode: 0o700 });
   const filename = `${id}${extension}`;
-  const fullPath = join(userDir, filename);
+  const storageKey = `uploads/${input.userId}/${filename}`;
+  const fullPath = resolveStoredFilePath(input.dataDir, storageKey);
+  await mkdir(resolve(input.dataDir, 'uploads', input.userId), { recursive: true, mode: 0o700 });
   await writeFile(fullPath, buffer, { mode: 0o600 });
   await chmod(fullPath, 0o600);
   if (input.mimeType === DOCX) await validateStoredDocx(fullPath);
@@ -109,13 +135,18 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
     id,
     originalName,
     mimeType: input.mimeType,
-    storageKey: fullPath,
+    storageKey,
     sizeBytes: buffer.byteLength,
     sha256: createHash('sha256').update(buffer).digest('hex'),
     extractedText
   };
 }
 
-export async function deleteStoredFile(path: string): Promise<void> {
-  try { await unlink(path); } catch { /* already absent */ }
+export async function deleteStoredFile(dataDir: string, storageKey: string): Promise<void> {
+  const path = resolveStoredFilePath(dataDir, storageKey);
+  try {
+    await unlink(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
 }
