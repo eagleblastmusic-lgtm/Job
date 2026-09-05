@@ -261,6 +261,21 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     sendJson(res, 201, { experience }); return true;
   }
 
+  if (method === 'POST' && pathname === '/api/education') {
+    const user = requireUser(req, store); const body = await readJson(req);
+    const institution = boundedStringField(body, 'institution', 200, true, 1) ?? '';
+    const education = store.addEducation(user.id, {
+      institution,
+      field: boundedStringField(body, 'field', 200, false),
+      degree: boundedStringField(body, 'degree', 120, false),
+      startDate: boundedStringField(body, 'startDate', 32, false),
+      endDate: boundedStringField(body, 'endDate', 32, false),
+      description: boundedStringField(body, 'description', 10_000, false)
+    });
+    store.analytics(user.id, 'education_added');
+    sendJson(res, 201, { education }); return true;
+  }
+
   if (method === 'POST' && pathname === '/api/cv/upload') {
     const user = requireUser(req, store); const body = await readJson(req, config.maxUploadBytes * 2);
     const upload = await storeCvUpload({ dataDir: config.dataDir, userId: user.id, filename: boundedStringField(body, 'filename', 255) ?? 'cv', mimeType: boundedStringField(body, 'mimeType', 100) ?? 'application/octet-stream', base64: stringField(body, 'base64') ?? '', maxBytes: config.maxUploadBytes });
