@@ -4,7 +4,6 @@ import sys
 from html import escape
 from pathlib import Path
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -69,10 +68,17 @@ story += [Paragraph('Edukacja', h2)]
 education = data.get('education') or []
 if education:
     for ed in education:
-        story.append(Paragraph(escape(str(ed.get('institution',''))), h3))
+        block = [Paragraph(escape(str(ed.get('institution',''))), h3)]
         detail = ' — '.join(str(x) for x in [ed.get('degree'), ed.get('field')] if x)
         if detail:
-            story.append(Paragraph(escape(detail), base))
+            block.append(Paragraph(escape(detail), base))
+        date_text = ' – '.join(str(x) for x in [ed.get('startDate'), ed.get('endDate')] if x)
+        if date_text:
+            block.append(Paragraph(escape(date_text), muted))
+        if ed.get('description'):
+            block.append(Paragraph(escape(str(ed['description'])), base))
+        story.append(KeepTogether(block))
+        story.append(Spacer(1, 2*mm))
 else:
     story.append(Paragraph('Brak uzupełnionej edukacji.', muted))
 

@@ -32,6 +32,18 @@ test('critical user flow reaches Decision Card, application and outcome', async 
   await page.locator('#factForm').getByRole('button', { name: 'Dodaj jako potwierdzone' }).click();
   await expect(page.locator('#factsList')).toContainText('UDT');
 
+  await page.locator('#educationForm input[name="institution"]').fill('Zespół Szkół Logistycznych');
+  await page.locator('#educationForm input[name="field"]').fill('Logistyka');
+  await page.locator('#educationForm input[name="degree"]').fill('technik logistyk');
+  await page.locator('#educationForm input[name="startDate"]').fill('2019-09');
+  await page.locator('#educationForm input[name="endDate"]').fill('2023-06');
+  await page.locator('#educationForm input[name="description"]').fill('Profil magazynowo-logistyczny');
+  await page.locator('#educationForm').getByRole('button', { name: 'Dodaj wykształcenie' }).click();
+  await expect(page.locator('#educationMessage')).toContainText('Wykształcenie zapisane');
+  await expect(page.locator('#educationList')).toContainText('Zespół Szkół Logistycznych');
+  await expect(page.locator('#educationList')).toContainText('technik logistyk');
+  await expect(page.locator('#educationList')).toContainText('2019-09');
+
   await page.locator('[data-view="job"]:visible').first().click();
   await page.locator('#jobForm textarea[name="text"]').fill('Magazynier\nFirma: Logistyka ABC\nMiejsce pracy: Gdynia\nUmowa o pracę\nWynagrodzenie 6000 - 7000 PLN brutto\nWymagania: UDT. Mile widziane WMS.\nPraca stacjonarna.');
   await page.getByRole('button', { name: 'Sprawdź, czy warto aplikować' }).click();
@@ -47,6 +59,9 @@ test('critical user flow reaches Decision Card, application and outcome', async 
   const outcome = page.locator('[data-outcome]').first();
   await outcome.selectOption('INTERVIEW');
   await expect(page.locator('#toast')).toContainText('Wynik zapisany');
+
+  await page.locator('[data-view="profile"]:visible').first().click();
+  await expect(page.locator('#educationList')).toContainText('Zespół Szkół Logistycznych');
 });
 
 test('required consents block registration until explicitly accepted and optional analytics can be changed', async ({ page }) => {

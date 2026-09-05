@@ -28,7 +28,8 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Career Truth Lite with explicit status, provenance and confidence semantics.
 - User-confirmed facts remain distinct from inferred/unknown/not-possessed/conflicting/expired states.
 - CV inference never auto-confirms a fact and inferred facts are never automatically allowed into generated CV content.
-- Experiences, education and practical Polish occupation/skill normalization foundations.
+- User-entered career experience and education, with institution, field/degree, dates and optional descriptions preserved for CV generation and export.
+- Practical Polish occupation/skill normalization foundations.
 
 ### Job understanding and decision support
 - Paste-job workflow.
@@ -40,6 +41,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 ### Application execution and learning loop
 - Career-Truth-grounded Application Package.
 - Base CV generation and real server-side PDF export with Polish characters.
+- Education entered in Career Truth is carried into the Application Package and rendered in HTML/PDF CV output with degree/field, dates and description when supplied.
 - Application Tracker with guarded state transitions.
 - Invalid tracker transitions are returned as controlled client validation errors and are not persisted.
 - One-tap recruitment Outcome Capture.
@@ -65,7 +67,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Render disposable staging explicitly enables the trusted-proxy boundary so rate limiting can distinguish clients behind platform ingress.
 - Ordinary non-upload JSON requests are limited to 64 KiB by default instead of the previous multi-megabyte generic allowance.
 - Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
-- Profile arrays, Career Truth facts, experience fields/achievements, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
+- Profile arrays, Career Truth facts, experience/education fields, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
 - Analytics event names and property objects are bounded by name length, top-level property count and serialized size before sanitization/storage.
 - User-owned Career Truth facts, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
 - Invalid application status transitions use a stable 400 `INVALID_STATUS_TRANSITION` contract and regression tests verify that rejected transitions do not mutate the stored application.
@@ -115,7 +117,9 @@ GitHub CI currently gates merges on:
 - fresh-database migration validation,
 - Node unit/API/security tests,
 - proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
-- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience descriptions and analytics property/name limits,
+- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience/education descriptions and analytics property/name limits,
+- API critical-flow coverage that creates education, reads it through Career Truth, verifies it in the Application Package and checks it in the data export,
+- browser critical-flow coverage that enters education through the UI and verifies it remains visible after navigating away and back,
 - resource isolation/error-contract tests comparing foreign vs nonexistent Career Truth facts, decision overrides and application outcomes,
 - invalid application-transition regression verifying a controlled 400 and no state mutation,
 - semantic backup/restore exercise,
@@ -181,7 +185,7 @@ The Render connector is connected, but its direct web-service creation action do
 
 ### PDF
 - Current implementation: server-side ReportLab with DejaVu Sans.
-- Status: deterministic real PDF generation with Polish characters and contract coverage.
+- Status: deterministic real PDF generation with Polish characters and Career Truth education rendering.
 
 ## Remaining MVP work
 
@@ -217,7 +221,8 @@ The following items were listed as missing in the original status file but are n
 - API no-store cache policy and production transport/resource security headers,
 - bounded ordinary JSON bodies and persistence-facing MVP input fields,
 - stable resource-not-found contracts for foreign/nonexistent user-owned records,
-- controlled non-mutating invalid application-transition handling.
+- controlled non-mutating invalid application-transition handling,
+- end-to-end user-entered education flow from Career Truth through package/CV/export.
 
 ## Phase result
 

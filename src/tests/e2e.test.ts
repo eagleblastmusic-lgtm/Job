@@ -19,7 +19,7 @@ async function jsonRequest<T>(base: string, path: string, options: { method?: st
   return setCookie ? { data, cookie: setCookie } : { data };
 }
 
-test('critical API flow: signup → profile → Career Truth → job → Decision → package → application → outcome → export', async () => {
+test('critical API flow: signup → profile → Career Truth → education → job → Decision → package → application → outcome → export', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-e2e-'));
   const app = createJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
@@ -33,15 +33,26 @@ test('critical API flow: signup → profile → Career Truth → job → Decisio
     await jsonRequest(base, '/api/profile', { method: 'PUT', cookie, body: { desiredRoles: ['magazynier'], location: 'Gdynia', commuteKm: 25, remotePreferences: ['ONSITE'], salaryMin: 5500, contractPreferences: ['UOP'], shiftPreferences: { nights: false, weekends: true }, availability: 'od zaraz' } });
     await jsonRequest(base, '/api/career-truth/facts', { method: 'POST', cookie, body: { type: 'CREDENTIAL', value: 'UDT' } });
     await jsonRequest(base, '/api/experiences', { method: 'POST', cookie, body: { employer: 'Magazyn Sp. z o.o.', title: 'Magazynier', startDate: '2024-01', current: true, description: 'Przyjęcie i wydanie towaru', achievements: [] } });
+    const education = await jsonRequest<{ education: { id: string; institution: string; field: string | null; degree: string | null; startDate: string | null; endDate: string | null; description: string | null } }>(base, '/api/education', {
+      method: 'POST', cookie, body: { institution: 'Zespół Szkół Logistycznych', field: 'Logistyka', degree: 'technik logistyk', startDate: '2019-09', endDate: '2023-06', description: 'Profil magazynowo-logistyczny' }
+    });
+    assert.equal(education.data.education.institution, 'Zespół Szkół Logistycznych');
+
+    const careerTruth = await jsonRequest<{ education: Array<{ id: string; institution: string; field: string | null; degree: string | null; description: string | null }> }>(base, '/api/career-truth', { cookie });
+    assert.equal(careerTruth.data.education.length, 1);
+    assert.equal(careerTruth.data.education[0]?.field, 'Logistyka');
+    assert.equal(careerTruth.data.education[0]?.degree, 'technik logistyk');
 
     const parsed = await jsonRequest<{ jobId: string }>(base, '/api/jobs/parse', { method: 'POST', cookie, body: { text: 'Magazynier\nFirma: Logistyka ABC\nMiejsce pracy: Gdynia\nUmowa o pracę\nWynagrodzenie 6000 - 7000 PLN brutto\nWymagania: UDT. Mile widziane WMS.\nPraca stacjonarna.' } });
     const decision = await jsonRequest<{ decisionId: string; decision: { recommendation: string; explanation: { why: string[] } } }>(base, `/api/jobs/${parsed.data.jobId}/decide`, { method: 'POST', cookie, body: {} });
     assert.ok(decision.data.decisionId);
     assert.ok(decision.data.decision.explanation.why.some(x => x.includes('UDT')));
 
-    const pack = await jsonRequest<{ package: { message: string; fitSummary: string } }>(base, `/api/jobs/${parsed.data.jobId}/application-package`, { method: 'POST', cookie, body: {} });
+    const pack = await jsonRequest<{ package: { message: string; fitSummary: string; cv: { education: Array<{ institution: string; field: string | null; degree: string | null; description: string | null }> } } }>(base, `/api/jobs/${parsed.data.jobId}/application-package`, { method: 'POST', cookie, body: {} });
     assert.ok(pack.data.package.message.includes('Logistyka ABC'));
     assert.ok(!pack.data.package.message.includes('WMS'));
+    assert.equal(pack.data.package.cv.education[0]?.institution, 'Zespół Szkół Logistycznych');
+    assert.equal(pack.data.package.cv.education[0]?.description, 'Profil magazynowo-logistyczny');
 
     const pdfResponse = await fetch(`${base}/api/cv/base.pdf`, { headers: { cookie } });
     assert.equal(pdfResponse.status, 200);
@@ -56,6 +67,10 @@ test('critical API flow: signup → profile → Career Truth → job → Decisio
     assert.ok(Array.isArray(exported.data.applications));
     assert.ok(Array.isArray(exported.data.outcomes));
     assert.ok(Array.isArray(exported.data.consents));
+    assert.ok(Array.isArray(exported.data.education));
+    const exportedEducation = exported.data.education as Array<{ institution: string; field: string | null; degree: string | null }>;
+    assert.equal(exportedEducation[0]?.institution, 'Zespół Szkół Logistycznych');
+    assert.equal(exportedEducation[0]?.degree, 'technik logistyk');
   } finally {
     await app.close();
     await rm(dir, { recursive: true, force: true });
