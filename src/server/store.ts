@@ -162,6 +162,14 @@ export class AppStore {
     }));
   }
 
+  addEducation(userId: string, input: Omit<EducationRecord, 'id'>): EducationRecord {
+    const id = randomUUID();
+    this.db.prepare(`INSERT INTO education(id,user_id,institution,field,degree,start_date,end_date,description) VALUES(?,?,?,?,?,?,?,?)`).run(
+      id, userId, input.institution, input.field, input.degree, input.startDate, input.endDate, input.description
+    );
+    return { id, ...input };
+  }
+
   listEducation(userId: string): EducationRecord[] {
     return (this.db.prepare('SELECT id,institution,field,degree,start_date,end_date,description FROM education WHERE user_id=? ORDER BY end_date DESC').all(userId) as unknown as EducationRow[]).map(row => ({
       id: row.id, institution: row.institution, field: row.field, degree: row.degree, startDate: row.start_date, endDate: row.end_date, description: row.description
