@@ -62,6 +62,10 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Forwarded client IP addresses are ignored by default; they are considered only when `TRUST_PROXY=true` is explicitly configured.
 - Trusted-proxy mode validates the first forwarded address as IPv4/IPv6 and falls back to the socket peer address when forwarded data is invalid or missing.
 - Render disposable staging explicitly enables the trusted-proxy boundary so rate limiting can distinguish clients behind platform ingress.
+- Ordinary non-upload JSON requests are limited to 64 KiB by default instead of the previous multi-megabyte generic allowance.
+- Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
+- Profile arrays, Career Truth facts, experience fields/achievements, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
+- Analytics event names and property objects are bounded by name length, top-level property count and serialized size before sanitization/storage.
 - Cross-user record isolation regression coverage.
 - Controlled 4xx validation for malformed registration credentials.
 - Bounded e-mail/password inputs and generic login-failure responses.
@@ -108,6 +112,7 @@ GitHub CI currently gates merges on:
 - fresh-database migration validation,
 - Node unit/API/security tests,
 - proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
+- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience descriptions and analytics property/name limits,
 - semantic backup/restore exercise,
 - Playwright Chromium browser E2E on mobile and desktop profiles,
 - axe automated WCAG 2.2 A/AA checks on public and authenticated MVP surfaces,
@@ -119,9 +124,11 @@ GitHub CI currently gates merges on:
 
 The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation. Browser E2E also covers the destructive-action re-authentication path.
 
-A new HTTP/proxy suite verifies that untrusted forwarded addresses do not split rate-limit buckets, trusted validated addresses do, invalid forwarded values fall back safely, limiter state is isolated per app instance, API responses are non-cacheable, production HSTS is emitted, and browser Fetch Metadata blocks non-same-origin mutation contexts.
+The HTTP/proxy suite verifies that untrusted forwarded addresses do not split rate-limit buckets, trusted validated addresses do, invalid forwarded values fall back safely, limiter state is isolated per app instance, API responses are non-cacheable, production HSTS is emitted, and browser Fetch Metadata blocks non-same-origin mutation contexts.
 
 The HTTP hardening work also exposed and fixed an existing configuration defect: explicit `nodeEnv` overrides supplied to `loadConfig` / `createJobApp` were previously ignored in favor of the process environment. The override contract is now tested.
+
+The input-boundary work also closes a prior error-contract gap: too-short pasted job text is rejected as a controlled client validation error before `parseJobText` can throw a generic server-side exception.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -200,7 +207,8 @@ The following items were listed as missing in the original status file but are n
 - Render test-staging Blueprint,
 - deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`,
 - explicit trusted-proxy handling for single-instance rate limiting,
-- API no-store cache policy and production transport/resource security headers.
+- API no-store cache policy and production transport/resource security headers,
+- bounded ordinary JSON bodies and persistence-facing MVP input fields.
 
 ## Phase result
 

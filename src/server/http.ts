@@ -2,11 +2,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
+export const DEFAULT_JSON_MAX_BYTES = 64 * 1024;
+
 export class HttpError extends Error {
   constructor(readonly status: number, message: string, readonly code = 'REQUEST_ERROR') { super(message); }
 }
 
-export async function readJson(req: IncomingMessage, maxBytes = 6 * 1024 * 1024): Promise<Record<string, unknown>> {
+export async function readJson(req: IncomingMessage, maxBytes = DEFAULT_JSON_MAX_BYTES): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -74,12 +76,40 @@ export const stringField = (body: Record<string, unknown>, key: string, required
   return value.trim();
 };
 
+export function boundedStringField(body: Record<string, unknown>, key: string, maxLength: number, required = true, minLength = 0): string | null {
+  const value = stringField(body, key, required);
+  if (value === null) return null;
+  if (value.length > maxLength) throw new HttpError(400, `Pole ${key} może mieć maksymalnie ${maxLength} znaków.`, 'FIELD_TOO_LONG');
+  if (value.length < minLength) throw new HttpError(400, `Pole ${key} musi mieć co najmniej ${minLength} znaków.`, 'VALIDATION_ERROR');
+  return value;
+}
+
 export const stringArrayField = (body: Record<string, unknown>, key: string): string[] => {
   const value = body[key];
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) throw new HttpError(400, `Pole ${key} musi być listą tekstową.`, 'VALIDATION_ERROR');
   return value.map(item => item.trim()).filter(Boolean);
 };
+
+export function boundedStringArrayField(body: Record<string, unknown>, key: string, maxItems: number, maxItemLength: number): string[] {
+  const raw = body[key];
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.some(item => typeof item !== 'string')) throw new HttpError(400, `Pole ${key} musi być listą tekstową.`, 'VALIDATION_ERROR');
+  if (raw.length > maxItems) throw new HttpError(400, `Pole ${key} może zawierać maksymalnie ${maxItems} elementów.`, 'TOO_MANY_ITEMS');
+  const values = raw.map(item => item.trim()).filter(Boolean);
+  if (values.some(item => item.length > maxItemLength)) throw new HttpError(400, `Element pola ${key} może mieć maksymalnie ${maxItemLength} znaków.`, 'FIELD_TOO_LONG');
+  return values;
+}
+
+export function boundedObjectField(body: Record<string, unknown>, key: string, maxKeys: number, maxBytes: number): Record<string, unknown> {
+  const value = body[key];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) throw new HttpError(400, `Pole ${key} musi być obiektem.`, 'VALIDATION_ERROR');
+  const object = value as Record<string, unknown>;
+  if (Object.keys(object).length > maxKeys) throw new HttpError(400, `Pole ${key} może zawierać maksymalnie ${maxKeys} właściwości.`, 'TOO_MANY_ITEMS');
+  if (Buffer.byteLength(JSON.stringify(object), 'utf8') > maxBytes) throw new HttpError(400, `Pole ${key} jest zbyt duże.`, 'FIELD_TOO_LONG');
+  return object;
+}
 
 export const nullableNumberField = (body: Record<string, unknown>, key: string): number | null => {
   const value = body[key];

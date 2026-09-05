@@ -33,6 +33,7 @@
 - [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
+- [x] API payload/field boundary regression tests for oversized JSON, job text, profile, Career Truth, experience and analytics inputs
 - [ ] manual WCAG 2.2 AA review with assistive technology
 
 ## Security / operations
@@ -41,6 +42,10 @@
 - [x] controlled 4xx registration validation with bounded e-mail/password input sizes
 - [x] generic login failure contract with dummy scrypt verification for unknown accounts
 - [x] password re-authentication and rate limiting before irreversible account deletion
+- [x] ordinary JSON request bodies capped at 64 KiB unless an endpoint has a documented larger requirement
+- [x] paste-job endpoint capped at 256 KiB JSON / 100,000 characters of job text, with minimum useful-length validation before parsing
+- [x] bounded profile, Career Truth, experience, decision override, application/outcome and analytics fields/lists before persistence
+- [x] analytics event properties capped by property count and serialized size before sanitization/storage
 - [x] private local uploads
 - [x] upload extension/MIME/signature/size validation
 - [x] portable relative upload storage keys with traversal-safe resolution
