@@ -20,6 +20,10 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 
 ### Identity, onboarding and Career Truth
 - Registration/login with scrypt password hashing, opaque hashed sessions and HttpOnly cookies.
+- Registration validation returns controlled client errors rather than converting invalid credentials into internal-server failures.
+- E-mail/password input sizes are bounded before expensive credential work.
+- Unknown-account and wrong-password login attempts use the same external error contract; unknown accounts receive a dummy scrypt verification to reduce the account-existence timing distinction.
+- Irreversible account deletion requires the current password in addition to the explicit confirmation phrase and is separately rate-limited.
 - CareerProfile onboarding without requiring a CV.
 - Career Truth Lite with explicit status, provenance and confidence semantics.
 - User-confirmed facts remain distinct from inferred/unknown/not-possessed/conflicting/expired states.
@@ -38,7 +42,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Base CV generation and real server-side PDF export with Polish characters.
 - Application Tracker with guarded state transitions.
 - One-tap recruitment Outcome Capture.
-- Data export and account deletion.
+- Data export and re-authenticated account deletion.
 - FREE/TRIAL/PRO/JOB_SPRINT product configuration and local trial state; live paid checkout is not implemented.
 
 ### Interface and administration
@@ -51,8 +55,12 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 
 - Security headers including CSP, frame protection, referrer policy and permissions policy.
 - Same-origin mutation guard.
-- Basic rate limiting on sensitive endpoints.
+- Basic rate limiting on sensitive endpoints, including a dedicated deletion re-authentication limit.
 - Cross-user record isolation regression coverage.
+- Controlled 4xx validation for malformed registration credentials.
+- Bounded e-mail/password inputs and generic login-failure responses.
+- Dummy scrypt verification for normal-sized unknown-account login attempts; this reduces but does not claim to eliminate all possible timing side channels.
+- Current-password re-authentication before irreversible account deletion.
 - Upload size, extension, MIME, PDF signature and DOCX structure validation.
 - Private upload filesystem permissions for the current single-instance architecture.
 - Portable upload keys in the form `uploads/<user>/<file>` rather than host-specific absolute paths.
@@ -100,9 +108,9 @@ GitHub CI currently gates merges on:
 - production Docker image build,
 - booted production-container `/api/health` smoke test.
 
-Latest hardening run for the backup/restore change on 2026-09-05: **18 Node tests, 18 passed, 0 failed**, followed by a successful semantic restore exercise, browser E2E, Docker build and container smoke test.
+The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation.
 
-The repository has also repeatedly passed the same full CI chain after subsequent staging-configuration changes.
+The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
 ## Render test staging decision
 
@@ -140,7 +148,7 @@ The Render connector is connected, but its direct web-service creation action do
 
 ### Authentication
 - Recommended baseline: managed authentication.
-- Current executable MVP: first-party email/password, scrypt and opaque server sessions.
+- Current executable MVP: first-party email/password, scrypt and opaque server sessions with bounded credential inputs, generic failure responses and destructive-action re-authentication.
 - Status: functional with security regression coverage; production choice remains either additional hardening or migration to the selected managed provider.
 
 ### PDF
