@@ -318,7 +318,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'DELETE' && pathname === '/api/account') {
     const user = requireUser(req, store); const body = await readJson(req); const confirmation = stringField(body, 'confirmation') ?? '';
     if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
-    for (const path of store.listUploadPaths(user.id)) await deleteStoredFile(path);
+    for (const storageKey of store.listUploadPaths(user.id)) await deleteStoredFile(config.dataDir, storageKey);
     store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id);
     await rm(resolve(config.dataDir, 'uploads', user.id), { recursive: true, force: true });
     res.setHeader('set-cookie', clearSessionCookie(config)); sendJson(res, 200, { ok: true }); return true;
