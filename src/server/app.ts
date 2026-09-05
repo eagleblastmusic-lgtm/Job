@@ -9,7 +9,7 @@ import { AppStore, type UserRecord } from './store.js';
 import { assertEmail, assertPassword, hashPassword, hashSessionToken, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, newSessionToken, normalizeEmail, parseCookies, verifyLoginPassword, verifyPassword } from './auth.js';
 import { deleteStoredFile, storeCvUpload } from './files.js';
 import { cvToPdf } from './pdf.js';
-import { HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringArrayField, stringField } from './http.js';
+import { boundedObjectField, boundedStringArrayField, boundedStringField, HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringField } from './http.js';
 import { inferCareerFactsFromText } from '../domain/careerTruth.js';
 import { normalizeText } from '../domain/ontology.js';
 import { parseJobText } from '../domain/jobParser.js';
@@ -20,6 +20,9 @@ import type { ApplicationStatus, CareerFactStatus, CareerProfile } from '../doma
 import { AiGateway } from './aiGateway.js';
 
 const LEGAL_VERSION = '2026-09-05-test-v1';
+const JOB_TEXT_MAX_CHARS = 100_000;
+const JOB_JSON_MAX_BYTES = 256 * 1024;
+const ANALYTICS_PROPERTIES_MAX_BYTES = 16 * 1024;
 
 interface AppRuntime {
   server: Server;
@@ -106,17 +109,17 @@ function parseProfile(body: Record<string, unknown>): CareerProfile {
   const shiftsRaw = body.shiftPreferences;
   const shifts = shiftsRaw && typeof shiftsRaw === 'object' && !Array.isArray(shiftsRaw) ? shiftsRaw as Record<string, unknown> : {};
   return {
-    desiredRoles: stringArrayField(body, 'desiredRoles'),
-    location: stringField(body, 'location', false),
+    desiredRoles: boundedStringArrayField(body, 'desiredRoles', 20, 120),
+    location: boundedStringField(body, 'location', 200, false),
     commuteKm: nullableNumberField(body, 'commuteKm'),
-    remotePreferences: stringArrayField(body, 'remotePreferences'),
+    remotePreferences: boundedStringArrayField(body, 'remotePreferences', 10, 80),
     salaryMin: nullableNumberField(body, 'salaryMin'),
-    contractPreferences: stringArrayField(body, 'contractPreferences'),
+    contractPreferences: boundedStringArrayField(body, 'contractPreferences', 10, 80),
     shiftPreferences: {
       nights: nullableBooleanField(shifts, 'nights'),
       weekends: nullableBooleanField(shifts, 'weekends')
     },
-    availability: stringField(body, 'availability', false)
+    availability: boundedStringField(body, 'availability', 200, false)
   };
 }
 
@@ -149,9 +152,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     const body = await readJson(req);
     const email = normalizeEmail(stringField(body, 'email') ?? '');
     const password = stringField(body, 'password') ?? '';
-    const name = stringField(body, 'name') ?? '';
+    const name = boundedStringField(body, 'name', 80, true, 2) ?? '';
     assertEmail(email); assertPassword(password);
-    if (name.length < 2 || name.length > 80) throw new HttpError(400, 'Imię powinno mieć od 2 do 80 znaków.');
     if (body.acceptTerms !== true || body.acceptPrivacy !== true) throw new HttpError(400, 'Aby utworzyć konto, zaakceptuj warunki i informację o prywatności.', 'REQUIRED_CONSENT_MISSING');
     if (store.getUserByEmail(email)) throw new HttpError(409, 'Konto z tym adresem już istnieje.', 'EMAIL_EXISTS');
     const role = config.adminEmails.has(email) ? 'ADMIN' : 'USER';
@@ -223,15 +225,16 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   if (method === 'POST' && pathname === '/api/career-truth/facts') {
     const user = requireUser(req, store); const body = await readJson(req);
-    const value = stringField(body, 'value') ?? ''; const type = stringField(body, 'type') ?? 'SKILL';
-    const fact = store.insertFact(user.id, { type, value, normalizedValue: normalizeText(value), level: stringField(body, 'level', false), source: 'USER', status: 'CONFIRMED', confidence: 1, evidence: 'Dodane i potwierdzone przez użytkownika.', allowedForCv: true });
+    const value = boundedStringField(body, 'value', 500, true, 1) ?? '';
+    const type = boundedStringField(body, 'type', 50, true, 1) ?? 'SKILL';
+    const fact = store.insertFact(user.id, { type, value, normalizedValue: normalizeText(value), level: boundedStringField(body, 'level', 100, false), source: 'USER', status: 'CONFIRMED', confidence: 1, evidence: 'Dodane i potwierdzone przez użytkownika.', allowedForCv: true });
     store.analytics(user.id, 'career_fact_confirmed'); sendJson(res, 201, { fact }); return true;
   }
 
   const factStatusMatch = pathname.match(/^\/api\/career-truth\/facts\/([^/]+)\/status$/);
   if (method === 'PATCH' && factStatusMatch) {
     const user = requireUser(req, store); const body = await readJson(req);
-    const status = stringField(body, 'status') as CareerFactStatus;
+    const status = boundedStringField(body, 'status', 32) as CareerFactStatus;
     if (!['CONFIRMED','INFERRED','UNKNOWN','NOT_POSSESSED','EXPIRED','CONFLICTING'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status faktu.');
     const fact = store.updateFactStatus(user.id, factStatusMatch[1] ?? '', status, status === 'CONFIRMED');
     store.analytics(user.id, status === 'CONFIRMED' ? 'career_fact_confirmed' : 'career_fact_corrected');
@@ -240,17 +243,18 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   if (method === 'POST' && pathname === '/api/experiences') {
     const user = requireUser(req, store); const body = await readJson(req);
-    const employer = stringField(body, 'employer') ?? ''; const title = stringField(body, 'title') ?? '';
+    const employer = boundedStringField(body, 'employer', 200, true, 1) ?? '';
+    const title = boundedStringField(body, 'title', 200, true, 1) ?? '';
     const experience = store.addExperience(user.id, {
-      employer, title, normalizedTitle: normalizeText(title), startDate: stringField(body, 'startDate', false), endDate: stringField(body, 'endDate', false),
-      current: body.current === true, description: stringField(body, 'description', false), achievements: stringArrayField(body, 'achievements')
+      employer, title, normalizedTitle: normalizeText(title), startDate: boundedStringField(body, 'startDate', 32, false), endDate: boundedStringField(body, 'endDate', 32, false),
+      current: body.current === true, description: boundedStringField(body, 'description', 10_000, false), achievements: boundedStringArrayField(body, 'achievements', 30, 1_000)
     });
     sendJson(res, 201, { experience }); return true;
   }
 
   if (method === 'POST' && pathname === '/api/cv/upload') {
     const user = requireUser(req, store); const body = await readJson(req, config.maxUploadBytes * 2);
-    const upload = await storeCvUpload({ dataDir: config.dataDir, userId: user.id, filename: stringField(body, 'filename') ?? 'cv', mimeType: stringField(body, 'mimeType') ?? 'application/octet-stream', base64: stringField(body, 'base64') ?? '', maxBytes: config.maxUploadBytes });
+    const upload = await storeCvUpload({ dataDir: config.dataDir, userId: user.id, filename: boundedStringField(body, 'filename', 255) ?? 'cv', mimeType: boundedStringField(body, 'mimeType', 100) ?? 'application/octet-stream', base64: stringField(body, 'base64') ?? '', maxBytes: config.maxUploadBytes });
     store.recordUpload(user.id, upload);
     const inferred = upload.extractedText ? inferCareerFactsFromText(upload.extractedText, `CV:${upload.id}`) : [];
     const created = store.upsertInferredFacts(user.id, inferred.map(f => ({ ...f, level: null })));
@@ -260,8 +264,9 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/jobs/parse') {
-    const user = requireUser(req, store); enforceRate(rateMap, `jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req);
-    const text = stringField(body, 'text') ?? ''; const parsed = parseJobText(text); const jobId = store.createJob(user.id, text, parsed);
+    const user = requireUser(req, store); enforceRate(rateMap, `jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req, JOB_JSON_MAX_BYTES);
+    const text = boundedStringField(body, 'text', JOB_TEXT_MAX_CHARS, true, 20) ?? '';
+    const parsed = parseJobText(text); const jobId = store.createJob(user.id, text, parsed);
     store.analytics(user.id, 'job_added'); store.analytics(user.id, 'job_parsed');
     sendJson(res, 201, { jobId, job: parsed }); return true;
   }
@@ -277,8 +282,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   const overrideMatch = pathname.match(/^\/api\/decisions\/([^/]+)\/override$/);
   if (method === 'POST' && overrideMatch) {
-    const user = requireUser(req, store); const body = await readJson(req); const override = stringField(body, 'override') ?? '';
-    store.setDecisionOverride(user.id, overrideMatch[1] ?? '', override, stringField(body, 'reason', false));
+    const user = requireUser(req, store); const body = await readJson(req); const override = boundedStringField(body, 'override', 50, true, 1) ?? '';
+    store.setDecisionOverride(user.id, overrideMatch[1] ?? '', override, boundedStringField(body, 'reason', 2_000, false));
     store.analytics(user.id, 'decision_overridden', { override }); sendJson(res, 200, { ok: true }); return true;
   }
 
@@ -302,7 +307,9 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/applications') {
-    const user = requireUser(req, store); const body = await readJson(req); const jobId = stringField(body, 'jobId') ?? ''; const statusRaw = (stringField(body, 'status', false) ?? 'SAVED') as ApplicationStatus;
+    const user = requireUser(req, store); const body = await readJson(req);
+    const jobId = boundedStringField(body, 'jobId', 100) ?? '';
+    const statusRaw = (boundedStringField(body, 'status', 32, false) ?? 'SAVED') as ApplicationStatus;
     if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(statusRaw)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
     if (!store.getJob(user.id, jobId)) throw new HttpError(404, 'Nie znaleziono oferty.');
     const applicationId = store.createApplication(user.id, jobId, statusRaw); store.analytics(user.id, 'application_created', { status: statusRaw });
@@ -311,7 +318,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   const applicationStatusMatch = pathname.match(/^\/api\/applications\/([^/]+)\/status$/);
   if (method === 'PATCH' && applicationStatusMatch) {
-    const user = requireUser(req, store); const body = await readJson(req); const status = stringField(body, 'status') as ApplicationStatus;
+    const user = requireUser(req, store); const body = await readJson(req); const status = boundedStringField(body, 'status', 32) as ApplicationStatus;
     if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
     const application = store.getApplication(user.id, applicationStatusMatch[1] ?? ''); if (!application) throw new HttpError(404, 'Nie znaleziono aplikacji.');
     assertApplicationTransition(application.status, status); store.updateApplicationStatus(user.id, application.id, status); sendJson(res, 200, { ok: true }); return true;
@@ -319,7 +326,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   const outcomeMatch = pathname.match(/^\/api\/applications\/([^/]+)\/outcomes$/);
   if (method === 'POST' && outcomeMatch) {
-    const user = requireUser(req, store); const body = await readJson(req); const outcomeType = stringField(body, 'outcomeType') ?? '';
+    const user = requireUser(req, store); const body = await readJson(req); const outcomeType = boundedStringField(body, 'outcomeType', 32) ?? '';
     const allowed = ['NO_RESPONSE','CONTACTED','INTERVIEW','REJECTED','OFFER','WAITING']; if (!allowed.includes(outcomeType)) throw new HttpError(400, 'Nieprawidłowy wynik rekrutacji.');
     const outcome = store.addOutcome(user.id, outcomeMatch[1] ?? '', outcomeType); store.analytics(user.id, 'outcome_recorded', { outcomeType }); sendJson(res, 201, { outcome }); return true;
   }
@@ -334,7 +341,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   if (method === 'DELETE' && pathname === '/api/account') {
     const user = requireUser(req, store); enforceRate(rateMap, `account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
-    const confirmation = stringField(body, 'confirmation') ?? '';
+    const confirmation = boundedStringField(body, 'confirmation', 32) ?? '';
     if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
     const password = stringField(body, 'password', false) ?? '';
     if (!password || password.length > MAX_PASSWORD_LENGTH || !verifyPassword(password, user.passwordHash)) {
@@ -352,8 +359,9 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'POST' && pathname === '/api/events') {
-    const user = currentUser(req, store); const body = await readJson(req); const eventName = stringField(body, 'eventName') ?? '';
-    const props = body.properties && typeof body.properties === 'object' && !Array.isArray(body.properties) ? body.properties as Record<string, unknown> : {};
+    const user = currentUser(req, store); const body = await readJson(req);
+    const eventName = boundedStringField(body, 'eventName', 100, true, 1) ?? '';
+    const props = boundedObjectField(body, 'properties', 32, ANALYTICS_PROPERTIES_MAX_BYTES);
     store.analytics(user?.id ?? null, eventName, props); sendJson(res, 202, { ok: true }); return true;
   }
 
