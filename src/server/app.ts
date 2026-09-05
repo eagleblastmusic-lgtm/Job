@@ -15,7 +15,7 @@ import { normalizeText } from '../domain/ontology.js';
 import { parseJobText } from '../domain/jobParser.js';
 import { decideJob } from '../domain/decisionEngine.js';
 import { buildApplicationPackage, buildCvDocument } from '../domain/cvEngine.js';
-import { assertApplicationTransition } from '../domain/statusTransitions.js';
+import { canTransitionApplication } from '../domain/statusTransitions.js';
 import type { ApplicationStatus, CareerFactStatus, CareerProfile } from '../domain/types.js';
 import { AiGateway } from './aiGateway.js';
 
@@ -75,6 +75,15 @@ function enforceOrigin(req: IncomingMessage, config: AppConfig): void {
   }
   const origin = req.headers.origin;
   if (origin && origin !== config.appOrigin) throw new HttpError(403, 'Nieprawidłowe źródło żądania.', 'ORIGIN_REJECTED');
+}
+
+function mapStoreNotFound<T>(operation: () => T, storeMessage: string, clientMessage = storeMessage): T {
+  try {
+    return operation();
+  } catch (error) {
+    if (error instanceof Error && error.message === storeMessage) throw new HttpError(404, clientMessage, 'NOT_FOUND');
+    throw error;
+  }
 }
 
 function cookieForSession(raw: string, config: AppConfig): string {
@@ -236,7 +245,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     const user = requireUser(req, store); const body = await readJson(req);
     const status = boundedStringField(body, 'status', 32) as CareerFactStatus;
     if (!['CONFIRMED','INFERRED','UNKNOWN','NOT_POSSESSED','EXPIRED','CONFLICTING'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status faktu.');
-    const fact = store.updateFactStatus(user.id, factStatusMatch[1] ?? '', status, status === 'CONFIRMED');
+    const fact = mapStoreNotFound(() => store.updateFactStatus(user.id, factStatusMatch[1] ?? '', status, status === 'CONFIRMED'), 'Nie znaleziono faktu zawodowego.');
     store.analytics(user.id, status === 'CONFIRMED' ? 'career_fact_confirmed' : 'career_fact_corrected');
     sendJson(res, 200, { fact }); return true;
   }
@@ -274,7 +283,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   const decisionMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/decide$/);
   if (method === 'POST' && decisionMatch) {
     const user = requireUser(req, store); const found = store.getJob(user.id, decisionMatch[1] ?? '');
-    if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
+    if (!found) throw new HttpError(404, 'Nie znaleziono oferty.', 'NOT_FOUND');
     const decision = decideJob(store.getProfile(user.id), store.listFacts(user.id), found.job); const decisionId = store.saveDecision(user.id, found.id, decision);
     store.analytics(user.id, 'decision_viewed', { recommendation: decision.recommendation });
     sendJson(res, 200, { decisionId, decision: { ...decision, label: recommendationLabel(decision.recommendation) } }); return true;
@@ -283,13 +292,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   const overrideMatch = pathname.match(/^\/api\/decisions\/([^/]+)\/override$/);
   if (method === 'POST' && overrideMatch) {
     const user = requireUser(req, store); const body = await readJson(req); const override = boundedStringField(body, 'override', 50, true, 1) ?? '';
-    store.setDecisionOverride(user.id, overrideMatch[1] ?? '', override, boundedStringField(body, 'reason', 2_000, false));
+    mapStoreNotFound(() => store.setDecisionOverride(user.id, overrideMatch[1] ?? '', override, boundedStringField(body, 'reason', 2_000, false)), 'Nie znaleziono decyzji.');
     store.analytics(user.id, 'decision_overridden', { override }); sendJson(res, 200, { ok: true }); return true;
   }
 
   const packageMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/application-package$/);
   if (method === 'POST' && packageMatch) {
-    const user = requireUser(req, store); const found = store.getJob(user.id, packageMatch[1] ?? ''); if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
+    const user = requireUser(req, store); const found = store.getJob(user.id, packageMatch[1] ?? ''); if (!found) throw new HttpError(404, 'Nie znaleziono oferty.', 'NOT_FOUND');
     const cv = buildCvDocument({ name: user.name, profile: store.getProfile(user.id), facts: store.listFacts(user.id), experiences: store.listExperiences(user.id), education: store.listEducation(user.id) });
     const pack = buildApplicationPackage(cv, found.job); store.analytics(user.id, 'application_package_created'); store.analytics(user.id, 'cv_generated');
     sendJson(res, 200, { package: pack, pdfUrl: `/api/cv/base.pdf?jobId=${encodeURIComponent(found.id)}` }); return true;
@@ -311,7 +320,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     const jobId = boundedStringField(body, 'jobId', 100) ?? '';
     const statusRaw = (boundedStringField(body, 'status', 32, false) ?? 'SAVED') as ApplicationStatus;
     if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(statusRaw)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
-    if (!store.getJob(user.id, jobId)) throw new HttpError(404, 'Nie znaleziono oferty.');
+    if (!store.getJob(user.id, jobId)) throw new HttpError(404, 'Nie znaleziono oferty.', 'NOT_FOUND');
     const applicationId = store.createApplication(user.id, jobId, statusRaw); store.analytics(user.id, 'application_created', { status: statusRaw });
     sendJson(res, 201, { applicationId }); return true;
   }
@@ -320,15 +329,18 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'PATCH' && applicationStatusMatch) {
     const user = requireUser(req, store); const body = await readJson(req); const status = boundedStringField(body, 'status', 32) as ApplicationStatus;
     if (!['SAVED','APPLIED','CONTACTED','INTERVIEW','OFFER','CLOSED'].includes(status)) throw new HttpError(400, 'Nieprawidłowy status aplikacji.');
-    const application = store.getApplication(user.id, applicationStatusMatch[1] ?? ''); if (!application) throw new HttpError(404, 'Nie znaleziono aplikacji.');
-    assertApplicationTransition(application.status, status); store.updateApplicationStatus(user.id, application.id, status); sendJson(res, 200, { ok: true }); return true;
+    const application = store.getApplication(user.id, applicationStatusMatch[1] ?? ''); if (!application) throw new HttpError(404, 'Nie znaleziono aplikacji.', 'NOT_FOUND');
+    if (!canTransitionApplication(application.status, status)) throw new HttpError(400, `Niedozwolona zmiana statusu: ${application.status} → ${status}`, 'INVALID_STATUS_TRANSITION');
+    mapStoreNotFound(() => store.updateApplicationStatus(user.id, application.id, status), 'Nie znaleziono aplikacji.');
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   const outcomeMatch = pathname.match(/^\/api\/applications\/([^/]+)\/outcomes$/);
   if (method === 'POST' && outcomeMatch) {
     const user = requireUser(req, store); const body = await readJson(req); const outcomeType = boundedStringField(body, 'outcomeType', 32) ?? '';
     const allowed = ['NO_RESPONSE','CONTACTED','INTERVIEW','REJECTED','OFFER','WAITING']; if (!allowed.includes(outcomeType)) throw new HttpError(400, 'Nieprawidłowy wynik rekrutacji.');
-    const outcome = store.addOutcome(user.id, outcomeMatch[1] ?? '', outcomeType); store.analytics(user.id, 'outcome_recorded', { outcomeType }); sendJson(res, 201, { outcome }); return true;
+    const outcome = mapStoreNotFound(() => store.addOutcome(user.id, outcomeMatch[1] ?? '', outcomeType), 'Nie znaleziono aplikacji.');
+    store.analytics(user.id, 'outcome_recorded', { outcomeType }); sendJson(res, 201, { outcome }); return true;
   }
 
   if (method === 'GET' && pathname === '/api/billing') {
