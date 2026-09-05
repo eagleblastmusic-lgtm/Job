@@ -148,6 +148,11 @@ export class AppStore {
     return factFromRow(row);
   }
 
+  deleteFact(userId: string, factId: string): void {
+    const result = this.db.prepare('DELETE FROM career_facts WHERE id=? AND user_id=?').run(factId, userId);
+    if (Number(result.changes) !== 1) throw new Error('Nie znaleziono faktu zawodowego.');
+  }
+
   addExperience(userId: string, input: Omit<CareerExperience, 'id'>): CareerExperience {
     const id = randomUUID();
     this.db.prepare(`INSERT INTO career_experiences(id,user_id,employer,title,normalized_title,start_date,end_date,current,description,achievements) VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
@@ -162,6 +167,11 @@ export class AppStore {
     }));
   }
 
+  deleteExperience(userId: string, experienceId: string): void {
+    const result = this.db.prepare('DELETE FROM career_experiences WHERE id=? AND user_id=?').run(experienceId, userId);
+    if (Number(result.changes) !== 1) throw new Error('Nie znaleziono doświadczenia.');
+  }
+
   addEducation(userId: string, input: Omit<EducationRecord, 'id'>): EducationRecord {
     const id = randomUUID();
     this.db.prepare(`INSERT INTO education(id,user_id,institution,field,degree,start_date,end_date,description) VALUES(?,?,?,?,?,?,?,?)`).run(
@@ -174,6 +184,11 @@ export class AppStore {
     return (this.db.prepare('SELECT id,institution,field,degree,start_date,end_date,description FROM education WHERE user_id=? ORDER BY end_date DESC').all(userId) as unknown as EducationRow[]).map(row => ({
       id: row.id, institution: row.institution, field: row.field, degree: row.degree, startDate: row.start_date, endDate: row.end_date, description: row.description
     }));
+  }
+
+  deleteEducation(userId: string, educationId: string): void {
+    const result = this.db.prepare('DELETE FROM education WHERE id=? AND user_id=?').run(educationId, userId);
+    if (Number(result.changes) !== 1) throw new Error('Nie znaleziono wykształcenia.');
   }
 
   recordUpload(userId: string, upload: { id: string; originalName: string; mimeType: string; storageKey: string; sizeBytes: number; sha256: string; extractedText: string | null }): void {
