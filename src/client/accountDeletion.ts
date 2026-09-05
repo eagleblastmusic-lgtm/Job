@@ -1,3 +1,5 @@
+export {};
+
 type ApiErrorPayload = { error?: { message?: string } };
 
 const button = document.querySelector<HTMLButtonElement>('#deleteAccountButton');
