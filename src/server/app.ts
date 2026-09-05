@@ -245,15 +245,17 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'POST' && pathname === '/api/jobs/parse') {
     const user = requireUser(req, store); enforceRate(`jobparse:${user.id}`, 60, 3600_000); const body = await readJson(req);
     const text = stringField(body, 'text') ?? ''; const parsed = parseJobText(text); const jobId = store.createJob(user.id, text, parsed);
-    store.analytics(user.id, 'job_added'); store.analytics(user.id, 'job_parsed'); sendJson(res, 201, { jobId, parsed }); return true;
+    store.analytics(user.id, 'job_added'); store.analytics(user.id, 'job_parsed');
+    sendJson(res, 201, { jobId, job: parsed }); return true;
   }
 
-  const decisionMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/decision$/);
-  if (method === 'GET' && decisionMatch) {
-    const user = requireUser(req, store); const found = store.getJob(user.id, decisionMatch[1] ?? ''); if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
-    const result = decideJob({ job: found.job, profile: store.getProfile(user.id), facts: store.listFacts(user.id) });
-    const decisionId = store.saveDecision(user.id, found.id, result); store.analytics(user.id, 'decision_card_viewed', { recommendation: result.recommendation, score: result.score });
-    sendJson(res, 200, { decisionId, recommendationLabel: recommendationLabel(result.recommendation), ...result }); return true;
+  const decisionMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/decide$/);
+  if (method === 'POST' && decisionMatch) {
+    const user = requireUser(req, store); const found = store.getJob(user.id, decisionMatch[1] ?? '');
+    if (!found) throw new HttpError(404, 'Nie znaleziono oferty.');
+    const decision = decideJob(store.getProfile(user.id), store.listFacts(user.id), found.job); const decisionId = store.saveDecision(user.id, found.id, decision);
+    store.analytics(user.id, 'decision_viewed', { recommendation: decision.recommendation });
+    sendJson(res, 200, { decisionId, decision: { ...decision, label: recommendationLabel(decision.recommendation) } }); return true;
   }
 
   const overrideMatch = pathname.match(/^\/api\/decisions\/([^/]+)\/override$/);
