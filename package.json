@@ -1,0 +1,23 @@
+{
+  "name": "job-decision-career-navigation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Polski system zdobywania pracy — Job Decision & Career Navigation System",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "check": "npm run typecheck && npm run test",
+    "start": "node --enable-source-maps dist/server/index.js",
+    "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.0",
+    "typescript": "5.8.3"
+  }
+}
