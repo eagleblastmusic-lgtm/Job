@@ -11,16 +11,18 @@
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-static.mjs",
     "lint": "node scripts/lint.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "validate:migrations": "node scripts/validate-migrations.mjs",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "check": "npm run lint && npm run typecheck && npm run validate:migrations && npm test",
+    "test:browser": "npm run build && playwright test",
+    "check": "npm run lint && npm run typecheck && npm run validate:migrations && npm test && npm run test:browser",
     "backup:data": "node scripts/backup.mjs",
     "restore:data": "node scripts/restore.mjs",
     "start": "node --enable-source-maps dist/server/index.js",
     "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/node": "22.15.0",
     "typescript": "5.8.3"
   }

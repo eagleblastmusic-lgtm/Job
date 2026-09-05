@@ -4,6 +4,9 @@ data/*.sqlite
 data/*.sqlite-*
 data/uploads/*
 !data/uploads/.gitkeep
+.playwright-data/
+playwright-report/
+test-results/
 .env
 .env.*
 !.env.example
