@@ -63,7 +63,7 @@ test('job paste has an explicit larger body budget but bounded text length and m
   });
 });
 
-test('profile, Career Truth and experience fields are bounded before SQLite writes', async () => {
+test('profile, Career Truth, experience and education fields are bounded before SQLite writes', async () => {
   await withApp(async base => {
     const cookie = await register(base);
 
@@ -90,6 +90,14 @@ test('profile, Career Truth and experience fields are bounded before SQLite writ
     });
     assert.equal(experience.status, 400);
     assert.equal(await errorCode(experience), 'FIELD_TOO_LONG');
+
+    const education = await fetch(`${base}/api/education`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ institution: 'x'.repeat(201), field: 'Logistyka', degree: 'technik logistyk' })
+    });
+    assert.equal(education.status, 400);
+    assert.equal(await errorCode(education), 'FIELD_TOO_LONG');
   });
 });
 
