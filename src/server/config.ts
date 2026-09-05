@@ -34,7 +34,7 @@ export interface AppConfig {
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  const nodeEnvRaw = process.env.NODE_ENV ?? 'development';
+  const nodeEnvRaw = overrides.nodeEnv ?? process.env.NODE_ENV ?? 'development';
   const nodeEnv: AppConfig['nodeEnv'] = nodeEnvRaw === 'production' || nodeEnvRaw === 'test' ? nodeEnvRaw : 'development';
   const dataDir = overrides.dataDir ?? resolve(process.env.DATA_DIR ?? './data');
   const adminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean));
