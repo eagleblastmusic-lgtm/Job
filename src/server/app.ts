@@ -117,7 +117,14 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   const method = req.method ?? 'GET';
 
   if (method === 'GET' && pathname === '/api/health') {
-    sendJson(res, 200, { ok: true, service: 'job', version: '0.1.0', now: new Date().toISOString() }); return true;
+    const timestamp = new Date().toISOString();
+    try {
+      store.diagnostics();
+      sendJson(res, 200, { ok: true, service: 'job', version: '0.1.0', database: 'ok', now: timestamp });
+    } catch {
+      sendJson(res, 503, { ok: false, service: 'job', version: '0.1.0', database: 'unavailable', now: timestamp });
+    }
+    return true;
   }
 
   if (method === 'GET' && pathname === '/api/legal') {
