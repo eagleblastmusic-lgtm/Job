@@ -20,6 +20,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run validate:migrations
       - run: npm test
+      - name: Backup and restore portability exercise
+        run: npm run verify:backup-restore
       - name: Install Chromium for browser E2E
         run: npx playwright install --with-deps chromium
       - name: Browser E2E — mobile and desktop
