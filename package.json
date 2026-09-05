@@ -23,6 +23,7 @@
     "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.62.1",
     "@types/node": "22.15.0",
     "typescript": "5.8.3"
