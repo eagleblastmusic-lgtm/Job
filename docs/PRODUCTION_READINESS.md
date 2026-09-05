@@ -32,6 +32,7 @@
 - [x] browser-level Playwright E2E on desktop and mobile Chromium profiles
 - [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
+- [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
 - [ ] manual WCAG 2.2 AA review with assistive technology
 
 ## Security / operations
