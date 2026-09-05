@@ -34,6 +34,7 @@
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
 - [x] API payload/field boundary regression tests for oversized JSON, job text, profile, Career Truth, experience and analytics inputs
+- [x] resource error-contract tests for foreign/nonexistent records and invalid application transitions
 - [ ] manual WCAG 2.2 AA review with assistive technology
 
 ## Security / operations
@@ -46,6 +47,8 @@
 - [x] paste-job endpoint capped at 256 KiB JSON / 100,000 characters of job text, with minimum useful-length validation before parsing
 - [x] bounded profile, Career Truth, experience, decision override, application/outcome and analytics fields/lists before persistence
 - [x] analytics event properties capped by property count and serialized size before sanitization/storage
+- [x] foreign and nonexistent user-owned Career Truth facts, decisions and applications expose the same stable 404 contract
+- [x] invalid application status transitions return controlled 400 errors and are verified not to mutate stored status
 - [x] private local uploads
 - [x] upload extension/MIME/signature/size validation
 - [x] portable relative upload storage keys with traversal-safe resolution
