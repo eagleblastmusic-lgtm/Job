@@ -41,6 +41,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Career-Truth-grounded Application Package.
 - Base CV generation and real server-side PDF export with Polish characters.
 - Application Tracker with guarded state transitions.
+- Invalid tracker transitions are returned as controlled client validation errors and are not persisted.
 - One-tap recruitment Outcome Capture.
 - Data export and re-authenticated account deletion.
 - FREE/TRIAL/PRO/JOB_SPRINT product configuration and local trial state; live paid checkout is not implemented.
@@ -66,6 +67,8 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
 - Profile arrays, Career Truth facts, experience fields/achievements, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
 - Analytics event names and property objects are bounded by name length, top-level property count and serialized size before sanitization/storage.
+- User-owned Career Truth facts, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
+- Invalid application status transitions use a stable 400 `INVALID_STATUS_TRANSITION` contract and regression tests verify that rejected transitions do not mutate the stored application.
 - Cross-user record isolation regression coverage.
 - Controlled 4xx validation for malformed registration credentials.
 - Bounded e-mail/password inputs and generic login-failure responses.
@@ -113,6 +116,8 @@ GitHub CI currently gates merges on:
 - Node unit/API/security tests,
 - proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
 - API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience descriptions and analytics property/name limits,
+- resource isolation/error-contract tests comparing foreign vs nonexistent Career Truth facts, decision overrides and application outcomes,
+- invalid application-transition regression verifying a controlled 400 and no state mutation,
 - semantic backup/restore exercise,
 - Playwright Chromium browser E2E on mobile and desktop profiles,
 - axe automated WCAG 2.2 A/AA checks on public and authenticated MVP surfaces,
@@ -129,6 +134,8 @@ The HTTP/proxy suite verifies that untrusted forwarded addresses do not split ra
 The HTTP hardening work also exposed and fixed an existing configuration defect: explicit `nodeEnv` overrides supplied to `loadConfig` / `createJobApp` were previously ignored in favor of the process environment. The override contract is now tested.
 
 The input-boundary work also closes a prior error-contract gap: too-short pasted job text is rejected as a controlled client validation error before `parseJobText` can throw a generic server-side exception.
+
+Resource-error hardening preserves the domain/store separation: the API layer translates only known ownership/not-found store outcomes into 404 and uses domain transition predicates for client-visible 400 validation; unrelated database/runtime failures still surface as internal server errors rather than being masked.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -208,7 +215,9 @@ The following items were listed as missing in the original status file but are n
 - deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`,
 - explicit trusted-proxy handling for single-instance rate limiting,
 - API no-store cache policy and production transport/resource security headers,
-- bounded ordinary JSON bodies and persistence-facing MVP input fields.
+- bounded ordinary JSON bodies and persistence-facing MVP input fields,
+- stable resource-not-found contracts for foreign/nonexistent user-owned records,
+- controlled non-mutating invalid application-transition handling.
 
 ## Phase result
 
