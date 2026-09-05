@@ -103,7 +103,9 @@ try {
   try {
     const db = restoredDb.db;
     const user = db.prepare('SELECT email,name FROM users WHERE id=?').get(userId);
-    assert.deepEqual(user, { email: 'restore.exercise@example.test', name: 'Backup Exercise' });
+    assert.ok(user, 'user must survive restore');
+    assert.equal(user.email, 'restore.exercise@example.test');
+    assert.equal(user.name, 'Backup Exercise');
 
     const profile = db.prepare('SELECT desired_roles,location,salary_min FROM career_profiles WHERE user_id=?').get(userId);
     assert.ok(profile, 'career profile must survive restore');
@@ -112,7 +114,10 @@ try {
     assert.deepEqual(JSON.parse(profile.desired_roles), ['Magazynier']);
 
     const fact = db.prepare('SELECT value,status,allowed_for_cv FROM career_facts WHERE user_id=? AND normalized_value=?').get(userId, 'excel');
-    assert.deepEqual(fact, { value: 'Excel', status: 'CONFIRMED', allowed_for_cv: 1 });
+    assert.ok(fact, 'career fact must survive restore');
+    assert.equal(fact.value, 'Excel');
+    assert.equal(fact.status, 'CONFIRMED');
+    assert.equal(fact.allowed_for_cv, 1);
 
     const consentCount = db.prepare('SELECT COUNT(*) AS count FROM consents WHERE user_id=?').get(userId);
     assert.equal(Number(consentCount?.count ?? 0), 3);
@@ -123,7 +128,9 @@ try {
     assert.equal(job?.id, jobId);
     assert.match(String(job?.raw_text ?? ''), /Magazynier/);
     const application = db.prepare('SELECT id,status FROM applications WHERE id=? AND user_id=?').get(applicationId, userId);
-    assert.deepEqual(application, { id: applicationId, status: 'APPLIED' });
+    assert.ok(application, 'application must survive restore');
+    assert.equal(application.id, applicationId);
+    assert.equal(application.status, 'APPLIED');
     const outcome = db.prepare('SELECT outcome_type FROM outcomes WHERE application_id=?').get(applicationId);
     assert.equal(outcome?.outcome_type, 'CONTACTED');
 
