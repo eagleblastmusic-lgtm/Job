@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net';
 import { createJobApp } from '../server/app.js';
 
 interface ApiError { error?: { code?: string; message?: string; requestId?: string } }
-interface PublicError { code?: string; message?: string }
+interface PublicError { code: string | undefined; message: string | undefined }
 
 async function withApp(run: (base: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), 'job-resource-errors-'));
