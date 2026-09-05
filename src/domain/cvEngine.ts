@@ -44,6 +44,10 @@ export function renderCvHtml(cv: CvDocument): string {
   const escape = (value: string): string => value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] ?? ch));
   const facts = cv.facts.map(f => `<li>${escape(f.value)}${f.level ? ` — ${escape(f.level)}` : ''}</li>`).join('');
   const experiences = cv.experiences.map(exp => `<section><h3>${escape(exp.title)} — ${escape(exp.employer)}</h3><p>${escape([exp.startDate, exp.endDate ?? (exp.current ? 'obecnie' : null)].filter(Boolean).join(' – '))}</p>${exp.description ? `<p>${escape(exp.description)}</p>` : ''}</section>`).join('');
-  const education = cv.education.map(ed => `<section><h3>${escape(ed.institution)}</h3><p>${escape([ed.degree, ed.field].filter(Boolean).join(' — '))}</p></section>`).join('');
+  const education = cv.education.map(ed => {
+    const detail = [ed.degree, ed.field].filter(Boolean).join(' — ');
+    const period = [ed.startDate, ed.endDate].filter(Boolean).join(' – ');
+    return `<section><h3>${escape(ed.institution)}</h3>${detail ? `<p>${escape(detail)}</p>` : ''}${period ? `<p class="muted">${escape(period)}</p>` : ''}${ed.description ? `<p>${escape(ed.description)}</p>` : ''}</section>`;
+  }).join('');
   return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><style>@page{size:A4;margin:18mm}body{font-family:Arial,'DejaVu Sans',sans-serif;color:#111827;line-height:1.45}h1{font-size:28px;margin:0}h2{font-size:17px;margin-top:24px;border-bottom:1px solid #d1d5db;padding-bottom:6px}h3{font-size:14px;margin-bottom:2px}p{margin:5px 0}li{margin:3px 0}.muted{color:#4b5563}</style></head><body><h1>${escape(cv.name)}</h1><p class="muted">${escape(cv.headline)}</p><p>${escape(cv.summary)}</p><h2>Kompetencje</h2><ul>${facts || '<li>Brak potwierdzonych kompetencji do CV.</li>'}</ul><h2>Doświadczenie</h2>${experiences || '<p>Brak uzupełnionego doświadczenia.</p>'}<h2>Edukacja</h2>${education || '<p>Brak uzupełnionej edukacji.</p>'}</body></html>`;
 }
