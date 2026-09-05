@@ -39,12 +39,15 @@
 - [x] secure password hashing and HttpOnly sessions
 - [x] private local uploads
 - [x] upload extension/MIME/signature/size validation
+- [x] portable relative upload storage keys with traversal-safe resolution
+- [x] legacy Linux/Windows absolute upload path migration
 - [x] rate limiting on vulnerable endpoints
 - [x] security headers and same-origin mutation guard
 - [x] sensitive analytics minimization
 - [x] analytics storage blocked when optional analytics consent is not active
 - [x] versioned database migrations with CI validation
 - [x] local backup/restore tooling
+- [x] automated backup → restore-to-different-root semantic exercise in CI
 - [x] production Docker build and container smoke test in CI
 - [x] reproducible Render staging Blueprint with persistent data disk and CI-gated deploy trigger
 - [ ] live internal staging deployment and environment-level acceptance run
