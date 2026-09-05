@@ -18,6 +18,8 @@ import { assertApplicationTransition } from '../domain/statusTransitions.js';
 import type { ApplicationStatus, CareerFactStatus, CareerProfile } from '../domain/types.js';
 import { AiGateway } from './aiGateway.js';
 
+const LEGAL_VERSION = '2026-09-05-test-v1';
+
 interface AppRuntime {
   server: Server;
   db: JobDatabase;
@@ -118,6 +120,10 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     sendJson(res, 200, { ok: true, service: 'job', version: '0.1.0', now: new Date().toISOString() }); return true;
   }
 
+  if (method === 'GET' && pathname === '/api/legal') {
+    sendJson(res, 200, { legalVersion: LEGAL_VERSION, termsUrl: '/terms.html', privacyUrl: '/privacy.html' }); return true;
+  }
+
   if (method === 'POST' && pathname === '/api/auth/register') {
     enforceRate(`register:${clientIp(req)}`, 15, 15 * 60_000);
     const body = await readJson(req);
@@ -126,9 +132,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     const name = stringField(body, 'name') ?? '';
     assertEmail(email); assertPassword(password);
     if (name.length < 2 || name.length > 80) throw new HttpError(400, 'Imię powinno mieć od 2 do 80 znaków.');
+    if (body.acceptTerms !== true || body.acceptPrivacy !== true) throw new HttpError(400, 'Aby utworzyć konto, zaakceptuj warunki i informację o prywatności.', 'REQUIRED_CONSENT_MISSING');
     if (store.getUserByEmail(email)) throw new HttpError(409, 'Konto z tym adresem już istnieje.', 'EMAIL_EXISTS');
     const role = config.adminEmails.has(email) ? 'ADMIN' : 'USER';
     const user = store.createUser({ email, passwordHash: hashPassword(password), name, role });
+    store.recordConsent(user.id, 'TERMS', true, LEGAL_VERSION);
+    store.recordConsent(user.id, 'PRIVACY', true, LEGAL_VERSION);
+    store.recordConsent(user.id, 'ANALYTICS', body.analyticsConsent === true, LEGAL_VERSION);
     const token = newSessionToken();
     const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
     store.createSession(user.id, token.hash, expires);
@@ -162,6 +172,18 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'GET' && pathname === '/api/me') {
     const user = requireUser(req, store);
     sendJson(res, 200, { user: { id: user.id, email: user.email, name: user.name, role: user.role, locale: user.locale, timezone: user.timezone }, profile: store.getProfile(user.id), subscription: store.getSubscription(user.id) }); return true;
+  }
+
+  if (method === 'GET' && pathname === '/api/consents') {
+    const user = requireUser(req, store);
+    sendJson(res, 200, { legalVersion: LEGAL_VERSION, consents: store.listConsents(user.id) }); return true;
+  }
+
+  if (method === 'PUT' && pathname === '/api/consents/analytics') {
+    const user = requireUser(req, store); const body = await readJson(req);
+    if (typeof body.granted !== 'boolean') throw new HttpError(400, 'Pole granted musi być wartością true albo false.', 'INVALID_CONSENT_VALUE');
+    const consent = store.recordConsent(user.id, 'ANALYTICS', body.granted, LEGAL_VERSION);
+    sendJson(res, 200, { consent }); return true;
   }
 
   if (method === 'PUT' && pathname === '/api/profile') {
