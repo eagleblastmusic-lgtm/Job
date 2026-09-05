@@ -6,7 +6,10 @@
 - [x] onboarding/profile without CV
 - [x] Career Truth Lite
 - [x] user-entered experience and education
+- [x] user correction/removal controls for Career Truth facts, experience and education
+- [x] explicit current-employment representation with end-date clearing
 - [x] education carried into Application Package, CV and data export
+- [x] removed Career Truth records excluded from subsequent Application Package/CV generation
 - [x] CV upload
 - [x] paste-job workflow
 - [x] deterministic Job Parser
@@ -30,10 +33,12 @@
 - [x] unit tests
 - [x] critical API E2E test
 - [x] critical API E2E verifies education through Career Truth, Application Package and export
+- [x] Career Truth correction API tests verify own deletion, foreign/nonexistent 404 equivalence and current-employment end-date clearing
 - [x] production build command
 - [x] responsive mobile-first UI
 - [x] browser-level Playwright E2E on desktop and mobile Chromium profiles
 - [x] browser critical flow enters education and verifies persisted UI rendering
+- [x] browser correction flow verifies fact/experience/education removal and current employment
 - [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
@@ -51,7 +56,8 @@
 - [x] paste-job endpoint capped at 256 KiB JSON / 100,000 characters of job text, with minimum useful-length validation before parsing
 - [x] bounded profile, Career Truth, experience, education, decision override, application/outcome and analytics fields/lists before persistence
 - [x] analytics event properties capped by property count and serialized size before sanitization/storage
-- [x] foreign and nonexistent user-owned Career Truth facts, decisions and applications expose the same stable 404 contract
+- [x] foreign and nonexistent user-owned Career Truth facts, experience, education, decisions and applications expose stable indistinguishable 404 contracts
+- [x] Career Truth delete operations are SQL-scoped by authenticated `user_id` and record ID
 - [x] invalid application status transitions return controlled 400 errors and are verified not to mutate stored status
 - [x] private local uploads
 - [x] upload extension/MIME/signature/size validation

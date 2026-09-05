@@ -250,15 +250,34 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     sendJson(res, 200, { fact }); return true;
   }
 
+  const factDeleteMatch = pathname.match(/^\/api\/career-truth\/facts\/([^/]+)$/);
+  if (method === 'DELETE' && factDeleteMatch) {
+    const user = requireUser(req, store);
+    const factId = factDeleteMatch[1] ?? '';
+    mapStoreNotFound(() => store.deleteFact(user.id, factId), 'Nie znaleziono faktu zawodowego.');
+    store.analytics(user.id, 'career_fact_removed'); store.audit(user.id, 'CAREER_FACT_REMOVED', 'career_fact', factId);
+    sendJson(res, 200, { ok: true }); return true;
+  }
+
   if (method === 'POST' && pathname === '/api/experiences') {
     const user = requireUser(req, store); const body = await readJson(req);
     const employer = boundedStringField(body, 'employer', 200, true, 1) ?? '';
     const title = boundedStringField(body, 'title', 200, true, 1) ?? '';
+    const current = body.current === true;
     const experience = store.addExperience(user.id, {
-      employer, title, normalizedTitle: normalizeText(title), startDate: boundedStringField(body, 'startDate', 32, false), endDate: boundedStringField(body, 'endDate', 32, false),
-      current: body.current === true, description: boundedStringField(body, 'description', 10_000, false), achievements: boundedStringArrayField(body, 'achievements', 30, 1_000)
+      employer, title, normalizedTitle: normalizeText(title), startDate: boundedStringField(body, 'startDate', 32, false), endDate: current ? null : boundedStringField(body, 'endDate', 32, false),
+      current, description: boundedStringField(body, 'description', 10_000, false), achievements: boundedStringArrayField(body, 'achievements', 30, 1_000)
     });
     sendJson(res, 201, { experience }); return true;
+  }
+
+  const experienceDeleteMatch = pathname.match(/^\/api\/experiences\/([^/]+)$/);
+  if (method === 'DELETE' && experienceDeleteMatch) {
+    const user = requireUser(req, store);
+    const experienceId = experienceDeleteMatch[1] ?? '';
+    mapStoreNotFound(() => store.deleteExperience(user.id, experienceId), 'Nie znaleziono doświadczenia.');
+    store.analytics(user.id, 'experience_removed'); store.audit(user.id, 'EXPERIENCE_REMOVED', 'career_experience', experienceId);
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   if (method === 'POST' && pathname === '/api/education') {
@@ -274,6 +293,15 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
     });
     store.analytics(user.id, 'education_added');
     sendJson(res, 201, { education }); return true;
+  }
+
+  const educationDeleteMatch = pathname.match(/^\/api\/education\/([^/]+)$/);
+  if (method === 'DELETE' && educationDeleteMatch) {
+    const user = requireUser(req, store);
+    const educationId = educationDeleteMatch[1] ?? '';
+    mapStoreNotFound(() => store.deleteEducation(user.id, educationId), 'Nie znaleziono wykształcenia.');
+    store.analytics(user.id, 'education_removed'); store.audit(user.id, 'EDUCATION_REMOVED', 'education', educationId);
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   if (method === 'POST' && pathname === '/api/cv/upload') {

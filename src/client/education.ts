@@ -1,3 +1,5 @@
+import './careerTruthControls.js';
+
 export {};
 
 type Education = {
@@ -29,7 +31,7 @@ function renderEducation(records: Education[]): void {
     ? records.map(record => {
       const details = [record.degree, record.field].filter(Boolean).map(esc).join(' · ');
       const period = [record.startDate, record.endDate].filter(Boolean).map(esc).join(' – ');
-      return `<div class="education-item"><strong>${esc(record.institution)}</strong>${details ? `<div>${details}</div>` : ''}${period ? `<div class="hint">${period}</div>` : ''}${record.description ? `<div class="hint">${esc(record.description)}</div>` : ''}</div>`;
+      return `<div class="fact-item education-item"><strong>${esc(record.institution)}</strong>${details ? `<div>${details}</div>` : ''}${period ? `<div class="hint">${period}</div>` : ''}${record.description ? `<div class="hint">${esc(record.description)}</div>` : ''}<div class="fact-actions"><button class="mini-button bad" data-delete-education="${esc(record.id)}" aria-label="Usuń wykształcenie ${esc(record.institution)}">Usuń</button></div></div>`;
     }).join('')
     : '<p class="hint">Brak informacji o wykształceniu.</p>';
 }
@@ -66,6 +68,19 @@ form?.addEventListener('submit', async event => {
     });
     form.reset();
     if (message) { message.textContent = 'Wykształcenie zapisane.'; message.className = 'message success'; }
+    await refreshEducation();
+  } catch (error) {
+    if (message) { message.textContent = (error as Error).message; message.className = 'message error'; }
+  }
+});
+
+$('#educationList')?.addEventListener('click', async event => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('[data-delete-education]');
+  if (!button) return;
+  const message = $('#educationMessage');
+  try {
+    await api(`/api/education/${button.dataset.deleteEducation}`, { method: 'DELETE' });
+    if (message) { message.textContent = 'Wykształcenie usunięte.'; message.className = 'message success'; }
     await refreshEducation();
   } catch (error) {
     if (message) { message.textContent = (error as Error).message; message.className = 'message error'; }

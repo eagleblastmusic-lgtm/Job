@@ -29,6 +29,8 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - User-confirmed facts remain distinct from inferred/unknown/not-possessed/conflicting/expired states.
 - CV inference never auto-confirms a fact and inferred facts are never automatically allowed into generated CV content.
 - User-entered career experience and education, with institution, field/degree, dates and optional descriptions preserved for CV generation and export.
+- Career Truth correction controls allow a user to mark facts as not possessed, remove manually entered facts, and remove their own experience/education records; rejected foreign IDs are not distinguishable from nonexistent IDs through the public API contract.
+- Current employment is explicitly supported: selecting “pracuję tu obecnie” clears/disables the end date in the UI and the API enforces `endDate=null` whenever `current=true`.
 - Practical Polish occupation/skill normalization foundations.
 
 ### Job understanding and decision support
@@ -42,6 +44,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Career-Truth-grounded Application Package.
 - Base CV generation and real server-side PDF export with Polish characters.
 - Education entered in Career Truth is carried into the Application Package and rendered in HTML/PDF CV output with degree/field, dates and description when supplied.
+- Removed Career Truth facts, experience and education no longer enter a newly generated Application Package/CV.
 - Application Tracker with guarded state transitions.
 - Invalid tracker transitions are returned as controlled client validation errors and are not persisted.
 - One-tap recruitment Outcome Capture.
@@ -69,7 +72,8 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
 - Profile arrays, Career Truth facts, experience/education fields, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
 - Analytics event names and property objects are bounded by name length, top-level property count and serialized size before sanitization/storage.
-- User-owned Career Truth facts, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
+- User-owned Career Truth facts, experiences, education, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
+- Career Truth deletion SQL is scoped by both record ID and authenticated `user_id`; known misses are translated to 404 without masking unrelated database/runtime failures.
 - Invalid application status transitions use a stable 400 `INVALID_STATUS_TRANSITION` contract and regression tests verify that rejected transitions do not mutate the stored application.
 - Cross-user record isolation regression coverage.
 - Controlled 4xx validation for malformed registration credentials.
@@ -119,7 +123,9 @@ GitHub CI currently gates merges on:
 - proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
 - API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience/education descriptions and analytics property/name limits,
 - API critical-flow coverage that creates education, reads it through Career Truth, verifies it in the Application Package and checks it in the data export,
+- Career Truth correction tests proving own-record removal, foreign/nonexistent delete-contract equivalence, `current=true` end-date clearing, and exclusion of removed data from subsequent Application Package CV content,
 - browser critical-flow coverage that enters education through the UI and verifies it remains visible after navigating away and back,
+- browser correction coverage for manual fact removal, current employment, experience removal and education removal,
 - resource isolation/error-contract tests comparing foreign vs nonexistent Career Truth facts, decision overrides and application outcomes,
 - invalid application-transition regression verifying a controlled 400 and no state mutation,
 - semantic backup/restore exercise,
@@ -140,6 +146,8 @@ The HTTP hardening work also exposed and fixed an existing configuration defect:
 The input-boundary work also closes a prior error-contract gap: too-short pasted job text is rejected as a controlled client validation error before `parseJobText` can throw a generic server-side exception.
 
 Resource-error hardening preserves the domain/store separation: the API layer translates only known ownership/not-found store outcomes into 404 and uses domain transition predicates for client-visible 400 validation; unrelated database/runtime failures still surface as internal server errors rather than being masked.
+
+Career Truth correction hardening follows the same boundary: store deletion operations are user-scoped and HTTP-agnostic, while the API maps only the exact known missing-record outcomes to stable public 404 responses.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -222,7 +230,8 @@ The following items were listed as missing in the original status file but are n
 - bounded ordinary JSON bodies and persistence-facing MVP input fields,
 - stable resource-not-found contracts for foreign/nonexistent user-owned records,
 - controlled non-mutating invalid application-transition handling,
-- end-to-end user-entered education flow from Career Truth through package/CV/export.
+- end-to-end user-entered education flow from Career Truth through package/CV/export,
+- user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation.
 
 ## Phase result
 
