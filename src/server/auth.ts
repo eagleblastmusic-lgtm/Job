@@ -56,7 +56,7 @@ export function verifyLoginPassword(password: string, stored: string | null | un
   return Boolean(stored) && valid;
 }
 
-export newSessionToken(): { raw: string; hash: string } {
+export function newSessionToken(): { raw: string; hash: string } {
   const raw = randomBytes(32).toString('base64url');
   const hash = createHash('sha256').update(raw).digest('hex');
   return { raw, hash };
