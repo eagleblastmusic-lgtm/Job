@@ -3,7 +3,7 @@ type Me = { user:{id:string;email:string;name:string;role:string}; profile:{desi
 type Consent = {type:string;granted:boolean;version:string;createdAt:string};
 const $=<T extends Element=HTMLElement>(s:string)=>document.querySelector(s) as T;
 const $$=<T extends Element=HTMLElement>(s:string)=>[...document.querySelectorAll(s)] as T[];
-const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]??c));
+const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));
 const value=(f:FormData,k:string)=>String(f.get(k)??'').trim();
 const values=(f:FormData,k:string)=>f.getAll(k).map(String).filter(Boolean);
 let me:Me|null=null; let currentJob=''; let currentDecision='';
