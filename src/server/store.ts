@@ -22,6 +22,9 @@ interface ExperienceRow { id: string; employer: string; title: string; normalize
 interface EducationRow { id: string; institution: string; field: string | null; degree: string | null; start_date: string | null; end_date: string | null; description: string | null }
 interface ApplicationRow { id: string; job_id: string; status: ApplicationStatus; applied_at: string | null; source: string; current_stage: string; next_action: string | null; created_at: string; updated_at: string }
 interface OutcomeRow { id: string; application_id: string; outcome_type: string; occurred_at: string; source: string; confidence: number; confirmed_by_user: number; created_at: string }
+interface ConsentRow { consent_type: string; granted: number; version: string; created_at: string }
+
+export interface ConsentRecord { type: string; granted: boolean; version: string; createdAt: string }
 
 function profileFromRow(row: ProfileRow | undefined): CareerProfile {
   if (!row) return { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null };
@@ -245,6 +248,22 @@ export class AppStore {
 
   getSubscription(userId: string): Record<string, unknown> | null {
     return (this.db.prepare('SELECT plan,status,trial_ends_at,current_period_ends_at,provider,created_at,updated_at FROM subscriptions WHERE user_id=?').get(userId) as Record<string, unknown> | undefined) ?? null;
+  }
+
+  recordConsent(userId: string, type: 'TERMS' | 'PRIVACY' | 'ANALYTICS', granted: boolean, version: string): ConsentRecord {
+    const createdAt = now();
+    this.db.prepare('INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(), userId, type, granted ? 1 : 0, version, createdAt);
+    this.audit(userId, 'CONSENT_RECORDED', 'consent', type, { granted, version });
+    return { type, granted, version, createdAt };
+  }
+
+  listConsents(userId: string): ConsentRecord[] {
+    const rows = this.db.prepare('SELECT consent_type,granted,version,created_at FROM consents WHERE user_id=? ORDER BY created_at DESC').all(userId) as unknown as ConsentRow[];
+    const latest = new Map<string, ConsentRecord>();
+    for (const row of rows) {
+      if (!latest.has(row.consent_type)) latest.set(row.consent_type, { type: row.consent_type, granted: row.granted === 1, version: row.version, createdAt: row.created_at });
+    }
+    return [...latest.values()];
   }
 
   analytics(userId: string | null, eventName: string, properties: Record<string, unknown> = {}): void {
