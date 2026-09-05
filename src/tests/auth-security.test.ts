@@ -21,11 +21,9 @@ async function jsonRequest(base: string, path: string, options: { method?: strin
   const headers: Record<string, string> = {};
   if (options.body) headers['content-type'] = 'application/json';
   if (options.cookie) headers.cookie = options.cookie;
-  const response = await fetch(`${base}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+  const requestInit: RequestInit = { method: options.method ?? 'GET', headers };
+  if (options.body) requestInit.body = JSON.stringify(options.body);
+  const response = await fetch(`${base}${path}`, requestInit);
   const payload = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string }; [key: string]: unknown };
   return { response, payload };
 }
