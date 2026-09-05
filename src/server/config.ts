@@ -8,12 +8,21 @@ function intEnv(name: string, fallback: number): number {
   return parsed;
 }
 
+function boolEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'no', 'off'].includes(raw)) return false;
+  throw new Error(`Nieprawidłowa wartość ${name}.`);
+}
+
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   databasePath: string;
   dataDir: string;
   appOrigin: string;
+  trustProxy: boolean;
   sessionDays: number;
   adminEmails: Set<string>;
   aiBaseUrl: string | null;
@@ -37,6 +46,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     databasePath: overrides.databasePath ?? resolve(process.env.DATABASE_PATH ?? `${dataDir}/job.sqlite`),
     dataDir,
     appOrigin: explicitOrigin || platformOrigin || 'http://localhost:3000',
+    trustProxy: overrides.trustProxy ?? boolEnv('TRUST_PROXY', false),
     sessionDays: overrides.sessionDays ?? intEnv('SESSION_DAYS', 30),
     adminEmails: overrides.adminEmails ?? adminEmails,
     aiBaseUrl: overrides.aiBaseUrl ?? (process.env.AI_BASE_URL?.trim() || null),
