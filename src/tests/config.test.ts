@@ -35,6 +35,18 @@ test('explicit APP_ORIGIN takes precedence over platform URL', () => {
   }
 });
 
+test('explicit nodeEnv override takes precedence over process environment', () => {
+  const previous = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = 'development';
+    assert.equal(loadConfig({ nodeEnv: 'production', port: 3000 }).nodeEnv, 'production');
+    process.env.NODE_ENV = 'production';
+    assert.equal(loadConfig({ nodeEnv: 'test', port: 3000 }).nodeEnv, 'test');
+  } finally {
+    restoreEnv('NODE_ENV', previous);
+  }
+});
+
 test('TRUST_PROXY is disabled by default and accepts explicit boolean values', () => {
   const previous = process.env.TRUST_PROXY;
   try {
