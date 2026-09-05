@@ -53,9 +53,15 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 
 ## Privacy and security implemented
 
-- Security headers including CSP, frame protection, referrer policy and permissions policy.
-- Same-origin mutation guard.
+- Security headers including CSP, frame protection, referrer policy, permissions policy and same-origin resource isolation.
+- HSTS on production-mode responses.
+- `Cache-Control: no-store` and `Pragma: no-cache` on all API responses, including authenticated/profile/export surfaces.
+- Same-origin mutation guard plus Fetch Metadata rejection for browser mutations classified as cross-site or same-site.
 - Basic rate limiting on sensitive endpoints, including a dedicated deletion re-authentication limit.
+- Rate-limit state is scoped to one running application instance rather than shared as process-global module state.
+- Forwarded client IP addresses are ignored by default; they are considered only when `TRUST_PROXY=true` is explicitly configured.
+- Trusted-proxy mode validates the first forwarded address as IPv4/IPv6 and falls back to the socket peer address when forwarded data is invalid or missing.
+- Render disposable staging explicitly enables the trusted-proxy boundary so rate limiting can distinguish clients behind platform ingress.
 - Cross-user record isolation regression coverage.
 - Controlled 4xx validation for malformed registration credentials.
 - Bounded e-mail/password inputs and generic login-failure responses.
@@ -101,6 +107,7 @@ GitHub CI currently gates merges on:
 - strict server/client/browser TypeScript checks,
 - fresh-database migration validation,
 - Node unit/API/security tests,
+- proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
 - semantic backup/restore exercise,
 - Playwright Chromium browser E2E on mobile and desktop profiles,
 - axe automated WCAG 2.2 A/AA checks on public and authenticated MVP surfaces,
@@ -111,6 +118,10 @@ GitHub CI currently gates merges on:
 - booted production-container `/api/health` smoke test.
 
 The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation. Browser E2E also covers the destructive-action re-authentication path.
+
+A new HTTP/proxy suite verifies that untrusted forwarded addresses do not split rate-limit buckets, trusted validated addresses do, invalid forwarded values fall back safely, limiter state is isolated per app instance, API responses are non-cacheable, production HSTS is emitted, and browser Fetch Metadata blocks non-same-origin mutation contexts.
+
+The HTTP hardening work also exposed and fixed an existing configuration defect: explicit `nodeEnv` overrides supplied to `loadConfig` / `createJobApp` were previously ignored in favor of the process environment. The override contract is now tested.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -125,6 +136,7 @@ Render is intentionally treated only as a **free disposable test environment**, 
 - deploy from `main` after CI checks,
 - `/api/health` health check,
 - ephemeral SQLite/upload paths under `/app/data`,
+- `TRUST_PROXY=true` for platform ingress client-IP handling,
 - no persistent disk.
 
 A Render restart/redeploy may erase all staging state. This is expected. Real candidate CVs, production credentials and irreplaceable data must not be used there.
@@ -186,7 +198,9 @@ The following items were listed as missing in the original status file but are n
 - database-aware health endpoint,
 - production-container smoke test,
 - Render test-staging Blueprint,
-- deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`.
+- deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`,
+- explicit trusted-proxy handling for single-instance rate limiting,
+- API no-store cache policy and production transport/resource security headers.
 
 ## Phase result
 
