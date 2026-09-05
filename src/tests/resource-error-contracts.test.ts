@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createJobApp } from '../server/app.js';
 
-interface ApiError { error?: { code?: string; message?: string } }
+interface ApiError { error?: { code?: string; message?: string; requestId?: string } }
+interface PublicError { code?: string; message?: string }
 
 async function withApp(run: (base: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), 'job-resource-errors-'));
@@ -28,8 +29,9 @@ async function register(base: string, email: string): Promise<string> {
   return response.headers.get('set-cookie')?.split(';')[0] ?? '';
 }
 
-async function readError(response: Response): Promise<ApiError['error']> {
-  return ((await response.json()) as ApiError).error;
+async function readError(response: Response): Promise<PublicError | undefined> {
+  const error = ((await response.json()) as ApiError).error;
+  return error ? { code: error.code, message: error.message } : undefined;
 }
 
 async function postJson(base: string, path: string, cookie: string, body: Record<string, unknown>): Promise<Response> {
