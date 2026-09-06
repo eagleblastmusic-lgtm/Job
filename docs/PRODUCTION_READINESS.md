@@ -65,6 +65,9 @@
 - [x] upload extension/MIME/signature/size validation
 - [x] portable relative upload storage keys with traversal-safe resolution
 - [x] legacy Linux/Windows absolute upload path migration
+- [x] shell-free ClamAV-compatible CV malware-scanner command boundary with bounded timeout
+- [x] fail-closed upload mode (`REQUIRE_MALWARE_SCAN=true`) and deletion of infected/unscannable temporary files before document extraction or DB persistence
+- [x] regression tests proving rejected malware-scan uploads create no upload record or inferred Career Truth facts
 - [x] rate limiting on vulnerable endpoints
 - [x] instance-local rate-limit state with explicit trusted-proxy client-IP handling
 - [x] spoofed forwarded IP ignored unless `TRUST_PROXY` is explicitly enabled
@@ -83,7 +86,7 @@
 - [ ] PostgreSQL production database
 - [ ] managed encrypted backups + restore exercise against hosted infrastructure
 - [ ] S3-compatible private storage
-- [ ] malware scanning
+- [ ] live malware scanner installed/configured with `REQUIRE_MALWARE_SCAN=true` and environment-level clean/infected/unavailable acceptance evidence
 - [ ] managed error monitoring (Sentry or equivalent)
 - [ ] production product analytics provider, if retained after privacy review
 - [ ] payment provider
@@ -98,4 +101,4 @@
 - [ ] final legal bases, processors/subprocessors and retention schedule
 - [ ] final legal review before public beta
 
-Current readiness: **repository and container are ready for disposable closed test staging; live staging has not yet been evidenced. Render is test-only and not a production durability target. Not ready for broad public launch.**
+Current readiness: **repository and container are ready for disposable closed test staging; live staging has not yet been evidenced. Render is test-only and not a production durability target. The malware-scanning integration boundary exists, but no live scanner deployment is claimed. Not ready for broad public launch.**
