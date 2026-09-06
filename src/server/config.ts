@@ -31,9 +31,6 @@ export interface AppConfig {
   aiTimeoutMs: number;
   pdfRendererBin: string;
   maxUploadBytes: number;
-  malwareScannerBin: string | null;
-  malwareScanTimeoutMs: number;
-  requireMalwareScan: boolean;
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -57,9 +54,6 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     aiModel: overrides.aiModel ?? (process.env.AI_MODEL?.trim() || null),
     aiTimeoutMs: overrides.aiTimeoutMs ?? intEnv('AI_TIMEOUT_MS', 15000),
     pdfRendererBin: overrides.pdfRendererBin ?? (process.env.PDF_RENDERER_BIN?.trim() || 'python3'),
-    maxUploadBytes: overrides.maxUploadBytes ?? intEnv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024),
-    malwareScannerBin: overrides.malwareScannerBin ?? (process.env.MALWARE_SCANNER_BIN?.trim() || null),
-    malwareScanTimeoutMs: overrides.malwareScanTimeoutMs ?? intEnv('MALWARE_SCAN_TIMEOUT_MS', 15_000),
-    requireMalwareScan: overrides.requireMalwareScan ?? boolEnv('REQUIRE_MALWARE_SCAN', false)
+    maxUploadBytes: overrides.maxUploadBytes ?? intEnv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024)
   };
 }
