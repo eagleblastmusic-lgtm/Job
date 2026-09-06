@@ -151,8 +151,8 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   await mkdir(resolve(input.dataDir, 'uploads', input.userId), { recursive: true, mode: 0o700 });
   await writeFile(fullPath, buffer, { mode: 0o600 });
   await chmod(fullPath, 0o600);
-  if (input.mimeType === DOCX) await validateStoredDocx(fullPath);
   await enforceMalwareScan(fullPath, malwareScanner, requireMalwareScan);
+  if (input.mimeType === DOCX) await validateStoredDocx(fullPath);
   const extractedText = await extractText(fullPath, input.mimeType);
   return {
     id,
