@@ -1,6 +1,6 @@
 # MVP 0.1 — implementation status
 
-Last refreshed: 2026-09-05
+Last refreshed: 2026-09-06
 
 This file tracks the executable MVP against the master implementation plan. It records what is evidenced in the repository today and keeps production/external dependencies explicit rather than treating planned work as complete.
 
@@ -126,6 +126,7 @@ GitHub CI currently gates merges on:
 - Career Truth correction tests proving own-record removal, foreign/nonexistent delete-contract equivalence, `current=true` end-date clearing, and exclusion of removed data from subsequent Application Package CV content,
 - browser critical-flow coverage that enters education through the UI and verifies it remains visible after navigating away and back,
 - browser correction coverage for manual fact removal, current employment, experience removal and education removal,
+- a dedicated Playwright technical time-to-first-Decision-Card gate on mobile and desktop that fails above 180 seconds and logs `FIRST_DECISION_TECHNICAL_MS`,
 - resource isolation/error-contract tests comparing foreign vs nonexistent Career Truth facts, decision overrides and application outcomes,
 - invalid application-transition regression verifying a controlled 400 and no state mutation,
 - semantic backup/restore exercise,
@@ -136,6 +137,8 @@ GitHub CI currently gates merges on:
 - the same locked dependency graph used inside the Docker build,
 - production Docker image build,
 - booted production-container `/api/health` smoke test.
+
+The technical `<3 min` test proves only that the implemented browser/system path can complete within the target under automation. `docs/FIRST_DECISION_ACCEPTANCE.md` defines the separate representative-user acceptance protocol; that product/usability evidence remains open and is not replaced by CI timing.
 
 The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation. Browser E2E also covers the destructive-action re-authentication path.
 
@@ -200,7 +203,7 @@ The Render connector is connected, but its direct web-service creation action do
 Before calling the master-plan MVP 0.1 gate complete:
 
 1. **Live disposable staging acceptance** — apply the existing free Render Blueprint and run health, automated staging smoke, browser sanity and log review against the deployed commit.
-2. **First Decision Card time-to-value evidence** — validate the `<3 min` happy-path target with representative users/usability sessions; automated E2E duration alone is not a substitute for this product metric.
+2. **Representative-user first Decision Card time-to-value evidence** — execute the protocol in `docs/FIRST_DECISION_ACCEPTANCE.md` and validate the `<3 min` happy-path target with representative users; the automated technical 180-second gate is now present but is not a substitute for this product metric.
 3. **Manual accessibility review** — perform assistive-technology/manual WCAG 2.2 AA checks in addition to the existing automated axe gate.
 4. **Final privacy/legal readiness** — real controller/contact identity, final legal bases, subprocessors/transfers, retention schedule and legal review before public beta.
 5. **Live payments** — integrate the selected provider, subscription lifecycle and BLIK where practical; current billing is configuration/trial only.
@@ -231,7 +234,8 @@ The following items were listed as missing in the original status file but are n
 - stable resource-not-found contracts for foreign/nonexistent user-owned records,
 - controlled non-mutating invalid application-transition handling,
 - end-to-end user-entered education flow from Career Truth through package/CV/export,
-- user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation.
+- user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation,
+- automated technical browser gate proving the first Decision Card path stays below 180 seconds in CI.
 
 ## Phase result
 
