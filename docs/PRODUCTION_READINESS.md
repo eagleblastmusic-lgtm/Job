@@ -39,6 +39,8 @@
 - [x] browser-level Playwright E2E on desktop and mobile Chromium profiles
 - [x] browser critical flow enters education and verifies persisted UI rendering
 - [x] browser correction flow verifies fact/experience/education removal and current employment
+- [x] technical browser happy path to first Decision Card is gated at <= 180 seconds in CI
+- [ ] representative-user first Decision Card happy-path validation under 3 minutes
 - [x] automated axe WCAG 2.2 A/AA scan for public and authenticated MVP surfaces
 - [x] accessibility regression gate for labels, keyboard focus, target size and reduced motion
 - [x] committed npm dependency lockfile with `npm ci` enforced in CI and Docker builds
