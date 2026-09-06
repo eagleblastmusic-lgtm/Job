@@ -4,7 +4,7 @@ import { basename, extname, isAbsolute, relative, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { HttpError } from './http.js';
-import type { MalwareScanner } from './malwareScanner.js';
+import { malwareScanPolicyFromEnv, type MalwareScanner } from './malwareScanner.js';
 
 const execFileAsync = promisify(execFile);
 const PDF = 'application/pdf';
@@ -136,7 +136,11 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   if (buffer.byteLength === 0) throw new HttpError(400, 'Plik jest pusty.', 'EMPTY_UPLOAD');
   if (buffer.byteLength > input.maxBytes) throw new HttpError(413, `Plik przekracza limit ${Math.floor(input.maxBytes / 1024 / 1024)} MB.`, 'UPLOAD_TOO_LARGE');
   validateSignature(buffer, input.mimeType);
-  if (input.requireMalwareScan && !input.malwareScanner) {
+
+  const envPolicy = input.malwareScanner === undefined && input.requireMalwareScan === undefined ? malwareScanPolicyFromEnv() : null;
+  const malwareScanner = input.malwareScanner ?? envPolicy?.scanner;
+  const requireMalwareScan = input.requireMalwareScan ?? envPolicy?.required ?? false;
+  if (requireMalwareScan && !malwareScanner) {
     throw new HttpError(503, 'Skan bezpieczeństwa pliku jest chwilowo niedostępny.', 'UPLOAD_MALWARE_SCAN_UNAVAILABLE');
   }
 
@@ -148,7 +152,7 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   await writeFile(fullPath, buffer, { mode: 0o600 });
   await chmod(fullPath, 0o600);
   if (input.mimeType === DOCX) await validateStoredDocx(fullPath);
-  await enforceMalwareScan(fullPath, input.malwareScanner, input.requireMalwareScan === true);
+  await enforceMalwareScan(fullPath, malwareScanner, requireMalwareScan);
   const extractedText = await extractText(fullPath, input.mimeType);
   return {
     id,
