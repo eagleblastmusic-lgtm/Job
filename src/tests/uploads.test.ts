@@ -77,6 +77,16 @@ test('infected upload is rejected and deleted before extraction/persistence can 
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('infected DOCX is scanned before archive structure processing', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'job-upload-infected-docx-'));
+  const scanner: MalwareScanner = async () => ({ status: 'INFECTED' });
+  const fakeDocx = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('not-a-valid-office-archive')]);
+  try {
+    await expectUploadError(() => storeCvUpload({ dataDir: dir, userId: 'user-1', filename: 'cv.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', base64: fakeDocx.toString('base64'), maxBytes: 1024, malwareScanner: scanner, requireMalwareScan: true }), 'UPLOAD_MALWARE_DETECTED');
+    assert.deepEqual(await readdir(join(dir, 'uploads', 'user-1')), []);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('configured scanner failure rejects and deletes the upload', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-upload-scan-error-'));
   const scanner: MalwareScanner = async () => ({ status: 'ERROR', reason: 'timeout' });
