@@ -4,6 +4,7 @@ import { basename, extname, isAbsolute, relative, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { HttpError } from './http.js';
+import type { MalwareScanner } from './malwareScanner.js';
 
 const execFileAsync = promisify(execFile);
 const PDF = 'application/pdf';
@@ -85,6 +86,20 @@ async function validateStoredDocx(path: string): Promise<void> {
   }
 }
 
+async function enforceMalwareScan(path: string, scanner: MalwareScanner | undefined, required: boolean): Promise<void> {
+  if (!scanner) {
+    if (required) throw new HttpError(503, 'Skan bezpieczeństwa pliku jest chwilowo niedostępny.', 'UPLOAD_MALWARE_SCAN_UNAVAILABLE');
+    return;
+  }
+  const result = await scanner(path);
+  if (result.status === 'CLEAN') return;
+  await unlink(path).catch(() => undefined);
+  if (result.status === 'INFECTED') {
+    throw new HttpError(422, 'Plik został odrzucony przez skan bezpieczeństwa.', 'UPLOAD_MALWARE_DETECTED');
+  }
+  throw new HttpError(503, 'Skan bezpieczeństwa pliku jest chwilowo niedostępny.', 'UPLOAD_MALWARE_SCAN_UNAVAILABLE');
+}
+
 /**
  * Resolve a persisted, platform-neutral upload key under DATA_DIR.
  * Persisted keys are deliberately relative so a backup can be restored to a
@@ -110,7 +125,7 @@ export function resolveStoredFilePath(dataDir: string, storageKey: string): stri
   return fullPath;
 }
 
-export async function storeCvUpload(input: { dataDir: string; userId: string; filename: string; mimeType: string; base64: string; maxBytes: number }): Promise<StoredUpload> {
+export async function storeCvUpload(input: { dataDir: string; userId: string; filename: string; mimeType: string; base64: string; maxBytes: number; malwareScanner?: MalwareScanner; requireMalwareScan?: boolean }): Promise<StoredUpload> {
   if (!ALLOWED.has(input.mimeType)) throw new HttpError(400, 'Obsługiwane formaty CV: PDF, DOCX, TXT i Markdown.', 'UNSUPPORTED_UPLOAD_TYPE');
   if (!/^[a-zA-Z0-9_-]+$/.test(input.userId)) throw new Error('Invalid upload owner identifier.');
   const originalName = safeName(input.filename);
@@ -121,6 +136,9 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   if (buffer.byteLength === 0) throw new HttpError(400, 'Plik jest pusty.', 'EMPTY_UPLOAD');
   if (buffer.byteLength > input.maxBytes) throw new HttpError(413, `Plik przekracza limit ${Math.floor(input.maxBytes / 1024 / 1024)} MB.`, 'UPLOAD_TOO_LARGE');
   validateSignature(buffer, input.mimeType);
+  if (input.requireMalwareScan && !input.malwareScanner) {
+    throw new HttpError(503, 'Skan bezpieczeństwa pliku jest chwilowo niedostępny.', 'UPLOAD_MALWARE_SCAN_UNAVAILABLE');
+  }
 
   const id = randomUUID();
   const filename = `${id}${extension}`;
@@ -130,6 +148,7 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
   await writeFile(fullPath, buffer, { mode: 0o600 });
   await chmod(fullPath, 0o600);
   if (input.mimeType === DOCX) await validateStoredDocx(fullPath);
+  await enforceMalwareScan(fullPath, input.malwareScanner, input.requireMalwareScan === true);
   const extractedText = await extractText(fullPath, input.mimeType);
   return {
     id,
