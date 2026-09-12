@@ -17,7 +17,11 @@ function securityHeaders(res: ServerResponse, config: AppConfig): void {
 }
 
 function isExtendedPath(pathname: string): boolean {
-  return pathname === '/api/features' || pathname === '/api/export' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications');
+  return pathname === '/api/features'
+    || pathname === '/api/export'
+    || pathname.startsWith('/api/today')
+    || pathname.startsWith('/api/notifications')
+    || /^\/api\/applications\/[^/]+\/interview-pack$/.test(pathname);
 }
 
 export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
