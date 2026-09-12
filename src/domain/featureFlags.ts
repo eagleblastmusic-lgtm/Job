@@ -1,5 +1,6 @@
 export const FEATURE_FLAG_KEYS = [
   'today',
+  'notifications',
   'interview_pack',
   'skill_roi',
   'career_transition',

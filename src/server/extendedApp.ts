@@ -17,7 +17,7 @@ function securityHeaders(res: ServerResponse, config: AppConfig): void {
 }
 
 function isExtendedPath(pathname: string): boolean {
-  return pathname === '/api/features' || pathname.startsWith('/api/today');
+  return pathname === '/api/features' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications');
 }
 
 export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
@@ -28,10 +28,7 @@ export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
 
   app.server.on('request', async (req, res) => {
     const url = new URL(req.url ?? '/', app.config.appOrigin);
-    if (!isExtendedPath(url.pathname)) {
-      original(req, res);
-      return;
-    }
+    if (!isExtendedPath(url.pathname)) { original(req, res); return; }
 
     const requestId = randomUUID();
     securityHeaders(res, app.config);
@@ -48,6 +45,5 @@ export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
       else res.end();
     }
   });
-
   return app;
 }
