@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { AxeBuilder } from '@axe-core/playwright';
 
 const uniqueEmail = (): string => `today-ui-${Date.now()}-${Math.random().toString(16).slice(2)}@example.pl`;
 
