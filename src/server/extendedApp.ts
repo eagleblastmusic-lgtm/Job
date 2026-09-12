@@ -17,7 +17,7 @@ function securityHeaders(res: ServerResponse, config: AppConfig): void {
 }
 
 function isExtendedPath(pathname: string): boolean {
-  return pathname === '/api/features' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications');
+  return pathname === '/api/features' || pathname === '/api/export' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications');
 }
 
 export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
@@ -29,7 +29,6 @@ export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
   app.server.on('request', async (req, res) => {
     const url = new URL(req.url ?? '/', app.config.appOrigin);
     if (!isExtendedPath(url.pathname)) { original(req, res); return; }
-
     const requestId = randomUUID();
     securityHeaders(res, app.config);
     res.setHeader('x-request-id', requestId);
@@ -41,8 +40,7 @@ export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
     } catch (error) {
       const http = error instanceof HttpError ? error : new HttpError(500, 'Wystąpił błąd serwera.', 'INTERNAL_ERROR');
       if (!(error instanceof HttpError)) console.error(`[${requestId}]`, error);
-      if (!res.headersSent) sendJson(res, http.status, { error: { code: http.code, message: http.message, requestId } });
-      else res.end();
+      if (!res.headersSent) sendJson(res, http.status, { error: { code: http.code, message: http.message, requestId } }); else res.end();
     }
   });
   return app;

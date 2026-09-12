@@ -20,7 +20,7 @@ async function postJson<T>(base: string, path: string, cookie: string, body: unk
   return { response, data: await response.json() as T };
 }
 
-test('notifications are useful, configurable, deduplicated and user-scoped', async () => {
+test('notifications are useful, configurable, deduplicated, exportable and user-scoped', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-notifications-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', resolve).once('error', reject));
@@ -55,6 +55,13 @@ test('notifications are useful, configurable, deduplicated and user-scoped', asy
 
     const second = await fetch(`${base}/api/notifications`, { headers: { cookie: alice } });
     assert.equal(((await second.json()) as { notifications: unknown[] }).notifications.length, firstData.notifications.length, 'refresh must deduplicate the same reminder');
+
+    const exported = await fetch(`${base}/api/export`, { headers: { cookie: alice } });
+    assert.equal(exported.status, 200);
+    const exportedData = await exported.json() as Record<string, unknown>;
+    assert.ok(Array.isArray(exportedData.daily_actions));
+    assert.ok(Array.isArray(exportedData.notification_preferences));
+    assert.equal((exportedData.notifications as unknown[]).length, 1);
 
     const foreign = await fetch(`${base}/api/notifications/${followUp.id}/read`, { method: 'PATCH', headers: { cookie: bob } });
     assert.equal(foreign.status, 404);

@@ -43,22 +43,32 @@ function booleanSetting(body: Record<string, unknown>, key: keyof NotificationPr
   return value;
 }
 
+function extendedUserExport(store: AppStore, db: JobDatabase, userId: string): Record<string, unknown> {
+  const data = store.exportUserData(userId);
+  data.daily_actions = db.db.prepare('SELECT * FROM daily_actions WHERE user_id=? ORDER BY created_at').all(userId);
+  data.notification_preferences = db.db.prepare('SELECT * FROM notification_preferences WHERE user_id=?').all(userId);
+  data.notifications = db.db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at').all(userId);
+  return data;
+}
+
 export async function handleExtendedApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, db: JobDatabase, config: AppConfig): Promise<boolean> {
   const method = req.method ?? 'GET';
-  if (pathname !== '/api/features' && !pathname.startsWith('/api/today') && !pathname.startsWith('/api/notifications')) return false;
+  if (pathname !== '/api/features' && pathname !== '/api/export' && !pathname.startsWith('/api/today') && !pathname.startsWith('/api/notifications')) return false;
   enforceOrigin(req, config);
   const user = requireUser(req, store);
   const flags = new FeatureFlagService(db);
 
   if (method === 'GET' && pathname === '/api/features') {
-    sendJson(res, 200, { features: flags.effective({ userId: user.id, role: user.role }) });
-    return true;
+    sendJson(res, 200, { features: flags.effective({ userId: user.id, role: user.role }) }); return true;
+  }
+  if (method === 'GET' && pathname === '/api/export') {
+    store.audit(user.id, 'DATA_EXPORTED', 'user', user.id);
+    sendJson(res, 200, extendedUserExport(store, db, user.id)); return true;
   }
 
   if (pathname.startsWith('/api/notifications')) {
     requireFeature(flags, user, 'notifications', 'Powiadomienia nie są obecnie dostępne.');
     const notifications = new NotificationService(db);
-
     if (method === 'GET' && pathname === '/api/notifications/preferences') {
       sendJson(res, 200, { preferences: notifications.getPreferences(user.id) }); return true;
     }
@@ -90,13 +100,11 @@ export async function handleExtendedApi(req: IncomingMessage, res: ServerRespons
 
   requireFeature(flags, user, 'today', 'Funkcja DZISIAJ nie jest obecnie dostępna.');
   const today = new TodayService(db);
-
   if (method === 'GET' && pathname === '/api/today') {
     sendJson(res, 200, { actions: today.listToday(user.id, user.timezone) }); return true;
   }
   if (method === 'POST' && pathname === '/api/today/recommendations') {
-    const body = await readJson(req);
-    const rawBudget = body.timeBudgetMinutes;
+    const body = await readJson(req); const rawBudget = body.timeBudgetMinutes;
     if (typeof rawBudget !== 'number' || ![10, 30, 60, 120].includes(rawBudget)) throw new HttpError(400, 'Wybierz dostępny budżet czasu: 10, 30, 60 albo 120 minut.', 'INVALID_TIME_BUDGET');
     const actions = today.recommend(user.id, user.timezone, rawBudget);
     store.analytics(user.id, 'today_opened', { timeBudgetMinutes: rawBudget, actionCount: actions.length });
