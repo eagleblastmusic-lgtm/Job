@@ -1,7 +1,22 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
-const uniqueEmail = (): string => `today-ui-${Date.now()}-${Math.random().toString(16).slice(2)}@example.pl`;
+async function mockAuthenticatedUser(page: Page): Promise<void> {
+  await page.route('**/api/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      user: { id: 'ui-today-user', email: 'today-ui@example.pl', name: 'Tester Today', role: 'USER', locale: 'pl-PL', timezone: 'Europe/Warsaw' },
+      profile: { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null },
+      subscription: { plan: 'TRIAL', status: 'TRIALING' }
+    })
+  }));
+  await page.route('**/api/career-truth', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ facts: [], experiences: [], education: [] })
+  }));
+}
 
 test('Today screen is feature-gated, calm, actionable and accessible', async ({ page }) => {
   let accepted = false;
@@ -13,6 +28,7 @@ test('Today screen is feature-gated, calm, actionable and accessible', async ({ 
     recommendedFor: '2026-09-13', payload: {}
   });
 
+  await mockAuthenticatedUser(page);
   await page.route('**/api/features', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ features: { today: true } }) }));
   await page.route('**/api/today**', async route => {
     const url = new URL(route.request().url());
@@ -32,13 +48,6 @@ test('Today screen is feature-gated, calm, actionable and accessible', async ({ 
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
-  await page.locator('#registerForm input[name="name"]').fill('Tester Today');
-  await page.locator('#registerForm input[name="email"]').fill(uniqueEmail());
-  await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
-  await page.locator('#registerForm input[name="acceptTerms"]').check();
-  await page.locator('#registerForm input[name="acceptPrivacy"]').check();
-  await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
   await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
 
   await expect(page.locator('[data-view="today"]:visible').first()).toBeVisible();
@@ -47,7 +56,7 @@ test('Today screen is feature-gated, calm, actionable and accessible', async ({ 
   await page.getByRole('button', { name: '30 min' }).click();
   await expect(page.locator('#todayActions')).toContainText('Dopracuj bazowe CV');
   await expect(page.locator('#todayActions')).toContainText('około 10 min');
-  await expect(page.locator('#todayActions')).not.toContainText(/streak|przegapiłeś|musisz/i);
+  await expect(page.locator('#todayActions')).not.toContainText(/streak|przegapiłeś|musisz\b/i);
 
   await page.getByRole('button', { name: 'Wybieram to' }).click();
   await expect(page.locator('#todayMessage')).toContainText('Działanie wybrane');

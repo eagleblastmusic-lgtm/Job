@@ -11,6 +11,7 @@ This file tracks repository evidence against the Master Implementation Plan. A f
 - **MVP 0.1 live staging / representative-user / manual / legal / production-infrastructure acceptance:** PENDING.
 - **Feature-flag rollout foundation:** IMPLEMENTED.
 - **MVP 0.2 Today / Action Priority implementation:** IMPLEMENTED BEHIND FEATURE FLAG; product acceptance remains PENDING.
+- **MVP 0.2 useful in-app Notifications:** IMPLEMENTED BEHIND FEATURE FLAG; external delivery and rollout evidence remain PENDING.
 - **Later Master Plan phases:** not complete unless explicitly listed below.
 
 ## Implemented MVP 0.1 product scope
@@ -63,12 +64,12 @@ Large post-MVP features use persisted feature flags with deterministic user buck
 - `enabled=false` is immediate fail-closed rollback.
 - `enabled=true` + 0% exposes the feature only to persisted ADMIN users for internal testing.
 - Operator command: `npm run feature:flag -- <key> <on|off> <0|10|50|100>`.
-- Current keys include Today, Interview Pack, Skill ROI, Career Transition, Strategy Engine and Job Feed.
+- Current keys include Today, Notifications, Interview Pack, Skill ROI, Career Transition, Strategy Engine and Job Feed.
 - Existing flags remain disabled by default until explicitly rolled out.
 
 ## MVP 0.2 — Today / Action Priority
 
-Repository implementation now includes the feature-gated **DZISIAJ** vertical:
+Repository implementation includes the feature-gated **DZISIAJ** vertical:
 
 - deterministic Action Priority scoring based on opportunity value, urgency, confidence, expected progress and estimated effort;
 - supported time budgets 10/30/60/120 minutes;
@@ -87,6 +88,22 @@ Repository implementation now includes the feature-gated **DZISIAJ** vertical:
 
 **Important product gate:** the Master Plan requires real MVP usage before formally activating/accepting Today. Repository implementation is therefore not evidence that the product gate has passed. The flag remains the rollout boundary.
 
+## MVP 0.2 — Useful Notifications
+
+Repository implementation includes a feature-gated in-app notification center designed to surface only actionable reminders:
+
+- per-user settings for follow-up reminders, application deadlines, interview reminders and future matched-job notifications;
+- persisted notification records with read/dismiss state and deterministic deduplication keys;
+- current V1 generators cover follow-up after a sufficient waiting period and near application deadlines using real tracker/job data;
+- interview/matched-job switches are persisted now, while generation remains dependent on later interview-date/feed data rather than fabricated signals;
+- notifications are user-scoped and foreign IDs cannot be mutated by another user;
+- in-app UI uses calm language without streak/shame/panic mechanics and supports read/dismiss actions;
+- notification preferences and records are included in user export;
+- server events for notification interaction remain subject to existing analytics-consent persistence rules;
+- Node/API tests cover generation, deduplication, settings, user isolation and export; Playwright/axe covers the notification UI without consuming production authentication rate-limit budget.
+
+**Delivery boundary:** no external email, SMS or push provider is claimed. V1 is an in-app notification center; provider-backed delivery and real staged-rollout evidence remain open.
+
 ## Migrations
 
 Executable SQLite migrations are sequentially validated in CI:
@@ -95,7 +112,8 @@ Executable SQLite migrations are sequentially validated in CI:
 - `0002_hardening.sql` — hardening/index changes;
 - `0003_analytics_consent.sql` — analytics-consent persistence gate;
 - `0004_portable_upload_storage_keys.sql` — portable upload references and legacy-path migration;
-- `0005_today_actions.sql` — Today action key/priority/day/update fields and indexes.
+- `0005_today_actions.sql` — Today action key/priority/day/update fields and indexes;
+- `0006_notifications.sql` — notification preferences, persisted in-app notifications and notification rollout seed.
 
 `postgres_0001_reference.sql` remains a production target/reference, not an executed production PostgreSQL migration.
 
@@ -109,6 +127,7 @@ CI gates repository changes on:
 - HTTP/proxy/cache/transport/input-boundary/resource-isolation/authentication/malware regressions;
 - feature-flag deterministic rollout/rollback and audited operator tests;
 - Career Truth, education, document-generation and correction flows;
+- Today and Notifications ownership/input/deduplication/state tests;
 - semantic backup/restore exercise;
 - Playwright Chromium mobile + desktop flows and a <=180-second technical first-Decision-Card gate;
 - automated axe WCAG 2.2 A/AA checks and accessibility regressions;
@@ -128,8 +147,8 @@ The automated <=180-second path proves technical capability only. Representative
 8. Install and evidence a live malware scanner with required scanning in the chosen hosting architecture.
 9. Complete penetration/security review before broad launch.
 
-## Master Plan phases after Today
+## Master Plan phases after Notifications
 
-Next implementation order remains: useful notification settings/in-app notifications → Interview Prep Pack V1 → legal JobSourceConnector abstraction → Job Feed + deduplication → Bottleneck Engine/confidence → Local Labour Intelligence + Effective Wage → Skill ROI + just-in-time learning → Career Transition → Outcome Inbox → Strategy Engine → native/mobile and larger-scale data-moat phases.
+Next implementation order remains: Interview Prep Pack V1 → legal JobSourceConnector abstraction → Job Feed + deduplication → Bottleneck Engine/confidence → Local Labour Intelligence + Effective Wage → Skill ROI + just-in-time learning → Career Transition → Outcome Inbox → Strategy Engine → native/mobile and larger-scale data-moat phases.
 
 No later phase is marked complete merely because schema placeholders or feature-flag keys exist.

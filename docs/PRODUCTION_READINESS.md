@@ -28,7 +28,10 @@
 - [x] Today supports 10/30/60/120-minute budgets, max three actions, accept/complete/outcome persistence and calm no-guilt UX
 - [x] Today API ownership/flag/input tests and Playwright/axe UI coverage
 - [ ] Today real-user/product acceptance and staged rollout evidence
-- [ ] Notifications
+- [x] useful in-app Notifications behind a disabled-by-default feature flag
+- [x] notification preferences, deterministic deduplication, read/dismiss state, user scoping and export coverage
+- [x] follow-up/deadline notification generation from real tracker/job state and Playwright/axe UI coverage
+- [ ] provider-backed external email/push notification delivery and rollout evidence
 - [ ] Interview Prep Pack V1
 - [ ] Job Sources / Feed / Dedupe
 - [ ] Bottleneck / Confidence
@@ -85,10 +88,11 @@
 
 - [x] test-version privacy/terms surfaces and versioned consent history
 - [x] data export and re-authenticated account deletion
+- [x] Notifications settings/state included in data export
 - [ ] final controller/service-provider identity/contact data
 - [ ] final legal bases, processors/subprocessors/transfers and retention schedule
 - [ ] final legal review before public beta
 
 ## Current readiness
 
-The repository/container is suitable for **closed disposable testing**, not broad public production. Render remains test-only and ephemeral. Today is implemented behind a feature flag but the Master Plan product gate requiring real usage is not claimed as passed. Public production still requires the external/manual/legal/provider/infrastructure items above.
+The repository/container is suitable for **closed disposable testing**, not broad public production. Render remains test-only and ephemeral. Today and in-app Notifications are implemented behind feature flags, but real-user/staged-rollout product gates are not claimed as passed. External notification providers are not configured. Public production still requires the external/manual/legal/provider/infrastructure items above.
