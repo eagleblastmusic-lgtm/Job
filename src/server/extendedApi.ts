@@ -7,6 +7,7 @@ import { boundedStringField, HttpError, readJson, sendJson } from './http.js';
 import { FeatureFlagService } from './featureFlagService.js';
 import { TodayService } from './todayService.js';
 import { NotificationService, type NotificationPreferences } from './notificationService.js';
+import { InterviewPackService } from './interviewPackService.js';
 import type { FeatureFlagKey } from '../domain/featureFlags.js';
 
 function requireUser(req: IncomingMessage, store: AppStore): UserRecord {
@@ -53,7 +54,8 @@ function extendedUserExport(store: AppStore, db: JobDatabase, userId: string): R
 
 export async function handleExtendedApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, db: JobDatabase, config: AppConfig): Promise<boolean> {
   const method = req.method ?? 'GET';
-  if (pathname !== '/api/features' && pathname !== '/api/export' && !pathname.startsWith('/api/today') && !pathname.startsWith('/api/notifications')) return false;
+  const interviewMatch = pathname.match(/^\/api\/applications\/([^/]+)\/interview-pack$/);
+  if (pathname !== '/api/features' && pathname !== '/api/export' && !pathname.startsWith('/api/today') && !pathname.startsWith('/api/notifications') && !interviewMatch) return false;
   enforceOrigin(req, config);
   const user = requireUser(req, store);
   const flags = new FeatureFlagService(db);
@@ -64,6 +66,15 @@ export async function handleExtendedApi(req: IncomingMessage, res: ServerRespons
   if (method === 'GET' && pathname === '/api/export') {
     store.audit(user.id, 'DATA_EXPORTED', 'user', user.id);
     sendJson(res, 200, extendedUserExport(store, db, user.id)); return true;
+  }
+
+  if (interviewMatch) {
+    requireFeature(flags, user, 'interview_pack', 'Pakiet przygotowania do rozmowy nie jest obecnie dostępny.');
+    if (method !== 'GET') { sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Nie znaleziono endpointu.' } }); return true; }
+    const service = new InterviewPackService(store);
+    const pack = knownNotFound(() => service.generate(user.id, interviewMatch[1] ?? ''), 'Nie znaleziono aplikacji.');
+    store.analytics(user.id, 'interview_pack_opened');
+    sendJson(res, 200, { pack }); return true;
   }
 
   if (pathname.startsWith('/api/notifications')) {
