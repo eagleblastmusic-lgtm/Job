@@ -1,6 +1,6 @@
-import { createJobApp } from './app.js';
+import { createExtendedJobApp } from './extendedApp.js';
 
-const app = createJobApp();
+const app = createExtendedJobApp();
 app.server.listen(app.config.port, () => {
   console.log(`Job działa na ${app.config.appOrigin} (port ${app.config.port}).`);
 });
