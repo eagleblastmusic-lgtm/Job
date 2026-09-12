@@ -25,6 +25,7 @@ export interface AppConfig {
   appOrigin: string;
   trustProxy: boolean;
   sessionDays: number;
+  /** Compatibility field only. Public registration must never derive ADMIN from an asserted e-mail address. */
   adminEmails: Set<string>;
   aiBaseUrl: string | null;
   aiApiKey: string | null;
@@ -39,7 +40,6 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   const nodeEnvRaw = overrides.nodeEnv ?? process.env.NODE_ENV ?? 'development';
   const nodeEnv: AppConfig['nodeEnv'] = nodeEnvRaw === 'production' || nodeEnvRaw === 'test' ? nodeEnvRaw : 'development';
   const dataDir = overrides.dataDir ?? resolve(process.env.DATA_DIR ?? './data');
-  const adminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean));
   const explicitOrigin = overrides.appOrigin ?? process.env.APP_ORIGIN?.trim();
   const platformOrigin = process.env.RENDER_EXTERNAL_URL?.trim() || null;
   return {
@@ -50,7 +50,9 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appOrigin: explicitOrigin || platformOrigin || 'http://localhost:3000',
     trustProxy: overrides.trustProxy ?? boolEnv('TRUST_PROXY', false),
     sessionDays: overrides.sessionDays ?? intEnv('SESSION_DAYS', 30),
-    adminEmails: overrides.adminEmails ?? adminEmails,
+    // Deliberately ignore ADMIN_EMAILS and any override here. E-mail ownership is not
+    // verified in MVP, so an asserted address is not an authorization factor.
+    adminEmails: new Set<string>(),
     aiBaseUrl: overrides.aiBaseUrl ?? (process.env.AI_BASE_URL?.trim() || null),
     aiApiKey: overrides.aiApiKey ?? (process.env.AI_API_KEY?.trim() || null),
     aiModel: overrides.aiModel ?? (process.env.AI_MODEL?.trim() || null),

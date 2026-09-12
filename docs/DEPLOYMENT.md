@@ -26,6 +26,18 @@ Do not enable `TRUST_PROXY` on a service that can also be reached directly by un
 
 Production responses include HSTS, and all API responses are emitted with `Cache-Control: no-store` plus `Pragma: no-cache`. Browser mutations also reject Fetch Metadata requests classified as cross-site or same-site; non-browser clients without Fetch Metadata remain supported and are still subject to the existing Origin check when they send an `Origin` header.
 
+## Administrator provisioning
+
+Public registration never grants administrator privileges from an e-mail allow-list. The current MVP intentionally has no `ADMIN_EMAILS` privilege-grant mechanism because account creation does not yet verify ownership of an e-mail address.
+
+Create the normal account first, then provision the role from an operator environment with direct access to the same database:
+
+```bash
+DATABASE_PATH=/app/data/job.sqlite npm run provision:admin -- admin@example.pl
+```
+
+The operation updates the persisted role and records `ADMIN_PROVISIONED_OUT_OF_BAND` in the audit log in the same transaction. There is no public HTTP endpoint for elevation. See `docs/ADMIN_PROVISIONING.md` for the full boundary. Administrator MFA remains a pre-broad-launch requirement.
+
 ## Render test staging blueprint
 
 `render.yaml` defines a **free, disposable test environment only**. It is not the target production architecture and must not be treated as durable storage.
