@@ -17,11 +17,7 @@ function securityHeaders(res: ServerResponse, config: AppConfig): void {
 }
 
 function isExtendedPath(pathname: string): boolean {
-  return pathname === '/api/features'
-    || pathname === '/api/export'
-    || pathname.startsWith('/api/today')
-    || pathname.startsWith('/api/notifications')
-    || /^\/api\/applications\/[^/]+\/interview-pack$/.test(pathname);
+  return pathname === '/api/features' || pathname === '/api/export' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications') || pathname.startsWith('/api/job-feed') || pathname.startsWith('/api/admin/job-sources') || /^\/api\/applications\/[^/]+\/interview-pack$/.test(pathname);
 }
 
 export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
