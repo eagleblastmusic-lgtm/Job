@@ -21,6 +21,7 @@
     "backup:data": "node scripts/backup.mjs",
     "restore:data": "node scripts/restore.mjs",
     "provision:admin": "node scripts/provision-admin.mjs",
+    "feature:flag": "node scripts/set-feature-flag.mjs",
     "start": "node --enable-source-maps dist/server/index.js",
     "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js"
   },
