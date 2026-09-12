@@ -2,7 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
 async function mockAuthenticatedUser(page: Page): Promise<void> {
-  await page.route('**/api/auth/register', route => route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ user: { id: 'ui-interview-user', email: 'interview-ui@example.pl', name: 'Tester Rozmowy', role: 'USER' } }) }));
   await page.route('**/api/me', route => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify({
       user: { id: 'ui-interview-user', email: 'interview-ui@example.pl', name: 'Tester Rozmowy', role: 'USER', locale: 'pl-PL', timezone: 'Europe/Warsaw' },
@@ -35,13 +34,6 @@ test('Interview Pack is truthful, complete and accessible', async ({ page }) => 
   }));
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
-  await page.locator('#registerForm input[name="name"]').fill('Tester Rozmowy');
-  await page.locator('#registerForm input[name="email"]').fill('interview-ui@example.pl');
-  await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
-  await page.locator('#registerForm input[name="acceptTerms"]').check();
-  await page.locator('#registerForm input[name="acceptPrivacy"]').check();
-  await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
   await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
 
   await expect(page.locator('[data-view="interview"]:visible').first()).toBeVisible();
