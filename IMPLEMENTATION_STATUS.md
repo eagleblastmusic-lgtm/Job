@@ -1,6 +1,6 @@
 # MVP 0.1 — implementation status
 
-Last refreshed: 2026-09-06
+Last refreshed: 2026-09-12
 
 This file tracks the executable MVP against the master implementation plan. It records what is evidenced in the repository today and keeps production/external dependencies explicit rather than treating planned work as complete.
 
@@ -71,7 +71,7 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Ordinary non-upload JSON requests are limited to 64 KiB by default instead of the previous multi-megabyte generic allowance.
 - Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
 - Profile arrays, Career Truth facts, experience/education fields, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
-- Analytics event names and property objects are bounded by name length, top-level property count and serialized size before sanitization/storage.
+- Public arbitrary client analytics ingestion is removed; MVP analytics event names and properties are produced by trusted server paths rather than supplied through a generic `/api/events` endpoint.
 - User-owned Career Truth facts, experiences, education, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
 - Career Truth deletion SQL is scoped by both record ID and authenticated `user_id`; known misses are translated to 404 without masking unrelated database/runtime failures.
 - Invalid application status transitions use a stable 400 `INVALID_STATUS_TRANSITION` contract and regression tests verify that rejected transitions do not mutate the stored application.
@@ -89,9 +89,9 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Optional scanner execution occurs immediately after private file write and before DOCX archive inspection or text extraction.
 - Configured scanner errors/timeouts fail closed and delete the temporary file; infected files return controlled `422 UPLOAD_MALWARE_DETECTED` and scanner unavailability returns controlled `503 UPLOAD_MALWARE_SCAN_UNAVAILABLE`.
 - `REQUIRE_MALWARE_SCAN=true` blocks CV uploads before writing when no scanner is available. The current disposable environment does not yet claim a live scanner installation.
-- Analytics property minimization/redaction.
+- Analytics property minimization/redaction remains in the store as defense in depth for server-generated event properties.
 - Versioned TERMS and PRIVACY acceptance at registration.
-- Optional analytics consent with a database-level persistence gate: analytics events cannot be stored when the latest ANALYTICS consent is not granted.
+- Optional analytics consent with a database-level persistence gate: server-generated analytics events cannot be stored when the latest ANALYTICS consent is not granted.
 - Test-version Privacy and Terms surfaces are present and linked; they are explicitly not final legal documents.
 
 ## Persistence, migrations and recovery
@@ -125,7 +125,8 @@ GitHub CI currently gates merges on:
 - fresh-database migration validation,
 - Node unit/API/security tests,
 - proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
-- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience/education descriptions and analytics property/name limits,
+- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values and experience/education descriptions,
+- consent regression proving server-generated analytics remain blocked before opt-in and are persisted after opt-in, while the removed public `/api/events` route returns 404,
 - API critical-flow coverage that creates education, reads it through Career Truth, verifies it in the Application Package and checks it in the data export,
 - Career Truth correction tests proving own-record removal, foreign/nonexistent delete-contract equivalence, `current=true` end-date clearing, and exclusion of removed data from subsequent Application Package CV content,
 - malware scanner tests covering clean/infected/error exit semantics, timeout, shell-free path handling, temporary-file deletion, required-mode fail-closed behavior, startup environment validation, and no DB/fact persistence after a rejected CV upload,
@@ -158,6 +159,8 @@ Resource-error hardening preserves the domain/store separation: the API layer tr
 Career Truth correction hardening follows the same boundary: store deletion operations are user-scoped and HTTP-agnostic, while the API maps only the exact known missing-record outcomes to stable public 404 responses.
 
 The malware-scanning work establishes the application boundary and fail-closed semantics described in `docs/MALWARE_SCANNING.md`. It does not claim that ClamAV or another compatible live scanner is installed on Render or any future production host.
+
+The analytics-ingestion hardening removes a generic client-controlled event-name/property endpoint that the shipped client did not use. Product analytics in the current MVP is emitted only by explicit server flows and remains subject to the database consent trigger.
 
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
@@ -243,7 +246,8 @@ The following items were listed as missing in the original status file but are n
 - end-to-end user-entered education flow from Career Truth through package/CV/export,
 - user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation,
 - automated technical browser gate proving the first Decision Card path stays below 180 seconds in CI,
-- CV malware-scanner integration boundary, shell-free invocation, timeout/error handling and fail-closed application semantics.
+- CV malware-scanner integration boundary, shell-free invocation, timeout/error handling and fail-closed application semantics,
+- removal of unused public arbitrary analytics-event ingestion while preserving server-generated, consent-gated analytics.
 
 ## Phase result
 
