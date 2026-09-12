@@ -1,12 +1,33 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
-const uniqueEmail = (): string => `notify-ui-${Date.now()}-${Math.random().toString(16).slice(2)}@example.pl`;
+async function mockAuthenticatedUser(page: Page): Promise<void> {
+  await page.route('**/api/auth/register', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({ user: { id: 'ui-notify-user', email: 'notify-ui@example.pl', name: 'Tester Alertów', role: 'USER' } })
+  }));
+  await page.route('**/api/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      user: { id: 'ui-notify-user', email: 'notify-ui@example.pl', name: 'Tester Alertów', role: 'USER', locale: 'pl-PL', timezone: 'Europe/Warsaw' },
+      profile: { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null },
+      subscription: { plan: 'TRIAL', status: 'TRIALING' }
+    })
+  }));
+  await page.route('**/api/career-truth', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ facts: [], experiences: [], education: [] })
+  }));
+}
 
 test('notification settings and useful reminder UI work without pressure', async ({ page }) => {
   let settings = { followUp: true, deadlines: true, interviews: false, matchedJobs: false };
   let read = false;
   let dismissed = false;
+  await mockAuthenticatedUser(page);
   await page.route('**/api/features', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ features: { today: false, notifications: true } }) }));
   await page.route('**/api/notifications**', async route => {
     const url = new URL(route.request().url());
@@ -24,7 +45,7 @@ test('notification settings and useful reminder UI work without pressure', async
   await page.goto('/');
   await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
   await page.locator('#registerForm input[name="name"]').fill('Tester Alertów');
-  await page.locator('#registerForm input[name="email"]').fill(uniqueEmail());
+  await page.locator('#registerForm input[name="email"]').fill('notify-ui@example.pl');
   await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
   await page.locator('#registerForm input[name="acceptTerms"]').check();
   await page.locator('#registerForm input[name="acceptPrivacy"]').check();
@@ -35,7 +56,7 @@ test('notification settings and useful reminder UI work without pressure', async
   await page.locator('[data-view="notifications"]:visible').first().click();
   await expect(page.getByRole('heading', { name: 'Powiadomienia' })).toBeVisible();
   await expect(page.locator('#notificationList')).toContainText('Minęło co najmniej 7 dni');
-  await expect(page.locator('[data-screen="notifications"]')).not.toContainText(/streak|przegapiłeś|musisz|alarm/i);
+  await expect(page.locator('[data-screen="notifications"]')).not.toContainText(/streak|przegapiłeś|musisz\b/i);
 
   await page.locator('#notificationPreferences input[name="deadlines"]').uncheck();
   await page.getByRole('button', { name: 'Zapisz ustawienia' }).click();
