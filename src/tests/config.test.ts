@@ -75,3 +75,25 @@ test('explicit trustProxy override takes precedence over environment', () => {
     restoreEnv('TRUST_PROXY', previous);
   }
 });
+
+test('malware scan environment is validated during application configuration', () => {
+  const previousRequired = process.env.REQUIRE_MALWARE_SCAN;
+  const previousTimeout = process.env.MALWARE_SCAN_TIMEOUT_MS;
+  const previousBin = process.env.MALWARE_SCANNER_BIN;
+  try {
+    process.env.REQUIRE_MALWARE_SCAN = 'definitely';
+    assert.throws(() => loadConfig({ nodeEnv: 'test', port: 3000 }), /REQUIRE_MALWARE_SCAN/);
+
+    process.env.REQUIRE_MALWARE_SCAN = 'true';
+    process.env.MALWARE_SCAN_TIMEOUT_MS = '0';
+    assert.throws(() => loadConfig({ nodeEnv: 'test', port: 3000 }), /MALWARE_SCAN_TIMEOUT_MS/);
+
+    process.env.MALWARE_SCAN_TIMEOUT_MS = '15000';
+    delete process.env.MALWARE_SCANNER_BIN;
+    assert.doesNotThrow(() => loadConfig({ nodeEnv: 'test', port: 3000 }), 'required mode may start without a scanner but uploads must fail closed');
+  } finally {
+    restoreEnv('REQUIRE_MALWARE_SCAN', previousRequired);
+    restoreEnv('MALWARE_SCAN_TIMEOUT_MS', previousTimeout);
+    restoreEnv('MALWARE_SCANNER_BIN', previousBin);
+  }
+});

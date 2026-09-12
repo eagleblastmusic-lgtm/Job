@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { validateMalwareScanEnvironment } from './malwareScanner.js';
 
 function intEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -34,6 +35,7 @@ export interface AppConfig {
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
+  validateMalwareScanEnvironment();
   const nodeEnvRaw = overrides.nodeEnv ?? process.env.NODE_ENV ?? 'development';
   const nodeEnv: AppConfig['nodeEnv'] = nodeEnvRaw === 'production' || nodeEnvRaw === 'test' ? nodeEnvRaw : 'development';
   const dataDir = overrides.dataDir ?? resolve(process.env.DATA_DIR ?? './data');

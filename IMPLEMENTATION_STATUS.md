@@ -85,6 +85,10 @@ The core candidate journey is implemented and repeatedly green in GitHub CI. Lat
 - Portable upload keys in the form `uploads/<user>/<file>` rather than host-specific absolute paths.
 - Traversal-safe upload path resolution before deletion.
 - Migration of legacy Linux and Windows absolute upload paths.
+- Shell-free ClamAV-compatible malware scanner boundary for CV uploads; candidate-controlled file paths are passed as one argv element rather than interpolated shell text.
+- Optional scanner execution occurs immediately after private file write and before DOCX archive inspection or text extraction.
+- Configured scanner errors/timeouts fail closed and delete the temporary file; infected files return controlled `422 UPLOAD_MALWARE_DETECTED` and scanner unavailability returns controlled `503 UPLOAD_MALWARE_SCAN_UNAVAILABLE`.
+- `REQUIRE_MALWARE_SCAN=true` blocks CV uploads before writing when no scanner is available. The current disposable environment does not yet claim a live scanner installation.
 - Analytics property minimization/redaction.
 - Versioned TERMS and PRIVACY acceptance at registration.
 - Optional analytics consent with a database-level persistence gate: analytics events cannot be stored when the latest ANALYTICS consent is not granted.
@@ -124,6 +128,7 @@ GitHub CI currently gates merges on:
 - API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values, experience/education descriptions and analytics property/name limits,
 - API critical-flow coverage that creates education, reads it through Career Truth, verifies it in the Application Package and checks it in the data export,
 - Career Truth correction tests proving own-record removal, foreign/nonexistent delete-contract equivalence, `current=true` end-date clearing, and exclusion of removed data from subsequent Application Package CV content,
+- malware scanner tests covering clean/infected/error exit semantics, timeout, shell-free path handling, temporary-file deletion, required-mode fail-closed behavior, startup environment validation, and no DB/fact persistence after a rejected CV upload,
 - browser critical-flow coverage that enters education through the UI and verifies it remains visible after navigating away and back,
 - browser correction coverage for manual fact removal, current employment, experience removal and education removal,
 - a dedicated Playwright technical time-to-first-Decision-Card gate on mobile and desktop that fails above 180 seconds and logs `FIRST_DECISION_TECHNICAL_MS`,
@@ -152,6 +157,8 @@ Resource-error hardening preserves the domain/store separation: the API layer tr
 
 Career Truth correction hardening follows the same boundary: store deletion operations are user-scoped and HTTP-agnostic, while the API maps only the exact known missing-record outcomes to stable public 404 responses.
 
+The malware-scanning work establishes the application boundary and fail-closed semantics described in `docs/MALWARE_SCANNING.md`. It does not claim that ClamAV or another compatible live scanner is installed on Render or any future production host.
+
 The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
 
 ## Render test staging decision
@@ -168,7 +175,7 @@ Render is intentionally treated only as a **free disposable test environment**, 
 - `TRUST_PROXY=true` for platform ingress client-IP handling,
 - no persistent disk.
 
-A Render restart/redeploy may erase all staging state. This is expected. Real candidate CVs, production credentials and irreplaceable data must not be used there.
+A Render restart/redeploy may erase all staging state. This is expected. Real candidate CVs, production credentials and irreplaceable data must not be used there. No live malware scanner is currently claimed for this disposable staging configuration.
 
 The Render connector is connected, but its direct web-service creation action does not support the repository's required Docker deployment path. The Blueprint therefore still has to be applied once through the Render Dashboard before live environment checks can be evidenced. No live staging PASS is claimed yet.
 
@@ -182,7 +189,7 @@ The Render connector is connected, but its direct web-service creation action do
 ### File storage
 - Recommended baseline: private S3-compatible object storage.
 - Current executable MVP: private local filesystem below `DATA_DIR` with portable relative storage keys.
-- Status: secure enough for the current closed single-instance test architecture; external object storage remains required before horizontal/public deployment.
+- Status: secure enough for the current closed single-instance test architecture; external object storage and an evidenced live malware scanner remain required before horizontal/public deployment.
 
 ### Web stack
 - Recommended baseline: Next.js/React/TypeScript/Tailwind.
@@ -209,7 +216,7 @@ Before calling the master-plan MVP 0.1 gate complete:
 5. **Live payments** — integrate the selected provider, subscription lifecycle and BLIK where practical; current billing is configuration/trial only.
 6. **Production persistence architecture** — PostgreSQL plus private S3-compatible storage before stateless/horizontally scaled public deployment.
 7. **Production operations** — managed encrypted off-host backups/restore drills, managed error monitoring, stronger shared rate limiting and production analytics only if retained after privacy review.
-8. **Upload malware scanning and security validation** before broad public launch.
+8. **Live malware scanner deployment/acceptance** — install/configure a compatible scanner on the chosen hosting architecture, require scanning and evidence clean/infected/unavailable behavior at environment level.
 9. **Penetration/security review** before broad launch.
 
 ## What is no longer an open item
@@ -235,7 +242,8 @@ The following items were listed as missing in the original status file but are n
 - controlled non-mutating invalid application-transition handling,
 - end-to-end user-entered education flow from Career Truth through package/CV/export,
 - user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation,
-- automated technical browser gate proving the first Decision Card path stays below 180 seconds in CI.
+- automated technical browser gate proving the first Decision Card path stays below 180 seconds in CI,
+- CV malware-scanner integration boundary, shell-free invocation, timeout/error handling and fail-closed application semantics.
 
 ## Phase result
 
