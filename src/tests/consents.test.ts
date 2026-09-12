@@ -15,7 +15,7 @@ async function withApp(run: (base: string) => Promise<void>): Promise<void> {
   finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 }
 
-test('registration requires legal consent and analytics events follow the latest optional consent', async () => {
+test('registration requires legal consent and server-generated analytics follow the latest optional consent', async () => {
   await withApp(async base => {
     const missing = await fetch(`${base}/api/auth/register`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -42,10 +42,12 @@ test('registration requires legal consent and analytics events follow the latest
     assert.equal(initial.consents.find(c => c.type === 'ANALYTICS')?.granted, false);
     assert.ok(initial.consents.every(c => c.version === initial.legalVersion));
 
-    await fetch(`${base}/api/events`, {
+    const removedEndpoint = await fetch(`${base}/api/events`, {
       method: 'POST', headers: { 'content-type': 'application/json', cookie },
-      body: JSON.stringify({ eventName: 'should_not_be_stored', properties: { source: 'consent-test' } })
+      body: JSON.stringify({ eventName: 'client_event' })
     });
+    assert.equal(removedEndpoint.status, 404);
+
     const beforeExport = await fetch(`${base}/api/export`, { headers: { cookie } });
     const before = await beforeExport.json() as { analytics_events: unknown[] };
     assert.equal(before.analytics_events.length, 0);
@@ -59,12 +61,14 @@ test('registration requires legal consent and analytics events follow the latest
     const after = await relisted.json() as { consents: Array<{ type: string; granted: boolean }> };
     assert.equal(after.consents.find(c => c.type === 'ANALYTICS')?.granted, true);
 
-    await fetch(`${base}/api/events`, {
-      method: 'POST', headers: { 'content-type': 'application/json', cookie },
-      body: JSON.stringify({ eventName: 'consent_test', properties: { source: 'consent-test' } })
+    const profile = await fetch(`${base}/api/profile`, {
+      method: 'PUT', headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ desiredRoles: ['Magazynier'], location: 'Puck', remotePreferences: [], contractPreferences: [], shiftPreferences: { nights: false, weekends: false } })
     });
+    assert.equal(profile.status, 200);
+
     const afterExport = await fetch(`${base}/api/export`, { headers: { cookie } });
     const exported = await afterExport.json() as { analytics_events: Array<{ event_name: string }> };
-    assert.ok(exported.analytics_events.some(event => event.event_name === 'consent_test'));
+    assert.ok(exported.analytics_events.some(event => event.event_name === 'onboarding_completed'));
   });
 });
