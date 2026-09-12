@@ -1,262 +1,135 @@
-# MVP 0.1 — implementation status
+# Job — implementation status
 
-Last refreshed: 2026-09-12
+Last refreshed: 2026-09-13
 
-This file tracks the executable MVP against the master implementation plan. It records what is evidenced in the repository today and keeps production/external dependencies explicit rather than treating planned work as complete.
+This file tracks repository evidence against the Master Implementation Plan. A feature is marked implemented only when code and automated evidence exist. External/product gates that require real users, live infrastructure, legal review, provider credentials or manual accessibility work remain explicitly open.
 
-## Current gate
+## Gate summary
 
-**EXECUTABLE MVP CORE: PASS**
+- **MVP 0.1 executable core:** PASS in repository/CI.
+- **MVP 0.1 repository quality/recovery/security gates:** PASS for the current single-instance architecture.
+- **MVP 0.1 live staging / representative-user / manual / legal / production-infrastructure acceptance:** PENDING.
+- **Feature-flag rollout foundation:** IMPLEMENTED.
+- **MVP 0.2 Today / Action Priority implementation:** IMPLEMENTED BEHIND FEATURE FLAG; product acceptance remains PENDING.
+- **Later Master Plan phases:** not complete unless explicitly listed below.
 
-**REPOSITORY QUALITY / RECOVERY GATES: PASS**
-
-**LIVE INTERNAL STAGING ACCEPTANCE: NOT YET EVIDENCED**
-
-**MASTER PLAN MVP 0.1 ACCEPTANCE GATE: NOT YET COMPLETE**
-
-The core candidate journey is implemented and repeatedly green in GitHub CI. Later roadmap phases such as Today Engine, Strategy, Skill ROI and native mobile remain intentionally blocked until the MVP acceptance gate is closed.
-
-## Implemented product scope
+## Implemented MVP 0.1 product scope
 
 ### Identity, onboarding and Career Truth
-- Registration/login with scrypt password hashing, opaque hashed sessions and HttpOnly cookies.
-- Registration validation returns controlled client errors rather than converting invalid credentials into internal-server failures.
-- E-mail/password input sizes are bounded before expensive credential work.
-- Unknown-account and wrong-password login attempts use the same external error contract; unknown accounts receive a dummy scrypt verification to reduce the account-existence timing distinction.
-- Irreversible account deletion requires the current password in addition to the explicit confirmation phrase and is separately rate-limited.
+- Email/password registration/login with scrypt, opaque hashed sessions and HttpOnly cookies.
+- Bounded credential inputs, generic login failures and dummy scrypt work for normal-sized unknown-account attempts.
 - CareerProfile onboarding without requiring a CV.
-- Career Truth Lite with explicit status, provenance and confidence semantics.
-- User-confirmed facts remain distinct from inferred/unknown/not-possessed/conflicting/expired states.
-- CV inference never auto-confirms a fact and inferred facts are never automatically allowed into generated CV content.
-- User-entered career experience and education, with institution, field/degree, dates and optional descriptions preserved for CV generation and export.
-- Career Truth correction controls allow a user to mark facts as not possessed, remove manually entered facts, and remove their own experience/education records; rejected foreign IDs are not distinguishable from nonexistent IDs through the public API contract.
-- Current employment is explicitly supported: selecting “pracuję tu obecnie” clears/disables the end date in the UI and the API enforces `endDate=null` whenever `current=true`.
-- Practical Polish occupation/skill normalization foundations.
+- Career Truth Lite with status, provenance and confidence; inferred facts never auto-confirm and never auto-enter generated CV content.
+- Manual facts, experience and education; current employment is represented explicitly with `endDate=null`.
+- User corrections/removal for own facts, experience and education with indistinguishable foreign/nonexistent 404 contracts.
+- CV upload/inference boundary and Polish occupation/skill normalization foundations.
 
-### Job understanding and decision support
-- Paste-job workflow.
-- Deterministic Polish Job Parser for practical offer fields and MUST/NICE/UNKNOWN requirements.
-- Explainable deterministic Decision Engine with fit dimensions, uncertainty and Polish recommendations.
-- Decision Card and explicit user override path.
-- Optional AI Gateway boundary exists, but core MVP behavior does not depend on AI credentials.
-
-### Application execution and learning loop
-- Career-Truth-grounded Application Package.
-- Base CV generation and real server-side PDF export with Polish characters.
-- Education entered in Career Truth is carried into the Application Package and rendered in HTML/PDF CV output with degree/field, dates and description when supplied.
-- Removed Career Truth facts, experience and education no longer enter a newly generated Application Package/CV.
-- Application Tracker with guarded state transitions.
-- Invalid tracker transitions are returned as controlled client validation errors and are not persisted.
-- One-tap recruitment Outcome Capture.
+### Job decision and application execution
+- Paste-job workflow and deterministic Polish Job Parser.
+- Explainable deterministic Decision Engine with uncertainty and user override.
+- Career-Truth-grounded Application Package and server-side PDF CV generation with Polish characters.
+- Education is preserved in Application Package, HTML/PDF CV and export; removed Career Truth records do not enter newly generated documents.
+- Application Tracker with guarded state transitions and one-tap outcome capture.
 - Data export and re-authenticated account deletion.
-- FREE/TRIAL/PRO/JOB_SPRINT product configuration and local trial state; live paid checkout is not implemented.
+- Local FREE/TRIAL/PRO/JOB_SPRINT product state; live checkout remains external/open.
 
 ### Interface and administration
-- Polish mobile-first responsive PWA/web interface.
-- Install manifest and service worker.
-- Protected minimal admin diagnostics controlled through `ADMIN_EMAILS`.
-- Database-aware `/api/health` returns 503 when the application schema is unavailable instead of reporting a false healthy state.
+- Polish mobile-first PWA/web interface, install manifest and service worker.
+- Minimal admin diagnostics protected by persisted `ADMIN` role.
+- Public registration cannot obtain `ADMIN` through an email allow-list. Promotion is an out-of-band local operator action (`npm run provision:admin -- <email>`) and is audit logged transactionally.
+- Database-aware `/api/health` returns 503 when schema/database health is unavailable.
 
-## Privacy and security implemented
+## Security, privacy and recovery evidence
 
-- Security headers including CSP, frame protection, referrer policy, permissions policy and same-origin resource isolation.
-- HSTS on production-mode responses.
-- `Cache-Control: no-store` and `Pragma: no-cache` on all API responses, including authenticated/profile/export surfaces.
-- Same-origin mutation guard plus Fetch Metadata rejection for browser mutations classified as cross-site or same-site.
-- Basic rate limiting on sensitive endpoints, including a dedicated deletion re-authentication limit.
-- Rate-limit state is scoped to one running application instance rather than shared as process-global module state.
-- Forwarded client IP addresses are ignored by default; they are considered only when `TRUST_PROXY=true` is explicitly configured.
-- Trusted-proxy mode validates the first forwarded address as IPv4/IPv6 and falls back to the socket peer address when forwarded data is invalid or missing.
-- Render disposable staging explicitly enables the trusted-proxy boundary so rate limiting can distinguish clients behind platform ingress.
-- Ordinary non-upload JSON requests are limited to 64 KiB by default instead of the previous multi-megabyte generic allowance.
-- Paste-job parsing has a deliberate larger 256 KiB JSON budget but caps the actual offer text at 100,000 characters and validates a minimum useful length before parser execution.
-- Profile arrays, Career Truth facts, experience/education fields, decision overrides, application/outcome fields and destructive-action confirmation values are length/count bounded before persistence.
-- Public arbitrary client analytics ingestion is removed; MVP analytics event names and properties are produced by trusted server paths rather than supplied through a generic `/api/events` endpoint.
-- User-owned Career Truth facts, experiences, education, decisions and applications use stable 404 contracts for both nonexistent IDs and IDs owned by another user; API callers cannot distinguish those cases through status/code/message.
-- Career Truth deletion SQL is scoped by both record ID and authenticated `user_id`; known misses are translated to 404 without masking unrelated database/runtime failures.
-- Invalid application status transitions use a stable 400 `INVALID_STATUS_TRANSITION` contract and regression tests verify that rejected transitions do not mutate the stored application.
-- Cross-user record isolation regression coverage.
-- Controlled 4xx validation for malformed registration credentials.
-- Bounded e-mail/password inputs and generic login-failure responses.
-- Dummy scrypt verification for normal-sized unknown-account login attempts; this reduces but does not claim to eliminate all possible timing side channels.
-- Current-password re-authentication before irreversible account deletion.
-- Upload size, extension, MIME, PDF signature and DOCX structure validation.
-- Private upload filesystem permissions for the current single-instance architecture.
-- Portable upload keys in the form `uploads/<user>/<file>` rather than host-specific absolute paths.
-- Traversal-safe upload path resolution before deletion.
-- Migration of legacy Linux and Windows absolute upload paths.
-- Shell-free ClamAV-compatible malware scanner boundary for CV uploads; candidate-controlled file paths are passed as one argv element rather than interpolated shell text.
-- Optional scanner execution occurs immediately after private file write and before DOCX archive inspection or text extraction.
-- Configured scanner errors/timeouts fail closed and delete the temporary file; infected files return controlled `422 UPLOAD_MALWARE_DETECTED` and scanner unavailability returns controlled `503 UPLOAD_MALWARE_SCAN_UNAVAILABLE`.
-- `REQUIRE_MALWARE_SCAN=true` blocks CV uploads before writing when no scanner is available. The current disposable environment does not yet claim a live scanner installation.
-- Analytics property minimization/redaction remains in the store as defense in depth for server-generated event properties.
-- Versioned TERMS and PRIVACY acceptance at registration.
-- Optional analytics consent with a database-level persistence gate: server-generated analytics events cannot be stored when the latest ANALYTICS consent is not granted.
-- Test-version Privacy and Terms surfaces are present and linked; they are explicitly not final legal documents.
+- CSP, frame protection, referrer/permissions policies, same-origin resource isolation and production HSTS.
+- API `Cache-Control: no-store` / `Pragma: no-cache`.
+- Same-origin mutation guard plus Fetch Metadata rejection of browser cross-site/same-site mutation contexts.
+- Instance-local rate limiting and explicit trusted-proxy handling; forwarded addresses ignored by default.
+- Generic JSON body limit of 64 KiB; paste-job has explicit 256 KiB JSON / 100,000-character text budget and minimum useful length.
+- Bounded profile, Career Truth, experience/education, override, application/outcome and destructive-action inputs.
+- Public arbitrary analytics ingestion removed; analytics event names/properties originate from explicit server flows and remain gated by the database consent trigger.
+- User-owned resources use user-scoped SQL operations and stable public error contracts.
+- Private portable upload keys, traversal-safe deletion, legacy path migration, upload signature/MIME/size checks.
+- Shell-free ClamAV-compatible malware-scanner boundary. In required mode scanner absence/error/timeout fails closed before document extraction/DB persistence; infected uploads are deleted and rejected.
+- Versioned Terms/Privacy acceptance and user-managed optional analytics consent.
+- Public test-version legal surfaces exist but are not final legal documents.
+- SQLite snapshot + upload backup, versioned manifest, integrity-checked restore and automated semantic restore-to-different-root exercise.
 
-## Persistence, migrations and recovery
+## Feature rollout foundation
 
-Executable SQLite migrations are applied sequentially and validated against a fresh database in CI:
+Large post-MVP features use persisted feature flags with deterministic user bucketing and audited operator changes.
 
-- `0001_init.sql` — initial executable SQLite schema.
-- `0002_hardening.sql` — hardening/index changes.
-- `0003_analytics_consent.sql` — analytics-consent persistence enforcement.
-- `0004_portable_upload_storage_keys.sql` — portable upload references and legacy-path migration.
+- Stable 0/10/50/100% rollout.
+- `enabled=false` is immediate fail-closed rollback.
+- `enabled=true` + 0% exposes the feature only to persisted ADMIN users for internal testing.
+- Operator command: `npm run feature:flag -- <key> <on|off> <0|10|50|100>`.
+- Current keys include Today, Interview Pack, Skill ROI, Career Transition, Strategy Engine and Job Feed.
+- Existing flags remain disabled by default until explicitly rolled out.
 
-`postgres_0001_reference.sql` remains a production target/reference only and is not claimed as an executed PostgreSQL migration.
+## MVP 0.2 — Today / Action Priority
 
-Recovery evidence now includes:
-- consistent SQLite snapshot via `VACUUM INTO`,
-- upload-directory backup,
-- versioned backup manifest,
-- restore command with SQLite integrity validation,
-- automated semantic backup → restore exercise in CI,
-- restore into a deliberately different filesystem root,
-- verification after restore of user/profile, Career Truth, consents, job, application, outcome and uploaded CV bytes/hash.
+Repository implementation now includes the feature-gated **DZISIAJ** vertical:
 
-This proves the current local/single-instance recovery semantics. Managed encrypted off-host backups for future production infrastructure remain open.
+- deterministic Action Priority scoring based on opportunity value, urgency, confidence, expected progress and estimated effort;
+- supported time budgets 10/30/60/120 minutes;
+- maximum three primary actions and cumulative time-budget enforcement;
+- action candidates from real application/Career Truth state: apply, follow-up after sufficient waiting time, update outcome, interview preparation, confirm inferred Career Truth fact, plus a grounded base-CV fallback;
+- no streaks, shame/panic language or guilt mechanics;
+- user can accept and complete an action; estimated time, acceptance, completion and outcome are persisted;
+- accepted/completed daily plans are not silently replaced by a later re-ranking;
+- user-local date is derived from the stored timezone;
+- `/api/features` exposes only effective feature availability for the authenticated user;
+- `/api/today*` is fail-closed with `FEATURE_DISABLED` when the Today flag is unavailable;
+- foreign/nonexistent action IDs expose the same 404 contract;
+- server-generated `today_opened`, `today_action_accepted` and `today_action_completed` analytics events remain subject to analytics consent persistence rules;
+- the client injects the Today navigation/screen only when the feature is effective for the user and provides calm 10/30/60/120-minute controls plus accept/complete actions;
+- Node/API tests cover ranking, flag gating, invalid budgets, cross-user isolation and action state changes; Playwright/axe coverage exercises the Today UI on mobile/desktop CI profiles.
 
-## Automated quality evidence
+**Important product gate:** the Master Plan requires real MVP usage before formally activating/accepting Today. Repository implementation is therefore not evidence that the product gate has passed. The flag remains the rollout boundary.
 
-GitHub CI currently gates merges on:
+## Migrations
 
-- static project-policy lint,
-- strict server/client/browser TypeScript checks,
-- fresh-database migration validation,
-- Node unit/API/security tests,
-- proxy trust, Fetch Metadata, API cache-control and transport-header regression tests,
-- API payload/field boundary tests covering oversized generic JSON, oversized/too-short job text, profile list counts, Career Truth values and experience/education descriptions,
-- consent regression proving server-generated analytics remain blocked before opt-in and are persisted after opt-in, while the removed public `/api/events` route returns 404,
-- API critical-flow coverage that creates education, reads it through Career Truth, verifies it in the Application Package and checks it in the data export,
-- Career Truth correction tests proving own-record removal, foreign/nonexistent delete-contract equivalence, `current=true` end-date clearing, and exclusion of removed data from subsequent Application Package CV content,
-- malware scanner tests covering clean/infected/error exit semantics, timeout, shell-free path handling, temporary-file deletion, required-mode fail-closed behavior, startup environment validation, and no DB/fact persistence after a rejected CV upload,
-- browser critical-flow coverage that enters education through the UI and verifies it remains visible after navigating away and back,
-- browser correction coverage for manual fact removal, current employment, experience removal and education removal,
-- a dedicated Playwright technical time-to-first-Decision-Card gate on mobile and desktop that fails above 180 seconds and logs `FIRST_DECISION_TECHNICAL_MS`,
-- resource isolation/error-contract tests comparing foreign vs nonexistent Career Truth facts, decision overrides and application outcomes,
-- invalid application-transition regression verifying a controlled 400 and no state mutation,
-- semantic backup/restore exercise,
-- Playwright Chromium browser E2E on mobile and desktop profiles,
-- axe automated WCAG 2.2 A/AA checks on public and authenticated MVP surfaces,
-- accessibility regressions for labels, keyboard focus, target sizing and reduced motion,
-- a committed npm lockfile with `npm ci` used for CI installation,
-- the same locked dependency graph used inside the Docker build,
-- production Docker image build,
-- booted production-container `/api/health` smoke test.
+Executable SQLite migrations are sequentially validated in CI:
 
-The technical `<3 min` test proves only that the implemented browser/system path can complete within the target under automation. `docs/FIRST_DECISION_ACCEPTANCE.md` defines the separate representative-user acceptance protocol; that product/usability evidence remains open and is not replaced by CI timing.
+- `0001_init.sql` — initial schema and feature-flag seeds;
+- `0002_hardening.sql` — hardening/index changes;
+- `0003_analytics_consent.sql` — analytics-consent persistence gate;
+- `0004_portable_upload_storage_keys.sql` — portable upload references and legacy-path migration;
+- `0005_today_actions.sql` — Today action key/priority/day/update fields and indexes.
 
-The authentication regression suite additionally checks controlled registration validation, identical unknown-account/wrong-password login error contracts, failed deletion re-authentication preserving the account, successful re-authenticated deletion and old-session invalidation. Browser E2E also covers the destructive-action re-authentication path.
+`postgres_0001_reference.sql` remains a production target/reference, not an executed production PostgreSQL migration.
 
-The HTTP/proxy suite verifies that untrusted forwarded addresses do not split rate-limit buckets, trusted validated addresses do, invalid forwarded values fall back safely, limiter state is isolated per app instance, API responses are non-cacheable, production HSTS is emitted, and browser Fetch Metadata blocks non-same-origin mutation contexts.
+## Automated quality gate
 
-The HTTP hardening work also exposed and fixed an existing configuration defect: explicit `nodeEnv` overrides supplied to `loadConfig` / `createJobApp` were previously ignored in favor of the process environment. The override contract is now tested.
+CI gates repository changes on:
 
-The input-boundary work also closes a prior error-contract gap: too-short pasted job text is rejected as a controlled client validation error before `parseJobText` can throw a generic server-side exception.
+- locked `npm ci`, policy lint and strict server/client/E2E TypeScript checks;
+- fresh-database migration validation;
+- Node unit/API/security tests;
+- HTTP/proxy/cache/transport/input-boundary/resource-isolation/authentication/malware regressions;
+- feature-flag deterministic rollout/rollback and audited operator tests;
+- Career Truth, education, document-generation and correction flows;
+- semantic backup/restore exercise;
+- Playwright Chromium mobile + desktop flows and a <=180-second technical first-Decision-Card gate;
+- automated axe WCAG 2.2 A/AA checks and accessibility regressions;
+- Docker production-image build and booted-container `/api/health` smoke.
 
-Resource-error hardening preserves the domain/store separation: the API layer translates only known ownership/not-found store outcomes into 404 and uses domain transition predicates for client-visible 400 validation; unrelated database/runtime failures still surface as internal server errors rather than being masked.
+The automated <=180-second path proves technical capability only. Representative-user `<3 min` acceptance is still open.
 
-Career Truth correction hardening follows the same boundary: store deletion operations are user-scoped and HTTP-agnostic, while the API maps only the exact known missing-record outcomes to stable public 404 responses.
+## Remaining MVP 0.1/public-launch gates
 
-The malware-scanning work establishes the application boundary and fail-closed semantics described in `docs/MALWARE_SCANNING.md`. It does not claim that ClamAV or another compatible live scanner is installed on Render or any future production host.
+1. Apply the existing Render Blueprint once and evidence live disposable staging health/smoke/browser/log checks. Render is test-only and ephemeral.
+2. Execute representative-user first-value protocol and validate the `<3 min` target with real users.
+3. Perform manual assistive-technology/WCAG 2.2 AA review.
+4. Complete final controller/contact identity, legal bases, subprocessors/transfers, retention schedule and legal review.
+5. Integrate live payment provider/lifecycle/BLIK where practical.
+6. Move public production persistence to PostgreSQL plus private S3-compatible object storage.
+7. Add managed encrypted off-host backup/restore drills, managed monitoring and shared/distributed rate limiting where required by deployment topology.
+8. Install and evidence a live malware scanner with required scanning in the chosen hosting architecture.
+9. Complete penetration/security review before broad launch.
 
-The analytics-ingestion hardening removes a generic client-controlled event-name/property endpoint that the shipped client did not use. Product analytics in the current MVP is emitted only by explicit server flows and remains subject to the database consent trigger.
+## Master Plan phases after Today
 
-The repository has repeatedly passed the full CI chain after hardening changes; an individual feature is not marked merged until its own PR run is green.
+Next implementation order remains: useful notification settings/in-app notifications → Interview Prep Pack V1 → legal JobSourceConnector abstraction → Job Feed + deduplication → Bottleneck Engine/confidence → Local Labour Intelligence + Effective Wage → Skill ROI + just-in-time learning → Career Transition → Outcome Inbox → Strategy Engine → native/mobile and larger-scale data-moat phases.
 
-## Render test staging decision
-
-Render is intentionally treated only as a **free disposable test environment**, not as production hosting.
-
-`render.yaml` now specifies:
-- Docker runtime from the repository Dockerfile,
-- Frankfurt region,
-- free web-service plan,
-- deploy from `main` after CI checks,
-- `/api/health` health check,
-- ephemeral SQLite/upload paths under `/app/data`,
-- `TRUST_PROXY=true` for platform ingress client-IP handling,
-- no persistent disk.
-
-A Render restart/redeploy may erase all staging state. This is expected. Real candidate CVs, production credentials and irreplaceable data must not be used there. No live malware scanner is currently claimed for this disposable staging configuration.
-
-The Render connector is connected, but its direct web-service creation action does not support the repository's required Docker deployment path. The Blueprint therefore still has to be applied once through the Render Dashboard before live environment checks can be evidenced. No live staging PASS is claimed yet.
-
-## Deliberate technical deviations from the recommended baseline
-
-### Database
-- Recommended baseline: PostgreSQL with Drizzle/Prisma.
-- Current executable MVP: Node 22 built-in SQLite with committed SQL migrations.
-- Status: suitable for local/disposable single-instance validation; PostgreSQL is still required before production-scale/stateless deployment.
-
-### File storage
-- Recommended baseline: private S3-compatible object storage.
-- Current executable MVP: private local filesystem below `DATA_DIR` with portable relative storage keys.
-- Status: secure enough for the current closed single-instance test architecture; external object storage and an evidenced live malware scanner remain required before horizontal/public deployment.
-
-### Web stack
-- Recommended baseline: Next.js/React/TypeScript/Tailwind.
-- Current executable MVP: framework-free TypeScript client served by the Node modular monolith.
-- Status: functional and browser-tested; domain/server modules remain isolated so a future UI migration does not require rewriting the decision logic.
-
-### Authentication
-- Recommended baseline: managed authentication.
-- Current executable MVP: first-party email/password, scrypt and opaque server sessions with bounded credential inputs, generic failure responses and destructive-action re-authentication.
-- Status: functional with security regression coverage; production choice remains either additional hardening or migration to the selected managed provider.
-
-### PDF
-- Current implementation: server-side ReportLab with DejaVu Sans.
-- Status: deterministic real PDF generation with Polish characters and Career Truth education rendering.
-
-## Remaining MVP work
-
-Before calling the master-plan MVP 0.1 gate complete:
-
-1. **Live disposable staging acceptance** — apply the existing free Render Blueprint and run health, automated staging smoke, browser sanity and log review against the deployed commit.
-2. **Representative-user first Decision Card time-to-value evidence** — execute the protocol in `docs/FIRST_DECISION_ACCEPTANCE.md` and validate the `<3 min` happy-path target with representative users; the automated technical 180-second gate is now present but is not a substitute for this product metric.
-3. **Manual accessibility review** — perform assistive-technology/manual WCAG 2.2 AA checks in addition to the existing automated axe gate.
-4. **Final privacy/legal readiness** — real controller/contact identity, final legal bases, subprocessors/transfers, retention schedule and legal review before public beta.
-5. **Live payments** — integrate the selected provider, subscription lifecycle and BLIK where practical; current billing is configuration/trial only.
-6. **Production persistence architecture** — PostgreSQL plus private S3-compatible storage before stateless/horizontally scaled public deployment.
-7. **Production operations** — managed encrypted off-host backups/restore drills, managed error monitoring, stronger shared rate limiting and production analytics only if retained after privacy review.
-8. **Live malware scanner deployment/acceptance** — install/configure a compatible scanner on the chosen hosting architecture, require scanning and evidence clean/infected/unavailable behavior at environment level.
-9. **Penetration/security review** before broad launch.
-
-## What is no longer an open item
-
-The following items were listed as missing in the original status file but are now implemented and must not be re-opened without new evidence:
-
-- browser-level Playwright E2E,
-- automated accessibility/axe gate,
-- consent UI and versioned consent history,
-- analytics opt-out enforcement,
-- privacy/terms test surfaces,
-- reproducible multi-step migrations,
-- backup/restore tooling,
-- semantic restore drill,
-- database-aware health endpoint,
-- production-container smoke test,
-- Render test-staging Blueprint,
-- deterministic npm dependency installation in CI and Docker via lockfile + `npm ci`,
-- explicit trusted-proxy handling for single-instance rate limiting,
-- API no-store cache policy and production transport/resource security headers,
-- bounded ordinary JSON bodies and persistence-facing MVP input fields,
-- stable resource-not-found contracts for foreign/nonexistent user-owned records,
-- controlled non-mutating invalid application-transition handling,
-- end-to-end user-entered education flow from Career Truth through package/CV/export,
-- user-controlled Career Truth correction/removal for facts, experience and education, including current-employment representation,
-- automated technical browser gate proving the first Decision Card path stays below 180 seconds in CI,
-- CV malware-scanner integration boundary, shell-free invocation, timeout/error handling and fail-closed application semantics,
-- removal of unused public arbitrary analytics-event ingestion while preserving server-generated, consent-gated analytics.
-
-## Phase result
-
-**PHASE 1 EXECUTABLE MVP CORE: PASS**
-
-**MVP HARDENING / CI / LOCAL RECOVERY: PASS**
-
-**LIVE STAGING: PENDING**
-
-**MASTER PLAN MVP 0.1 ACCEPTANCE GATE: NOT YET COMPLETE**
-
-No Today Engine / Strategy / Skill ROI / native mobile milestone is marked complete or allowed to supersede the remaining MVP gate work.
+No later phase is marked complete merely because schema placeholders or feature-flag keys exist.
