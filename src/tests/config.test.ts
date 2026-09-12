@@ -76,6 +76,17 @@ test('explicit trustProxy override takes precedence over environment', () => {
   }
 });
 
+test('public runtime ignores ADMIN_EMAILS and adminEmails overrides', () => {
+  const previous = process.env.ADMIN_EMAILS;
+  try {
+    process.env.ADMIN_EMAILS = 'admin@example.pl';
+    assert.deepEqual([...loadConfig({ nodeEnv: 'test', port: 3000 }).adminEmails], []);
+    assert.deepEqual([...loadConfig({ nodeEnv: 'test', port: 3000, adminEmails: new Set(['override@example.pl']) }).adminEmails], []);
+  } finally {
+    restoreEnv('ADMIN_EMAILS', previous);
+  }
+});
+
 test('malware scan environment is validated during application configuration', () => {
   const previousRequired = process.env.REQUIRE_MALWARE_SCAN;
   const previousTimeout = process.env.MALWARE_SCAN_TIMEOUT_MS;
