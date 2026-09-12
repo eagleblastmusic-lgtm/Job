@@ -18,7 +18,9 @@ async function register(base: string, email: string): Promise<string> {
 }
 
 async function requestJson(base: string, path: string, cookie: string, method: string, body?: Record<string, unknown>): Promise<Response> {
-  return fetch(`${base}${path}`, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), cookie }, body: body ? JSON.stringify(body) : undefined });
+  const init: RequestInit = { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), cookie } };
+  if (body) init.body = JSON.stringify(body);
+  return fetch(`${base}${path}`, init);
 }
 
 const offer = `Magazynier
