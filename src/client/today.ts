@@ -1,3 +1,5 @@
+export {};
+
 type FeatureResponse = { features: { today: boolean } };
 type TodayAction = {
   id: string;
@@ -25,64 +27,39 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 function ensureUi(): HTMLElement {
   let screen = document.querySelector<HTMLElement>('[data-screen="today"]');
   if (screen) return screen;
-
   const mobile = document.querySelector('.mobile-nav');
   const sidebar = document.querySelector('.sidebar');
   const content = document.querySelector('.content');
   if (!mobile || !sidebar || !content) throw new Error('Brak kontenera aplikacji.');
 
   const mobileButton = document.createElement('button');
-  mobileButton.type = 'button';
-  mobileButton.className = 'nav-item';
-  mobileButton.dataset.view = 'today';
-  mobileButton.textContent = 'Dzisiaj';
+  mobileButton.type = 'button'; mobileButton.className = 'nav-item'; mobileButton.dataset.view = 'today'; mobileButton.textContent = 'Dzisiaj';
   mobile.insertBefore(mobileButton, mobile.children[1] ?? null);
 
   const sideButton = document.createElement('button');
-  sideButton.type = 'button';
-  sideButton.className = 'side-link';
-  sideButton.dataset.view = 'today';
-  sideButton.textContent = 'Dzisiaj';
+  sideButton.type = 'button'; sideButton.className = 'side-link'; sideButton.dataset.view = 'today'; sideButton.textContent = 'Dzisiaj';
   const firstSideLink = sidebar.querySelector('.side-link');
-  if (firstSideLink?.nextSibling) sidebar.insertBefore(sideButton, firstSideLink.nextSibling);
-  else sidebar.append(sideButton);
+  if (firstSideLink?.nextSibling) sidebar.insertBefore(sideButton, firstSideLink.nextSibling); else sidebar.append(sideButton);
 
   screen = document.createElement('section');
-  screen.className = 'screen hidden';
-  screen.dataset.screen = 'today';
+  screen.className = 'screen hidden'; screen.dataset.screen = 'today';
   screen.innerHTML = `
-    <div class="screen-heading">
-      <p class="eyebrow">Action Priority</p>
-      <h2>DZISIAJ</h2>
-      <p>Jeśli masz dziś tylko chwilę, zacznij od działania, które najbardziej przesuwa Cię do przodu.</p>
-    </div>
-    <div class="card">
-      <fieldset>
-        <legend>Ile masz dziś czasu?</legend>
-        <div class="fact-actions" id="todayBudget">
-          <button class="button button-secondary" type="button" data-today-budget="10">10 min</button>
-          <button class="button button-secondary" type="button" data-today-budget="30">30 min</button>
-          <button class="button button-secondary" type="button" data-today-budget="60">1 godz.</button>
-          <button class="button button-secondary" type="button" data-today-budget="120">Więcej</button>
-        </div>
-      </fieldset>
-      <div id="todayMessage" class="message" aria-live="polite"></div>
-    </div>
+    <div class="screen-heading"><p class="eyebrow">Action Priority</p><h2>DZISIAJ</h2><p>Jeśli masz dziś tylko chwilę, zacznij od działania, które najbardziej przesuwa Cię do przodu.</p></div>
+    <div class="card"><fieldset><legend>Ile masz dziś czasu?</legend><div class="fact-actions" id="todayBudget">
+      <button class="button button-secondary" type="button" data-today-budget="10">10 min</button>
+      <button class="button button-secondary" type="button" data-today-budget="30">30 min</button>
+      <button class="button button-secondary" type="button" data-today-budget="60">1 godz.</button>
+      <button class="button button-secondary" type="button" data-today-budget="120">Więcej</button>
+    </div></fieldset><div id="todayMessage" class="message" aria-live="polite"></div></div>
     <div id="todayActions" class="stack section-gap" aria-live="polite"></div>`;
   content.prepend(screen);
 
   for (const button of [mobileButton, sideButton]) {
-    button.addEventListener('click', () => {
-      location.hash = 'today';
-      showToday();
-      void loadToday();
-    });
+    button.addEventListener('click', () => { location.hash = 'today'; showToday(); void loadToday(); });
   }
   screen.querySelector('#todayBudget')?.addEventListener('click', event => {
     const button = (event.target as Element).closest<HTMLButtonElement>('[data-today-budget]');
-    if (!button) return;
-    const budget = Number(button.dataset.todayBudget);
-    void recommend(budget);
+    if (button) void recommend(Number(button.dataset.todayBudget));
   });
   screen.querySelector('#todayActions')?.addEventListener('click', event => {
     const target = event.target as Element;
@@ -109,8 +86,7 @@ function render(actions: TodayAction[]): void {
   list.innerHTML = actions.map((action, index) => `
     <article class="card action-card${action.completed ? ' today-completed' : ''}">
       <div class="row-between"><span class="badge">${index + 1}</span><span class="hint">około ${esc(action.estimatedMinutes)} min</span></div>
-      <h3>${esc(action.title)}</h3>
-      <p>${esc(action.reason)}</p>
+      <h3>${esc(action.title)}</h3><p>${esc(action.reason)}</p>
       ${action.outcome ? `<p class="hint"><strong>Wynik:</strong> ${esc(action.outcome)}</p>` : ''}
       <div class="fact-actions">
         ${!action.accepted && !action.completed ? `<button class="button button-secondary" type="button" data-today-accept="${esc(action.id)}">Wybieram to</button>` : ''}
@@ -122,42 +98,31 @@ function render(actions: TodayAction[]): void {
 function message(text: string, error = false): void {
   const element = document.querySelector<HTMLElement>('#todayMessage');
   if (!element) return;
-  element.textContent = text;
-  element.className = `message ${error ? 'error' : 'success'}`;
+  element.textContent = text; element.className = `message ${error ? 'error' : 'success'}`;
 }
 
 async function loadToday(): Promise<void> {
-  try {
-    const data = await api<TodayResponse>('/api/today');
-    render(data.actions);
-  } catch (error) {
-    message((error as Error).message, true);
-  }
+  try { render((await api<TodayResponse>('/api/today')).actions); }
+  catch (error) { message((error as Error).message, true); }
 }
 
 async function recommend(timeBudgetMinutes: number): Promise<void> {
   try {
     message('Układam najważniejsze działania…');
     const data = await api<TodayResponse>('/api/today/recommendations', { method: 'POST', body: JSON.stringify({ timeBudgetMinutes }) });
-    render(data.actions);
-    message(data.actions.length ? 'Plan na dziś jest gotowy.' : 'Najważniejsze na dziś zrobione.');
-  } catch (error) {
-    message((error as Error).message, true);
-  }
+    render(data.actions); message(data.actions.length ? 'Plan na dziś jest gotowy.' : 'Najważniejsze na dziś zrobione.');
+  } catch (error) { message((error as Error).message, true); }
 }
 
 async function mutateAction(actionId: string, operation: 'accept' | 'complete'): Promise<void> {
   if (!actionId) return;
   try {
-    await api(`/api/today/actions/${encodeURIComponent(actionId)}/${operation}`, {
-      method: 'PATCH',
-      body: operation === 'complete' ? JSON.stringify({ outcome: 'Oznaczone jako wykonane przez użytkownika.' }) : undefined
-    });
+    const init: RequestInit = { method: 'PATCH' };
+    if (operation === 'complete') init.body = JSON.stringify({ outcome: 'Oznaczone jako wykonane przez użytkownika.' });
+    await api(`/api/today/actions/${encodeURIComponent(actionId)}/${operation}`, init);
     await loadToday();
     message(operation === 'complete' ? 'Działanie oznaczone jako wykonane.' : 'Działanie wybrane.');
-  } catch (error) {
-    message((error as Error).message, true);
-  }
+  } catch (error) { message((error as Error).message, true); }
 }
 
 let enabled = false;
@@ -168,14 +133,10 @@ async function refreshFeature(): Promise<void> {
     if (!enabled) return;
     ensureUi();
     if (location.hash === '#today') { showToday(); await loadToday(); }
-  } catch {
-    enabled = false;
-  }
+  } catch { enabled = false; }
 }
 
-window.addEventListener('hashchange', () => {
-  if (enabled && location.hash === '#today') { showToday(); void loadToday(); }
-});
+window.addEventListener('hashchange', () => { if (enabled && location.hash === '#today') { showToday(); void loadToday(); } });
 const appView = document.querySelector('#appView');
 if (appView) new MutationObserver(() => { if (!appView.classList.contains('hidden')) void refreshFeature(); }).observe(appView, { attributes: true, attributeFilter: ['class'] });
 void refreshFeature();
