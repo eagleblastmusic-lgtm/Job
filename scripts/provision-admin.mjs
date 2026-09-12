@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -18,7 +19,17 @@ try {
     process.exitCode = 1;
   } else {
     const timestamp = new Date().toISOString();
-    db.prepare("UPDATE users SET role='ADMIN', updated_at=? WHERE id=?").run(timestamp, user.id);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare("UPDATE users SET role='ADMIN', updated_at=? WHERE id=?").run(timestamp, user.id);
+      db.prepare('INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES(?,?,?,?,?,?,?)').run(
+        randomUUID(), user.id, 'ADMIN_PROVISIONED_OUT_OF_BAND', 'user', user.id, JSON.stringify({ previousRole: user.role, method: 'local-cli' }), timestamp
+      );
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
     console.log(`ADMIN_PROVISIONED ${user.email}`);
   }
 } finally {
