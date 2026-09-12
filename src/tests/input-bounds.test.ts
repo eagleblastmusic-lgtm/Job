@@ -30,12 +30,12 @@ async function errorCode(response: Response): Promise<string | undefined> {
   return payload.error?.code;
 }
 
-test('ordinary JSON endpoints reject bodies above the 64 KiB default before persistence', async () => {
+test('ordinary JSON endpoints reject bodies above the 64 KiB default before credential work', async () => {
   await withApp(async base => {
-    const response = await fetch(`${base}/api/events`, {
+    const response = await fetch(`${base}/api/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ eventName: 'oversized_test', properties: { payload: 'x'.repeat(70_000) } })
+      body: JSON.stringify({ email: 'oversized@example.pl', password: 'Bezpieczne123', padding: 'x'.repeat(70_000) })
     });
     assert.equal(response.status, 413);
     assert.equal(await errorCode(response), 'PAYLOAD_TOO_LARGE');
@@ -98,34 +98,5 @@ test('profile, Career Truth, experience and education fields are bounded before 
     });
     assert.equal(education.status, 400);
     assert.equal(await errorCode(education), 'FIELD_TOO_LONG');
-  });
-});
-
-test('analytics event names and property objects are bounded before analytics sanitization/storage', async () => {
-  await withApp(async base => {
-    const tooManyProperties = Object.fromEntries(Array.from({ length: 33 }, (_, index) => [`k${index}`, index]));
-    const countResponse = await fetch(`${base}/api/events`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ eventName: 'bounded_event', properties: tooManyProperties })
-    });
-    assert.equal(countResponse.status, 400);
-    assert.equal(await errorCode(countResponse), 'TOO_MANY_ITEMS');
-
-    const sizeResponse = await fetch(`${base}/api/events`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ eventName: 'bounded_event', properties: { harmless: 'x'.repeat(17_000) } })
-    });
-    assert.equal(sizeResponse.status, 400);
-    assert.equal(await errorCode(sizeResponse), 'FIELD_TOO_LONG');
-
-    const nameResponse = await fetch(`${base}/api/events`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ eventName: 'x'.repeat(101), properties: {} })
-    });
-    assert.equal(nameResponse.status, 400);
-    assert.equal(await errorCode(nameResponse), 'FIELD_TOO_LONG');
   });
 });

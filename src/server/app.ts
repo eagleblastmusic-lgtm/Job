@@ -9,7 +9,7 @@ import { AppStore, type UserRecord } from './store.js';
 import { assertEmail, assertPassword, hashPassword, hashSessionToken, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, newSessionToken, normalizeEmail, parseCookies, verifyLoginPassword, verifyPassword } from './auth.js';
 import { deleteStoredFile, storeCvUpload } from './files.js';
 import { cvToPdf } from './pdf.js';
-import { boundedObjectField, boundedStringArrayField, boundedStringField, HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringField } from './http.js';
+import { boundedStringArrayField, boundedStringField, HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringField } from './http.js';
 import { inferCareerFactsFromText } from '../domain/careerTruth.js';
 import { normalizeText } from '../domain/ontology.js';
 import { parseJobText } from '../domain/jobParser.js';
@@ -22,7 +22,6 @@ import { AiGateway } from './aiGateway.js';
 const LEGAL_VERSION = '2026-09-05-test-v1';
 const JOB_TEXT_MAX_CHARS = 100_000;
 const JOB_JSON_MAX_BYTES = 256 * 1024;
-const ANALYTICS_PROPERTIES_MAX_BYTES = 16 * 1024;
 
 interface AppRuntime {
   server: Server;
@@ -411,13 +410,6 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   if (method === 'GET' && pathname === '/api/admin/diagnostics') {
     requireAdmin(req, store); sendJson(res, 200, store.diagnostics()); return true;
-  }
-
-  if (method === 'POST' && pathname === '/api/events') {
-    const user = currentUser(req, store); const body = await readJson(req);
-    const eventName = boundedStringField(body, 'eventName', 100, true, 1) ?? '';
-    const props = boundedObjectField(body, 'properties', 32, ANALYTICS_PROPERTIES_MAX_BYTES);
-    store.analytics(user?.id ?? null, eventName, props); sendJson(res, 202, { ok: true }); return true;
   }
 
   sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Nie znaleziono endpointu.' } }); return true;
