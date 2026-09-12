@@ -2,11 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
 async function mockAuthenticatedUser(page: Page): Promise<void> {
-  await page.route('**/api/auth/register', route => route.fulfill({
-    status: 201,
-    contentType: 'application/json',
-    body: JSON.stringify({ user: { id: 'ui-today-user', email: 'today-ui@example.pl', name: 'Tester Today', role: 'USER' } })
-  }));
   await page.route('**/api/me', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -53,13 +48,6 @@ test('Today screen is feature-gated, calm, actionable and accessible', async ({ 
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Załóż konto', exact: true }).click();
-  await page.locator('#registerForm input[name="name"]').fill('Tester Today');
-  await page.locator('#registerForm input[name="email"]').fill('today-ui@example.pl');
-  await page.locator('#registerForm input[name="password"]').fill('Bezpieczne123');
-  await page.locator('#registerForm input[name="acceptTerms"]').check();
-  await page.locator('#registerForm input[name="acceptPrivacy"]').check();
-  await page.locator('#registerForm').getByRole('button', { name: /Załóż konto i rozpocznij/ }).click();
   await expect(page.locator('#appView')).not.toHaveClass(/hidden/);
 
   await expect(page.locator('[data-view="today"]:visible').first()).toBeVisible();
