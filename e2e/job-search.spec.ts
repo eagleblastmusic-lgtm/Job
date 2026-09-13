@@ -19,7 +19,7 @@ async function mockAuthenticatedUser(page: Page): Promise<void> {
   }));
 }
 
-test('job search auto-imports source results, pre-fills Career Truth and shows per-source health', async ({ page }) => {
+test('job search prefers official API results and shows direct-source health independently', async ({ page }) => {
   await mockAuthenticatedUser(page);
   await page.route('**/api/job-feed**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs: [], limit: 25, offset: 0 }) }));
   const autoProvider = (key: string, label: string, searchUrl: string) => ({
@@ -27,6 +27,7 @@ test('job search auto-imports source results, pre-fills Career Truth and shows p
     canIngestAutomatically: true, notes: 'Automatyczny odczyt publicznych stron.', checkedAt: '2026-09-13'
   });
   const providers = [
+    { key: 'jooble_pl', label: 'Jooble Polska API', homepageUrl: 'https://pl.jooble.org/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'OFFICIAL_API_ACTIVE', searchUrl: 'https://pl.jooble.org/', canIngestAutomatically: true, notes: 'Oficjalny agregator API.', checkedAt: '2026-09-13' },
     autoProvider('pracuj', 'Pracuj.pl', 'https://www.pracuj.pl/praca/magazynier;kw/Puck;wp'),
     autoProvider('linkedin', 'LinkedIn Jobs', 'https://www.linkedin.com/jobs/search/?keywords=magazynier&location=Puck&distance=30'),
     autoProvider('olx', 'OLX Praca', 'https://www.olx.pl/praca/puck/q-magazynier/'),
@@ -36,6 +37,7 @@ test('job search auto-imports source results, pre-fills Career Truth and shows p
     { key: 'employer_careers', label: 'Strony karier pracodawców', homepageUrl: 'about:blank', searchMode: 'DIRECT_CAREER_PAGES', ingestionStatus: 'PERMITTED_SOURCE_REQUIRED', searchUrl: null, canIngestAutomatically: false, notes: 'Tylko jawnie dozwolone źródła.', checkedAt: '2026-09-13' }
   ];
   const sourceRefresh = [
+    { sourceKey: 'jooble_pl', status: 'IMPORTED', fetchedCount: 10, canonicalCount: 6, message: 'Jooble: 10 ofert, 6 nowych po deduplikacji.' },
     { sourceKey: 'pracuj', status: 'IMPORTED', fetchedCount: 8, canonicalCount: 5, message: 'Pobrano 8 ofert; 5 nowych po deduplikacji.' },
     { sourceKey: 'linkedin', status: 'BLOCKED', fetchedCount: 0, canonicalCount: 0, message: 'Źródło LinkedIn Jobs zablokowało automatyczny odczyt (HTTP 403).' },
     { sourceKey: 'olx', status: 'NO_RESULTS', fetchedCount: 0, canonicalCount: 0, message: 'Brak ofert do importu z bieżącej odpowiedzi źródła.' },
@@ -49,13 +51,13 @@ test('job search auto-imports source results, pre-fills Career Truth and shows p
     body: JSON.stringify({
       criteria: { query: 'magazynier', location: 'Puck', radiusKm: 30 },
       providers,
-      localJobs: [{ jobId: 'job-1', title: 'Magazynier', company: 'Port Logistics', location: 'Puck', sourceKeys: ['pracuj', 'rocketjobs'], sourceUrl: 'https://jobs.example.pl/puck', freshness: '2026-09-13T08:00:00.000Z', decisionState: { recommendation: 'APPLY', override: null } }],
+      localJobs: [{ jobId: 'job-1', title: 'Magazynier', company: 'Port Logistics', location: 'Puck', sourceKeys: ['jooble_pl', 'pracuj', 'rocketjobs'], sourceUrl: 'https://jobs.example.pl/puck', freshness: '2026-09-13T08:00:00.000Z', decisionState: { recommendation: 'APPLY', override: null } }],
       sourceRefresh,
-      externalSearchCount: 6,
-      automaticIngestionCount: 6,
-      importedCount: 21,
-      newCanonicalCount: 12,
-      boundary: 'Job automatycznie próbuje pobrać publiczne oferty; źródła z blokadą są pomijane bez obchodzenia zabezpieczeń.'
+      externalSearchCount: 7,
+      automaticIngestionCount: 7,
+      importedCount: 31,
+      newCanonicalCount: 18,
+      boundary: 'Job preferuje oficjalne API i dozwolone feedy; blokowane bezpośrednie źródła nie zatrzymują wyników z oficjalnych kanałów.'
     })
   }));
 
@@ -68,17 +70,18 @@ test('job search auto-imports source results, pre-fills Career Truth and shows p
   await expect(page.locator('#federatedSearchForm input[name="radiusKm"]')).toHaveValue('30');
   await page.getByRole('button', { name: 'Pobierz oferty ze wszystkich źródeł' }).click();
 
-  await expect(page.locator('#jobSearchSummary')).toContainText('pobrano 21 rekordów');
-  await expect(page.locator('#jobSearchSummary')).toContainText('12 nowych po deduplikacji');
+  await expect(page.locator('#jobSearchSummary')).toContainText('pobrano 31 rekordów');
+  await expect(page.locator('#jobSearchSummary')).toContainText('18 nowych po deduplikacji');
+  await expect(page.locator('#jobSearchProviders')).toContainText('Jooble Polska API');
+  await expect(page.locator('#jobSearchProviders')).toContainText('pobrano 10');
   await expect(page.locator('#jobSearchProviders')).toContainText('Pracuj.pl');
-  await expect(page.locator('#jobSearchProviders')).toContainText('pobrano 8');
   await expect(page.locator('#jobSearchProviders')).toContainText('LinkedIn Jobs');
   await expect(page.locator('#jobSearchProviders')).toContainText('źródło blokuje odczyt');
   await expect(page.locator('#jobSearchProviders')).toContainText('RocketJobs');
   await expect(page.locator('#jobSearchProviders')).toContainText('Just Join IT');
   await expect(page.locator('#jobSearchProviders')).toContainText('Strony karier pracodawców');
   await expect(page.locator('#jobSearchLocalJobs')).toContainText('Port Logistics');
-  await expect(page.locator('#jobSearchLocalJobs')).toContainText('pracuj, rocketjobs');
+  await expect(page.locator('#jobSearchLocalJobs')).toContainText('jooble_pl, pracuj, rocketjobs');
 
   const results = await new AxeBuilder({ page }).include('[data-screen="job-search"]').analyze();
   expect(results.violations).toEqual([]);
