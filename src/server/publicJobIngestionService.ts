@@ -33,15 +33,8 @@ interface CacheEntry {
   items: JobSourceInput[];
 }
 
-interface RobotsCacheEntry {
-  expiresAt: number;
-  allowed: boolean;
-}
-
 const CACHE = new Map<string, CacheEntry>();
-const ROBOTS_CACHE = new Map<string, RobotsCacheEntry>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const ROBOTS_TTL_MS = 24 * 60 * 60 * 1000;
 const GENERIC_MAX_DETAIL_PAGES = 8;
 const PRACUJ_MAX_SEARCH_PAGES = 3;
 const PRACUJ_MAX_DETAIL_PAGES = 24;
@@ -295,14 +288,8 @@ class PublicWebJobConnector implements JobSourceConnector {
   }
 
   private async assertPracujRobotsAllowsJobs(): Promise<void> {
-    const cacheKey = 'https://www.pracuj.pl/robots.txt';
-    const cached = ROBOTS_CACHE.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      if (!cached.allowed) throw new SourceBlockedError('Pracuj.pl robots.txt blokuje /praca/. Import został zatrzymany.');
-      return;
-    }
-
-    const response = await this.fetchImpl(cacheKey, {
+    const robotsUrl = 'https://www.pracuj.pl/robots.txt';
+    const response = await this.fetchImpl(robotsUrl, {
       method: 'GET',
       redirect: 'follow',
       signal: AbortSignal.timeout(8_000),
@@ -311,9 +298,9 @@ class PublicWebJobConnector implements JobSourceConnector {
     if ([401, 403, 429].includes(response.status)) throw new SourceBlockedError(`Pracuj.pl zablokował sprawdzenie robots.txt (HTTP ${response.status}). Import został zatrzymany.`);
     if (!response.ok) throw new Error(`Pracuj.pl robots.txt zwrócił HTTP ${response.status}.`);
     const robots = await responseTextBounded(response, MAX_ROBOTS_BYTES);
-    const allowed = !robotsWildcardDisallowsPath(robots, '/praca/');
-    ROBOTS_CACHE.set(cacheKey, { expiresAt: Date.now() + ROBOTS_TTL_MS, allowed });
-    if (!allowed) throw new SourceBlockedError('Pracuj.pl robots.txt blokuje /praca/. Import został zatrzymany.');
+    if (robotsWildcardDisallowsPath(robots, '/praca/')) {
+      throw new SourceBlockedError('Pracuj.pl robots.txt blokuje /praca/. Import został zatrzymany.');
+    }
   }
 
   private async fetchHtml(url: string): Promise<string> {
