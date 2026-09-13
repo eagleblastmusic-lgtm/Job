@@ -5,6 +5,7 @@ import './interviewPack.js';
 import './jobFeed.js';
 import './bottleneck.js';
 import './localLabour.js';
+import './effectiveWage.js';
 
 export {};
 
