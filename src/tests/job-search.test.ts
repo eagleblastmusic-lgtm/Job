@@ -24,20 +24,21 @@ async function request(base: string, path: string, cookie: string, method = 'GET
   return fetch(`${base}${path}`, init);
 }
 
-test('provider catalog includes all agreed sources and never claims automatic ingestion without access', () => {
+test('provider catalog includes all agreed sources and enables bounded public-page ingestion', () => {
   const providers = buildJobSearchProviders({ query: 'magazynier', location: 'Puck', radiusKm: 30 });
   assert.deepEqual(providers.map(provider => provider.key), ['pracuj', 'linkedin', 'olx', 'indeed', 'rocketjobs', 'justjoinit', 'employer_careers']);
-  assert.equal(providers.filter(provider => provider.canIngestAutomatically).length, 0);
+  assert.equal(providers.filter(provider => provider.canIngestAutomatically).length, 6);
   assert.equal(providers.filter(provider => provider.searchUrl !== null).length, 6);
   const linkedin = providers.find(provider => provider.key === 'linkedin');
   assert.ok(linkedin?.searchUrl?.includes('keywords=magazynier'));
   assert.ok(linkedin?.searchUrl?.includes('location=Puck'));
   assert.ok(linkedin?.searchUrl?.includes('distance=30'));
-  const olx = providers.find(provider => provider.key === 'olx');
-  assert.ok(olx?.notes.includes('nie służy do pobierania ogłoszeń innych użytkowników'));
+  assert.match(linkedin?.notes ?? '', /nie omija CAPTCHA/i);
+  const careers = providers.find(provider => provider.key === 'employer_careers');
+  assert.equal(careers?.canIngestAutomatically, false);
 });
 
-test('federated job search is feature-gated, returns providers and filters jobs already known to Job', async () => {
+test('job search is feature-gated and keeps working when all live sources are administratively disabled', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-search-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
@@ -50,6 +51,8 @@ test('federated job search is feature-gated, returns providers and filters jobs 
     assert.equal(((await disabled.json()) as { error: { code: string } }).error.code, 'FEATURE_DISABLED');
 
     new FeatureFlagService(app.db).set('job_feed', true, 100);
+    app.db.db.prepare("UPDATE job_source_registry SET enabled=0 WHERE key IN ('pracuj','linkedin','olx','indeed','rocketjobs','justjoinit')").run();
+
     const importResponse = await request(base, '/api/job-feed/import-user', cookie, 'POST', {
       rawText: 'Magazynier\nFirma: Port Logistics\nMiejsce pracy: Puck\nUmowa o pracę\nWynagrodzenie: 6200 PLN brutto\nWymagania: UDT',
       sourceUrl: 'https://jobs.example.pl/puck-magazynier'
@@ -61,17 +64,22 @@ test('federated job search is feature-gated, returns providers and filters jobs 
     const body = await response.json() as {
       providers: Array<{ key: string; searchUrl: string | null; canIngestAutomatically: boolean }>;
       localJobs: Array<{ title: string | null; company: string | null; location: string | null }>;
+      sourceRefresh: Array<{ status: string }>;
       externalSearchCount: number;
       automaticIngestionCount: number;
+      importedCount: number;
       boundary: string;
     };
     assert.equal(body.providers.length, 7);
     assert.equal(body.externalSearchCount, 6);
-    assert.equal(body.automaticIngestionCount, 0);
+    assert.equal(body.automaticIngestionCount, 6);
+    assert.equal(body.importedCount, 0);
+    assert.equal(body.sourceRefresh.length, 6);
+    assert.ok(body.sourceRefresh.every(source => source.status === 'DISABLED'));
     assert.equal(body.localJobs.length, 1);
     assert.equal(body.localJobs[0]?.company, 'Port Logistics');
     assert.equal(body.localJobs[0]?.location, 'Puck');
-    assert.match(body.boundary, /automatyczne pobieranie/i);
+    assert.match(body.boundary, /automatycznie próbuje pobrać/i);
 
     const registryKeys = (app.db.db.prepare("SELECT key FROM job_source_registry WHERE key IN ('pracuj','linkedin','olx','indeed','rocketjobs','justjoinit','employer_careers') ORDER BY key").all() as unknown as Array<{ key: string }>).map(row => row.key);
     assert.deepEqual(registryKeys, ['employer_careers', 'indeed', 'justjoinit', 'linkedin', 'olx', 'pracuj', 'rocketjobs']);
