@@ -35,16 +35,18 @@ export class JobSearchService {
   private readonly feed: JobFeedService;
   private readonly publicIngestion: PublicJobIngestionService;
   private readonly joobleIngestion: JoobleJobIngestionService;
+  private readonly joobleApiConfigured: boolean;
 
   constructor(database: JobDatabase, store: AppStore, config: AppConfig) {
     this.feed = new JobFeedService(database, store);
     this.publicIngestion = new PublicJobIngestionService(database, store);
+    this.joobleApiConfigured = Boolean(config.joobleApiKeyPl);
     this.joobleIngestion = new JoobleJobIngestionService(database, store, config.joobleApiKeyPl, config.joobleTimeoutMs);
   }
 
   async search(userId: string, input: JobSearchCriteria): Promise<FederatedJobSearchResult> {
     const criteria = validateJobSearchCriteria(input);
-    const providers = buildJobSearchProviders(criteria, { joobleApiConfigured: Boolean(this.joobleIngestionApiConfigured()) });
+    const providers = buildJobSearchProviders(criteria, { joobleApiConfigured: this.joobleApiConfigured });
     const [joobleRefresh, publicRefresh] = await Promise.all([
       this.joobleIngestion.refresh(userId, criteria),
       this.publicIngestion.refresh(userId, criteria)
@@ -64,9 +66,5 @@ export class JobSearchService {
       newCanonicalCount,
       boundary: 'Job preferuje oficjalne API i dozwolone feedy, a wyniki ze wszystkich źródeł trafiają do jednej normalizacji i deduplikacji. Bezpośredni odczyt publicznych stron pozostaje dodatkowym kanałem fail-closed: 403, 429, CAPTCHA albo logowanie nie są obchodzone i nie zatrzymują wyników z oficjalnych źródeł.'
     };
-  }
-
-  private joobleIngestionApiConfigured(): boolean {
-    return this.joobleIngestion.isConfigured();
   }
 }
