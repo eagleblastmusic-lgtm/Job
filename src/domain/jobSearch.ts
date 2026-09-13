@@ -1,6 +1,6 @@
 export type JobSearchProviderKey = 'pracuj' | 'linkedin' | 'olx' | 'indeed' | 'rocketjobs' | 'justjoinit' | 'employer_careers';
-export type JobSearchMode = 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
-export type JobIngestionStatus = 'PARTNER_REQUIRED' | 'PERMITTED_SOURCE_REQUIRED';
+export type JobSearchMode = 'AUTO_IMPORT' | 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
+export type JobIngestionStatus = 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
 
 export interface JobSearchCriteria {
   query: string;
@@ -61,7 +61,8 @@ function linkedinUrl(criteria: JobSearchCriteria): string {
 
 function olxUrl(criteria: JobSearchCriteria): string {
   const keyword = pathToken(criteria.query).toLowerCase();
-  const url = new URL(`https://www.olx.pl/praca/q-${keyword}/`);
+  const location = criteria.location ? `/${pathToken(criteria.location).toLowerCase()}` : '';
+  const url = new URL(`https://www.olx.pl/praca${location}/q-${keyword}/`);
   if (criteria.radiusKm !== null) url.searchParams.set('search[dist]', String(criteria.radiusKm));
   return url.toString();
 }
@@ -75,88 +76,52 @@ function indeedUrl(criteria: JobSearchCriteria): string {
 }
 
 function rocketJobsUrl(criteria: JobSearchCriteria): string {
-  return urlWithParams('https://rocketjobs.pl/', {
+  return urlWithParams('https://rocketjobs.pl/oferty-pracy/wszystkie-lokalizacje', {
     keyword: criteria.query,
-    location: criteria.location
+    location: criteria.location,
+    radius: criteria.radiusKm
   });
 }
 
 function justJoinItUrl(criteria: JobSearchCriteria): string {
   return urlWithParams('https://justjoin.it/job-offers/all-locations', {
-    keyword: criteria.query
+    q: `${criteria.query}@keyword`,
+    location: criteria.location,
+    radius: criteria.radiusKm
   });
 }
 
+const autoNotes = 'Job automatycznie próbuje odczytać publicznie dostępne strony wyników i ofert bez logowania. Nie omija CAPTCHA, blokad, limitów ani prywatnych endpointów; blokujące źródło failuje osobno, bez zatrzymania całego wyszukiwania.';
+
 const DEFINITIONS: readonly ProviderDefinition[] = [
   {
-    key: 'pracuj',
-    label: 'Pracuj.pl',
-    homepageUrl: 'https://www.pracuj.pl/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'Wyszukiwanie otwiera oficjalny serwis. Automatyczny import wymaga uzgodnionego, dozwolonego kanału danych; aplikacja nie uruchamia nieautoryzowanego scrapingu.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: pracujUrl
+    key: 'pracuj', label: 'Pracuj.pl', homepageUrl: 'https://www.pracuj.pl/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: autoNotes, checkedAt: CHECKED_AT, buildSearchUrl: pracujUrl
   },
   {
-    key: 'linkedin',
-    label: 'LinkedIn Jobs',
-    homepageUrl: 'https://www.linkedin.com/jobs/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'LinkedIn ogranicza Jobs API do zatwierdzonych integracji partnerskich. W Job dostępne jest bezpieczne wyszukiwanie wychodzące do serwisu.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: linkedinUrl
+    key: 'linkedin', label: 'LinkedIn Jobs', homepageUrl: 'https://www.linkedin.com/jobs/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: `${autoNotes} Oficjalne Jobs API nadal wymaga partnerstwa; ten adapter nie używa partnerskiego API.`, checkedAt: CHECKED_AT, buildSearchUrl: linkedinUrl
   },
   {
-    key: 'olx',
-    label: 'OLX Praca',
-    homepageUrl: 'https://www.olx.pl/praca/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'OLX Developer API wymaga zatwierdzenia aplikacji, a publiczne API nie służy do pobierania ogłoszeń innych użytkowników. Job nie obchodzi tego ograniczenia.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: olxUrl
+    key: 'olx', label: 'OLX Praca', homepageUrl: 'https://www.olx.pl/praca/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: `${autoNotes} Adapter nie korzysta z ograniczonego API OLX do pobierania cudzych ogłoszeń.`, checkedAt: CHECKED_AT, buildSearchUrl: olxUrl
   },
   {
-    key: 'indeed',
-    label: 'Indeed',
-    homepageUrl: 'https://pl.indeed.com/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'Automatyczna integracja jest przeznaczona dla partnerów Indeed. Do czasu uzyskania dostępu Job kieruje użytkownika do oficjalnego wyszukiwania.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: indeedUrl
+    key: 'indeed', label: 'Indeed', homepageUrl: 'https://pl.indeed.com/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: `${autoNotes} Oficjalne API Indeed pozostaje partnerskie; adapter publicznych stron działa niezależnie i zatrzymuje się przy blokadzie.`, checkedAt: CHECKED_AT, buildSearchUrl: indeedUrl
   },
   {
-    key: 'rocketjobs',
-    label: 'RocketJobs',
-    homepageUrl: 'https://rocketjobs.pl/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'Źródło jest obecne w federated search. Automatyczny import pozostaje wyłączony do czasu potwierdzenia dozwolonego feedu/API lub partnerstwa.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: rocketJobsUrl
+    key: 'rocketjobs', label: 'RocketJobs', homepageUrl: 'https://rocketjobs.pl/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: autoNotes, checkedAt: CHECKED_AT, buildSearchUrl: rocketJobsUrl
   },
   {
-    key: 'justjoinit',
-    label: 'Just Join IT',
-    homepageUrl: 'https://justjoin.it/',
-    searchMode: 'OUTBOUND_SEARCH',
-    ingestionStatus: 'PARTNER_REQUIRED',
-    notes: 'Źródło jest obecne w federated search. Automatyczny import pozostaje wyłączony do czasu potwierdzenia dozwolonego feedu/API lub partnerstwa.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: justJoinItUrl
+    key: 'justjoinit', label: 'Just Join IT', homepageUrl: 'https://justjoin.it/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
+    notes: autoNotes, checkedAt: CHECKED_AT, buildSearchUrl: justJoinItUrl
   },
   {
-    key: 'employer_careers',
-    label: 'Strony karier pracodawców',
-    homepageUrl: 'about:blank',
-    searchMode: 'DIRECT_CAREER_PAGES',
-    ingestionStatus: 'PERMITTED_SOURCE_REQUIRED',
-    notes: 'Docelowo obejmuje bezpośrednie strony karier dodane do jawnej allowlisty, gdy regulamin/zgoda pozwala na pobieranie. Brak automatycznego skanowania całego internetu.',
-    checkedAt: CHECKED_AT,
-    buildSearchUrl: () => null
+    key: 'employer_careers', label: 'Strony karier pracodawców', homepageUrl: 'about:blank', searchMode: 'DIRECT_CAREER_PAGES', ingestionStatus: 'PERMITTED_SOURCE_REQUIRED',
+    notes: 'Automatyczne pobieranie z bezpośrednich stron pracodawców wymaga jawnej allowlisty/feedu konkretnej firmy; aplikacja nie skanuje losowo całego internetu.',
+    checkedAt: CHECKED_AT, buildSearchUrl: () => null
   }
 ] as const;
 
@@ -179,7 +144,7 @@ export function buildJobSearchProviders(input: JobSearchCriteria): JobSearchProv
     searchMode: definition.searchMode,
     ingestionStatus: definition.ingestionStatus,
     searchUrl: definition.buildSearchUrl(criteria),
-    canIngestAutomatically: false,
+    canIngestAutomatically: definition.searchMode === 'AUTO_IMPORT',
     notes: definition.notes,
     checkedAt: definition.checkedAt
   }));
