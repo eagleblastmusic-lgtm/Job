@@ -1,24 +1,31 @@
-# Outcome Inbox V2
+# Outcome Inbox — V2
 
-## Purpose
+Outcome Inbox is an optional candidate-side assistant for interpreting recruitment messages. V2 supports **manual paste** of a message and deliberately does not require mailbox access.
 
-Outcome Inbox reduces friction in recording recruitment outcomes without silently changing application state.
+## Safety and privacy boundary
 
-## Implemented boundary
+- Analysis never changes an application status.
+- A suggested update is persisted separately and must be explicitly confirmed by the user.
+- Raw message text is not stored. The database keeps a SHA-256 message hash, structured signal type, confidence and generic evidence codes.
+- A dismissed suggestion cannot later mutate the application.
+- Cross-user suggestion/application access is blocked by user-scoped queries.
+- Existing application transition rules remain authoritative; confirmation fails when the proposed transition is not valid.
 
-V2 accepts a user-pasted recruitment message tied to one of the user's applications. A deterministic classifier can suggest `REJECTION`, `INTERVIEW`, `OFFER`, `RECRUITER_CONTACT` or `UNKNOWN` with an explicit confidence value. The suggestion is persisted as `PENDING`.
+## Signals
 
-The application status and `outcomes` table are changed only after the user explicitly chooses **Potwierdź**. Dismissing a suggestion records no recruitment outcome. Confirmation is transactional: application status, confirmed outcome and inbox resolution succeed or fail together.
+The deterministic V2 classifier can suggest:
 
-## Privacy and safety
+- rejection,
+- interview invitation,
+- job offer,
+- recruiter contact.
 
-- user-scoped SQL ownership on applications and inbox items;
-- no automatic status mutation from message content;
-- message storage is bounded to a short excerpt;
-- no hidden use of health, politics, family status or other sensitive traits;
-- Outcome Inbox data is included in the user export and deleted with the user through foreign-key cascades;
-- the feature is disabled by default behind `outcome_inbox`.
+Ambiguous or weak messages return no suggestion. Confidence is always below 1.0 and is shown to the user.
 
-## External email integration
+## Email integration
 
-The Master Plan calls email integration optional. This repository does **not** claim provider-backed mailbox access. A future connector may create the same pending suggestions, but it must preserve explicit user confirmation and pass a separate privacy/security review before rollout.
+Provider-backed email access is intentionally deferred. The Master Plan calls this integration optional; adding a mailbox connector requires a separately authorized provider connection, consent/minimization review and provider-specific security work. The current product remains usable without granting mailbox access.
+
+## Rollout
+
+The feature is behind `outcome_inbox`, disabled by default, and uses the shared deterministic rollout/rollback mechanism.

@@ -20,7 +20,9 @@ export async function handleV2ExportApi(req:IncomingMessage,res:ServerResponse,p
  add('skill_roi_assumptions','SELECT * FROM skill_roi_assumptions WHERE user_id=? ORDER BY normalized_skill');
  add('learning_sessions','SELECT * FROM learning_sessions WHERE user_id=? ORDER BY created_at');
  add('career_transition_explorations','SELECT * FROM career_transition_explorations WHERE user_id=? ORDER BY created_at');
- add('outcome_inbox_items','SELECT * FROM outcome_inbox_items WHERE user_id=? ORDER BY created_at');
+ add('outcome_inbox_suggestions','SELECT * FROM outcome_inbox_suggestions WHERE user_id=? ORDER BY created_at');
+ add('strategy_decisions','SELECT * FROM strategy_decisions WHERE user_id=? ORDER BY created_at');
+ add('interventions','SELECT * FROM interventions WHERE user_id=? ORDER BY created_at');
  store.audit(user.id,'DATA_EXPORTED','user',user.id,{scope:'v2'});
  sendJson(res,200,data);return true;
 }

@@ -9,6 +9,8 @@ import './effectiveWage.js';
 import './skillRoi.js';
 import './learning.js';
 import './careerTransition.js';
+import './outcomeInbox.js';
+import './strategy.js';
 
 export {};
 type Education={id:string;institution:string;field:string|null;degree:string|null;startDate:string|null;endDate:string|null;description:string|null};type CareerTruthResponse={education:Education[]};const $=<T extends Element=HTMLElement>(selector:string):T|null=>document.querySelector(selector) as T|null;const esc=(value:unknown):string=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]??char));async function api<T>(path:string,init:RequestInit={}):Promise<T>{const response=await fetch(path,{...init,headers:{...(init.body?{'content-type':'application/json'}:{}),...(init.headers??{})}});const data=await response.json().catch(()=>({})) as T&{error?:{message?:string}};if(!response.ok)throw new Error(data.error?.message??`HTTP ${response.status}`);return data;}

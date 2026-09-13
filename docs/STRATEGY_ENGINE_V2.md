@@ -1,28 +1,38 @@
-# Strategy Engine V2
+# Strategy Engine — V2
 
-## Purpose
+Strategy Engine activates only after the user has at least 10 sent applications. It uses only that user's recorded history plus already-available candidate-side modules; it does not compare the user with other people.
 
-Strategy Engine turns accumulated application/outcome history into cautious experiments. It is not a career oracle and does not make high-impact decisions from tiny samples.
+## Recommendation classes
+
+The engine may propose a small measurable experiment when evidence supports it:
+
+- temporarily increase the share of a better-performing role,
+- temporarily increase the share of a better-performing contract type,
+- prioritize fresh offers when the user's own fresh-vs-older samples differ materially,
+- test a sourced +10 km labour-market opportunity surfaced by Local Labour Intelligence,
+- verify learning a recurring skill surfaced by Skill ROI,
+- use a more selective high-fit application experiment when response is low and no more specific signal is sufficiently supported.
+
+At most three recommendations are shown at once.
 
 ## Evidence rules
 
-- fewer than 10 applied-or-beyond applications: no strategy recommendation, `ZA_MALO_DANYCH`;
-- 10–19 observations: at most an early signal;
-- 20–39: probable conclusion wording may be used;
-- 40+: strong-signal wording is permitted, but causality is still not claimed;
-- interview and late-stage advice has its own denominator threshold;
-- freshness comparisons are shown only when both fresh and older application groups have usable observations.
+- No strategy recommendations below 10 sent applications.
+- Segment comparisons require at least 5 applications in each compared segment.
+- Confidence uses the shared Bottleneck vocabulary: `ZA_MALO_DANYCH`, `WCZESNY_SYGNAL`, `PRAWDOPODOBNY_WNIOSEK`, `SILNY_WNIOSEK`.
+- Role/contract/freshness comparisons are explicitly described as observational correlation, not causation.
+- Radius recommendations are reused only when Local Labour Intelligence has a sourced `MAY_HELP` signal.
+- Skill recommendations are reused only when Skill ROI is above `ZA_MALO_DANYCH`, has at least five observed requirements and at least one saved job where the skill is the sole unconfirmed MUST_HAVE gap.
+- The engine does not recommend a wholesale CV-narrative change from low response alone; there is not enough causal evidence for that claim.
 
-## Recommendations
+## Data flywheel
 
-Current deterministic rules can propose bounded experiments around response rate, interview conversion, late-stage conversion and freshness. Each recommendation includes:
+The user can accept or dismiss a recommendation. The decision is persisted in `strategy_decisions`; accepted recommendations also create a `STRATEGY_EXPERIMENT` intervention. This gives later analysis a user-confirmed intervention boundary:
 
-- sample size;
-- confidence;
-- evidence/reason;
-- a small next experiment;
-- explicit language that the recommendation is a hypothesis rather than a sweeping career decision.
+`job → decision → application → outcome → intervention → later outcome`
 
-## Boundaries
+The engine never silently edits the user's Career Truth, desired roles, contract preferences or commute radius.
 
-The engine does not use cross-user outcomes, protected/sensitive traits, employer-side candidate ranking or causal claims. It is disabled by default behind `strategy_engine`. Later cross-user intelligence remains blocked until privacy/legal review and cohort/fairness safeguards are implemented.
+## Cross-user boundary
+
+V2 is strictly per-user. Cross-user aggregation, cohort intelligence or benchmarks remain disabled until the separate privacy/legal review required by the Master Plan.
