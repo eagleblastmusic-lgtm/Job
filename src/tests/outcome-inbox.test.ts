@@ -45,7 +45,9 @@ test('Outcome Inbox is feature-gated, does not mutate on analysis, and writes on
     const confirmed = await fetch(`${base}/api/outcome-inbox/${suggestion.suggestion.id}/confirm`, { method: 'PATCH', headers: { cookie } });
     assert.equal(confirmed.status, 200);
     assert.equal(app.store.getApplication(body.user.id, applicationId)?.status, 'INTERVIEW');
-    const outcome = app.db.db.prepare('SELECT source,confirmed_by_user,outcome_type FROM outcomes WHERE application_id=? ORDER BY created_at DESC LIMIT 1').get(applicationId) as { source: string; confirmed_by_user: number; outcome_type: string };
-    assert.deepEqual(outcome, { source: 'OUTCOME_INBOX', confirmed_by_user: 1, outcome_type: 'INTERVIEW' });
+    const outcome = app.db.db.prepare('SELECT source,confirmed_by_user,outcome_type FROM outcomes WHERE application_id=? ORDER BY created_at DESC LIMIT 1').get(applicationId) as unknown as { source: string; confirmed_by_user: number; outcome_type: string };
+    assert.equal(outcome.source, 'OUTCOME_INBOX');
+    assert.equal(outcome.confirmed_by_user, 1);
+    assert.equal(outcome.outcome_type, 'INTERVIEW');
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });
