@@ -1,6 +1,7 @@
 import type { JobDatabase } from './db.js';
 import type { AppStore } from './store.js';
 import { JobFeedService, type JobFeedCard } from './jobFeedService.js';
+import { PublicJobIngestionService, type LiveSourceRefreshResult } from './publicJobIngestionService.js';
 import { buildJobSearchProviders, validateJobSearchCriteria, type JobSearchCriteria, type JobSearchProvider } from '../domain/jobSearch.js';
 import { normalizeText } from '../domain/ontology.js';
 
@@ -8,8 +9,11 @@ export interface FederatedJobSearchResult {
   criteria: JobSearchCriteria;
   providers: JobSearchProvider[];
   localJobs: JobFeedCard[];
+  sourceRefresh: LiveSourceRefreshResult[];
   externalSearchCount: number;
   automaticIngestionCount: number;
+  importedCount: number;
+  newCanonicalCount: number;
   boundary: string;
 }
 
@@ -27,22 +31,30 @@ function matchesLocation(job: JobFeedCard, location: string | null): boolean {
 
 export class JobSearchService {
   private readonly feed: JobFeedService;
+  private readonly ingestion: PublicJobIngestionService;
 
   constructor(database: JobDatabase, store: AppStore) {
     this.feed = new JobFeedService(database, store);
+    this.ingestion = new PublicJobIngestionService(database, store);
   }
 
-  search(userId: string, input: JobSearchCriteria): FederatedJobSearchResult {
+  async search(userId: string, input: JobSearchCriteria): Promise<FederatedJobSearchResult> {
     const criteria = validateJobSearchCriteria(input);
     const providers = buildJobSearchProviders(criteria);
+    const sourceRefresh = await this.ingestion.refresh(userId, criteria);
     const localJobs = this.feed.list(userId, 50, 0).filter(job => matchesQuery(job, criteria.query) && matchesLocation(job, criteria.location));
+    const importedCount = sourceRefresh.reduce((sum, source) => sum + source.fetchedCount, 0);
+    const newCanonicalCount = sourceRefresh.reduce((sum, source) => sum + source.canonicalCount, 0);
     return {
       criteria,
       providers,
       localJobs,
+      sourceRefresh,
       externalSearchCount: providers.filter(provider => provider.searchUrl !== null).length,
       automaticIngestionCount: providers.filter(provider => provider.canIngestAutomatically).length,
-      boundary: 'Wyniki zapisane już w Job są filtrowane lokalnie. Zewnętrzne serwisy są otwierane przez oficjalne wyszukiwarki; automatyczne pobieranie pozostaje wyłączone bez potwierdzonego API, feedu, licencji albo zgody.'
+      importedCount,
+      newCanonicalCount,
+      boundary: 'Job automatycznie próbuje pobrać publiczne oferty z każdego aktywnego źródła, normalizuje je i przepuszcza przez istniejącą deduplikację. Jeśli serwis zwraca blokadę, CAPTCHA lub wymaga logowania, to źródło zostaje pominięte bez obchodzenia zabezpieczeń; pozostałe źródła nadal działają.'
     };
   }
 }
