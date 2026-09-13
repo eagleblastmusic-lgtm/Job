@@ -6,7 +6,8 @@ export const FEATURE_FLAG_KEYS = [
   'career_transition',
   'strategy_engine',
   'job_feed',
-  'bottleneck'
+  'bottleneck',
+  'effective_wage'
 ] as const;
 
 export type FeatureFlagKey = typeof FEATURE_FLAG_KEYS[number];
