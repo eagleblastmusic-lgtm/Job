@@ -16,15 +16,13 @@ async function makeFixture(email: string) {
     databasePath: join(dir, 'test.sqlite'),
     adminEmails: new Set()
   });
-  const userId = app.store.createUser({
+  const user = app.store.createUser({
     email,
     name: 'Jooble Tester',
     passwordHash: 'test-hash',
-    role: 'USER',
-    locale: 'pl-PL',
-    timezone: 'Europe/Warsaw'
+    role: 'USER'
   });
-  return { dir, app, userId };
+  return { dir, app, userId: user.id };
 }
 
 test('Jooble official API maps a Polish search into the existing feed and rounds radius to a supported value', async () => {
