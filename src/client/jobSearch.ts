@@ -7,7 +7,7 @@ type SearchProvider = {
   label: string;
   homepageUrl: string;
   searchMode: 'AUTO_IMPORT' | 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
-  ingestionStatus: 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
+  ingestionStatus: 'OFFICIAL_API_ACTIVE' | 'OFFICIAL_API_REQUIRED' | 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
   searchUrl: string | null;
   canIngestAutomatically: boolean;
   notes: string;
@@ -60,12 +60,13 @@ function formatDate(value: string | null): string {
 }
 
 function sourceStatusLabel(refresh: SourceRefresh | undefined, provider: SearchProvider): string {
+  if (provider.ingestionStatus === 'OFFICIAL_API_REQUIRED') return 'wymaga klucza API';
   if (!provider.canIngestAutomatically) return 'wymaga konfiguracji';
-  if (!refresh) return 'automatyczny import';
+  if (!refresh) return provider.ingestionStatus === 'OFFICIAL_API_ACTIVE' ? 'oficjalne API' : 'automatyczny import';
   if (refresh.status === 'IMPORTED') return `pobrano ${refresh.fetchedCount}`;
   if (refresh.status === 'NO_RESULTS') return 'brak wyników';
   if (refresh.status === 'BLOCKED') return 'źródło blokuje odczyt';
-  if (refresh.status === 'DISABLED') return 'wyłączone';
+  if (refresh.status === 'DISABLED') return provider.key === 'jooble_pl' ? 'wymaga klucza API' : 'wyłączone';
   return 'błąd źródła';
 }
 
@@ -98,7 +99,7 @@ function ensureUi(): HTMLElement {
     <div class="screen-heading">
       <p class="eyebrow">Wiele źródeł, jeden feed</p>
       <h2>Wyszukiwarka ofert</h2>
-      <p>Wpisz stanowisko i lokalizację. Job sam spróbuje pobrać publiczne oferty ze wszystkich aktywnych źródeł, połączy duplikaty i pokaże je w jednym miejscu.</p>
+      <p>Wpisz stanowisko i lokalizację. Job najpierw korzysta z dostępnych oficjalnych API, równolegle próbuje publiczne źródła, łączy duplikaty i pokazuje wszystko w jednym miejscu.</p>
     </div>
     <form id="federatedSearchForm" class="card form-grid">
       <label class="span-2">Stanowisko, firma lub słowo kluczowe<input name="q" required minlength="2" maxlength="120" placeholder="np. magazynier, Java developer"></label>
@@ -113,7 +114,7 @@ function ensureUi(): HTMLElement {
       <div id="jobSearchLocalJobs" class="stack"></div>
     </section>
     <section class="section-gap" aria-labelledby="jobSearchProvidersHeading">
-      <div class="row-between"><div><h3 id="jobSearchProvidersHeading">Stan źródeł</h3><p class="hint">Blokada jednego serwisu nie zatrzymuje pozostałych. Job nie obchodzi CAPTCHA ani logowania.</p></div></div>
+      <div class="row-between"><div><h3 id="jobSearchProvidersHeading">Stan źródeł</h3><p class="hint">Oficjalne API i feedy zmniejszają zależność od blokad portali. Blokada jednego serwisu nie zatrzymuje pozostałych źródeł.</p></div></div>
       <div id="jobSearchProviders" class="grid two"></div>
     </section>`;
   content.append(screen);
@@ -150,17 +151,20 @@ function render(result: SearchResponse): void {
   if (!summary || !providers || !jobs) return;
 
   const importedSources = result.sourceRefresh.filter(item => item.status === 'IMPORTED').length;
-  const blockedSources = result.sourceRefresh.filter(item => item.status === 'BLOCKED' || item.status === 'FAILED').length;
-  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.localJobs.length)} pasujących ofert</strong> · pobrano ${esc(result.importedCount)} rekordów · ${esc(result.newCanonicalCount)} nowych po deduplikacji · ${esc(importedSources)} źródeł odpowiedziało${blockedSources ? ` · ${esc(blockedSources)} źródeł niedostępnych` : ''}<p class="hint">${esc(result.boundary)}</p></div>`;
+  const unavailableSources = result.sourceRefresh.filter(item => item.status === 'BLOCKED' || item.status === 'FAILED').length;
+  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.localJobs.length)} pasujących ofert</strong> · pobrano ${esc(result.importedCount)} rekordów · ${esc(result.newCanonicalCount)} nowych po deduplikacji · ${esc(importedSources)} źródeł odpowiedziało${unavailableSources ? ` · ${esc(unavailableSources)} źródeł niedostępnych` : ''}<p class="hint">${esc(result.boundary)}</p></div>`;
 
   const refreshBySource = new Map(result.sourceRefresh.map(item => [item.sourceKey, item]));
   providers.innerHTML = result.providers.map(provider => {
     const refresh = refreshBySource.get(provider.key);
+    const fallbackText = provider.key === 'employer_careers'
+      ? '<span class="hint">Strony karier wymagają skonfigurowanej allowlisty pracodawców.</span>'
+      : '';
     return `
       <article class="card">
         <div class="row-between"><h3>${esc(provider.label)}</h3><span class="badge">${esc(sourceStatusLabel(refresh, provider))}</span></div>
         <p class="hint">${esc(refresh?.message ?? provider.notes)}</p>
-        ${provider.searchUrl ? `<a class="button button-secondary" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Otwórz ${esc(provider.label)} ręcznie</a>` : '<span class="hint">Strony karier wymagają skonfigurowanej allowlisty pracodawców.</span>'}
+        ${provider.searchUrl ? `<a class="button button-secondary" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Otwórz ${esc(provider.label)}</a>` : fallbackText}
       </article>`;
   }).join('');
 
@@ -170,7 +174,7 @@ function render(result: SearchResponse): void {
       <p><strong>${esc(job.company ?? 'Firma nieustalona')}</strong>${job.location ? ` · ${esc(job.location)}` : ''}</p>
       <p class="hint">Źródła: ${esc(job.sourceKeys.join(', '))}</p>
       ${job.sourceUrl ? `<a href="${esc(job.sourceUrl)}" target="_blank" rel="noopener noreferrer">Otwórz oryginalną ofertę</a>` : ''}
-    </article>`).join('') : '<div class="card"><strong>Nie znaleziono jeszcze pasujących ofert.</strong><p class="hint">Sprawdź status źródeł poniżej. Jeśli serwis zablokował automatyczny odczyt, możesz otworzyć go ręcznie; pozostałe źródła nadal działają niezależnie.</p></div>';
+    </article>`).join('') : '<div class="card"><strong>Nie znaleziono jeszcze pasujących ofert.</strong><p class="hint">Sprawdź stan źródeł poniżej. Oficjalne API działa niezależnie od bezpośrednich prób odczytu portali.</p></div>';
 }
 
 async function prefill(): Promise<void> {
@@ -201,7 +205,7 @@ async function search(): Promise<void> {
   if (radius) params.set('radiusKm', radius);
   try {
     if (submit) submit.disabled = true;
-    message('Pobieram publiczne oferty ze źródeł, normalizuję i usuwam duplikaty…');
+    message('Pobieram oferty z oficjalnych API i aktywnych źródeł, normalizuję i usuwam duplikaty…');
     const result = await api<SearchResponse>(`/api/job-search?${params.toString()}`);
     render(result);
     message(`Gotowe. Job pobrał ${result.importedCount} rekordów i dodał ${result.newCanonicalCount} nowych ofert po deduplikacji.`);
@@ -212,7 +216,6 @@ async function search(): Promise<void> {
   }
 }
 
-let enabled = false;
 async function refreshFeature(): Promise<void> {
   try {
     const data = await api<FeatureResponse>('/api/features');
@@ -223,6 +226,7 @@ async function refreshFeature(): Promise<void> {
   } catch { enabled = false; }
 }
 
+let enabled = false;
 window.addEventListener('hashchange', () => { if (enabled && location.hash === '#job-search') { show(); void prefill(); } });
 const appView = document.querySelector('#appView');
 if (appView) new MutationObserver(() => { if (!appView.classList.contains('hidden')) void refreshFeature(); }).observe(appView, { attributes: true, attributeFilter: ['class'] });
