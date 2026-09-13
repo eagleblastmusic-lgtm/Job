@@ -1,3 +1,6 @@
+import './outcomeInbox.js';
+import './strategy.js';
+
 export {};
 
 const form = document.querySelector<HTMLFormElement>('#experienceForm');

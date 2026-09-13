@@ -1,98 +1,81 @@
 # Production readiness checklist
 
-## Functional MVP core
+Status date: 2026-09-13
 
-- [x] signup/login
-- [x] onboarding/profile without CV
-- [x] Career Truth Lite
-- [x] user-entered/correctable facts, experience and education
-- [x] explicit current employment with end-date clearing
-- [x] education carried into Application Package, CV and export
-- [x] CV upload
-- [x] paste-job workflow and deterministic Job Parser
-- [x] explainable Decision Engine / Decision Card / user override
-- [x] Application Package and server-side PDF CV
-- [x] application tracker with guarded transitions
-- [x] outcome capture
-- [x] data export and re-authenticated deletion
-- [x] trial/product configuration
-- [x] admin diagnostics with persisted ADMIN role and audited out-of-band provisioning
-- [x] required legal consent and user-managed optional analytics consent
-- [ ] live paid checkout/provider lifecycle
+This checklist separates repository readiness from external production acceptance.
 
-## Post-MVP staged features
+## Repository / CI — required before merge
 
-- [x] deterministic persisted feature flags with 0/10/50/100 rollout and immediate fail-closed rollback
-- [x] audited operator feature-flag command
-- [x] Today / Action Priority implementation behind the disabled-by-default `today` flag
-- [x] Today supports 10/30/60/120-minute budgets, max three actions, accept/complete/outcome persistence and calm no-guilt UX
-- [x] Today API ownership/flag/input tests and Playwright/axe UI coverage
-- [ ] Today real-user/product acceptance and staged rollout evidence
-- [x] useful in-app Notifications behind a disabled-by-default feature flag
-- [x] notification preferences, deterministic deduplication, read/dismiss state, user scoping and export coverage
-- [x] follow-up/deadline notification generation from real tracker/job state and Playwright/axe UI coverage
-- [ ] provider-backed external email/push notification delivery and rollout evidence
-- [ ] Interview Prep Pack V1
-- [ ] Job Sources / Feed / Dedupe
-- [ ] Bottleneck / Confidence
-- [ ] Local Labour Intelligence / Effective Wage
-- [ ] Skill ROI / JIT Learning
-- [ ] Career Transition / Outcome Inbox / Strategy
-- [ ] Native/mobile and later data-moat phases
+- [x] TypeScript strict checks for server, client and E2E.
+- [x] Static policy lint.
+- [x] Sequential executable SQLite migrations.
+- [x] Unit/API/security test suites for critical flows and post-MVP engines.
+- [x] User ownership checks on protected resources.
+- [x] Feature flags default-off for large post-MVP features.
+- [x] Career Truth grounding rules and unsupported-claim protections.
+- [x] Today / Action Priority and useful in-app Notifications.
+- [x] Interview Prep Pack.
+- [x] Job Source connector boundary, Feed and deduplication.
+- [x] Bottleneck Engine and confidence vocabulary.
+- [x] Local Labour Intelligence and Effective Wage.
+- [x] Skill ROI and Just-in-Time Learning.
+- [x] Career Transition Engine.
+- [x] Outcome Inbox confirm-before-write boundary.
+- [x] Strategy Engine small-sample guard.
+- [x] Personal-data export includes V2 persisted user data.
+- [x] Account deletion and cascade model.
+- [x] Backup/restore portability exercise in CI.
+- [x] Browser E2E on mobile and desktop profiles.
+- [x] Automated axe checks on critical/new screens.
+- [x] Production Docker build and boot health smoke in CI.
+- [ ] Latest branch CI run green — final merge gate; verify after the last commit.
 
-## Quality
+## Security / privacy — repository controls
 
-- [x] strict TypeScript server/client/E2E checks
-- [x] unit/API/security tests
-- [x] fresh migration validation
-- [x] critical Career Truth/education/Application Package/export coverage
-- [x] correction/ownership/error-contract coverage
-- [x] browser Playwright E2E on mobile and desktop Chromium
-- [x] technical first Decision Card <=180s CI gate
-- [x] automated axe WCAG 2.2 A/AA and accessibility regressions
-- [x] locked npm dependency graph with `npm ci` in CI/Docker
-- [x] semantic backup/restore exercise
-- [x] production Docker build and running-container health smoke
-- [ ] representative-user first Decision Card validation under 3 minutes
-- [ ] manual WCAG 2.2 AA/assistive-technology review
+- [x] scrypt passwords, opaque hashed sessions and HttpOnly cookies.
+- [x] Same-origin mutation controls and Fetch Metadata checks on main API paths.
+- [x] CSP, frame, referrer, permissions and resource-isolation headers.
+- [x] Production HSTS header.
+- [x] Bounded request/data inputs.
+- [x] Private portable upload keys and traversal protection.
+- [x] MIME/signature/size validation.
+- [x] Malware scanner boundary with required fail-closed mode support.
+- [x] No raw CV content in generic product analytics.
+- [x] Optional analytics consent persistence.
+- [x] Audit records for sensitive operator/user actions.
+- [x] No unauthorized scraping implementation.
+- [x] No employer-side ranking or protected-trait matching.
+- [x] Outcome Inbox never updates status from classification alone.
+- [x] Strategy Engine does not recommend strategy changes from fewer than 10 applied-or-beyond applications.
 
-## Security / operations
+## External gates — not satisfiable by repository code alone
 
-- [x] scrypt passwords, opaque hashed sessions and HttpOnly cookies
-- [x] public registration cannot self-provision ADMIN through an email allow-list
-- [x] audited out-of-band admin promotion
-- [x] bounded authentication and application inputs
-- [x] generic login failure + dummy verification path
-- [x] re-authentication/rate limit before irreversible account deletion
-- [x] same-origin/Fetch Metadata mutation defenses
-- [x] security headers, production HSTS, API no-store
-- [x] explicit trusted-proxy boundary and instance-local rate limiting
-- [x] user-scoped data mutations and stable foreign/nonexistent error contracts
-- [x] private portable upload storage and path/signature/MIME/size validation
-- [x] shell-free malware scanner boundary with timeout and required-mode fail-closed behavior
-- [x] analytics persistence blocked without active optional analytics consent
-- [x] public generic client analytics ingestion removed
-- [x] versioned migrations and local backup/restore tooling
-- [x] reproducible free Render Blueprint for disposable test staging
-- [ ] live disposable Render staging deployment + environment acceptance
-- [ ] PostgreSQL production database
-- [ ] private S3-compatible production object storage
-- [ ] managed encrypted off-host backups and hosted restore drill
-- [ ] live required malware scanner deployment/evidence
-- [ ] managed error monitoring
-- [ ] shared/distributed rate limiting if deployment becomes multi-instance
-- [ ] payment provider
-- [ ] penetration/security review before broad launch
+- [ ] Final production controller/contact identity and legal review.
+- [ ] Final Terms/Privacy, legal bases, subprocessors/transfers and retention schedule.
+- [ ] Live staging deployment evidence after the final release candidate.
+- [ ] Production hosting decision and infrastructure review.
+- [ ] Live required malware scanner installation/evidence.
+- [ ] Managed monitoring/alerting and incident-response ownership.
+- [ ] Encrypted off-host backup policy and live restore drill.
+- [ ] Production PostgreSQL/object storage migration if required for chosen scale/topology.
+- [ ] Distributed/shared rate limiting if horizontally scaled.
+- [ ] Live payment provider lifecycle; recurring method and BLIK for one-time purchase where practical.
+- [ ] Manual assistive-technology / WCAG 2.2 AA review.
+- [ ] Penetration/security review before broad public launch.
+- [ ] Representative-user `<3 min` first-value evidence.
+- [ ] Closed-beta outcome capture, retention and paid-conversion evidence.
+- [ ] Source licences/partnerships and scheduled local-labour data refresh coverage.
 
-## Legal / privacy
+## Roadmap gates after V2
 
-- [x] test-version privacy/terms surfaces and versioned consent history
-- [x] data export and re-authenticated account deletion
-- [x] Notifications settings/state included in data export
-- [ ] final controller/service-provider identity/contact data
-- [ ] final legal bases, processors/subprocessors/transfers and retention schedule
-- [ ] final legal review before public beta
+### V2.5 native mobile
 
-## Current readiness
+Status: **BLOCKED BY PRODUCT GATE, not missing repository implementation.** The Master Plan says to build React Native/Expo only after PWA product-market fit. No PMF evidence has been produced yet. Domain logic is kept server/domain-side so it can be reused later rather than reimplemented.
 
-The repository/container is suitable for **closed disposable testing**, not broad public production. Render remains test-only and ephemeral. Today and in-app Notifications are implemented behind feature flags, but real-user/staged-rollout product gates are not claimed as passed. External notification providers are not configured. Public production still requires the external/manual/legal/provider/infrastructure items above.
+### V3 cross-user intelligence
+
+Status: **BLOCKED BY PRIVACY/LEGAL GATE.** Before implementation/rollout the project needs an approved aggregation/cohort design, minimum cohort size, privacy model, fairness monitoring, confidence thresholds and a rule preventing identifiable user-outcome exposure.
+
+## Release decision
+
+A green repository CI run is sufficient to merge the V2 implementation branch, but **not** sufficient to declare broad public production launch. Broad launch requires the external gates above to be closed with evidence.
