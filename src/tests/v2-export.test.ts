@@ -21,8 +21,8 @@ test('V2 export contains later-phase user-owned records', async () => {
     assert.equal(response.status, 200);
     const body = await response.json() as Record<string, unknown[]>;
     for (const key of ['daily_actions','notification_preferences','notifications','job_source_observations','job_feed_states','effective_wage_preferences','skill_roi_assumptions','learning_sessions','career_transition_explorations','outcome_inbox_suggestions','strategy_decisions','interventions']) assert.ok(Array.isArray(body[key]), `${key} should be exported`);
-    assert.equal(body.skill_roi_assumptions.length, 1);
-    assert.equal(body.career_transition_explorations.length, 1);
+    assert.equal((body.skill_roi_assumptions ?? []).length, 1);
+    assert.equal((body.career_transition_explorations ?? []).length, 1);
     assert.equal('outcome_inbox_items' in body, false);
   } finally {
     await app.close();

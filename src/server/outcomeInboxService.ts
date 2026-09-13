@@ -24,7 +24,7 @@ export class OutcomeInboxService {
   private get db() { return this.database.db; }
 
   private application(userId: string, applicationId: string): ApplicationRow | null {
-    return (this.db.prepare(`SELECT a.id,a.status,j.title,j.company FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND a.user_id=?`).get(applicationId, userId) as ApplicationRow | undefined) ?? null;
+    return (this.db.prepare(`SELECT a.id,a.status,j.title,j.company FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND a.user_id=?`).get(applicationId, userId) as unknown as ApplicationRow | undefined) ?? null;
   }
 
   list(userId: string): OutcomeInboxSuggestion[] {
@@ -38,24 +38,22 @@ export class OutcomeInboxService {
     const classification = classifyOutcomeMessage(messageText);
     if (!classification) return null;
     const messageHash = createHash('sha256').update(messageText.trim().toLowerCase()).digest('hex');
-    const existing = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.user_id=? AND s.application_id=? AND s.message_hash=?`).get(userId, applicationId, messageHash) as SuggestionRow | undefined;
+    const existing = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.user_id=? AND s.application_id=? AND s.message_hash=?`).get(userId, applicationId, messageHash) as unknown as SuggestionRow | undefined;
     if (existing) return publicSuggestion(existing);
     const id = randomUUID(), now = new Date().toISOString();
     this.db.prepare(`INSERT INTO outcome_inbox_suggestions(id,user_id,application_id,message_hash,suggestion_type,suggested_status,confidence,evidence_codes,source_kind,source_label,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id, userId, applicationId, messageHash, classification.type, classification.suggestedStatus, classification.confidence, JSON.stringify(classification.evidenceCodes), 'MANUAL_PASTE', sourceLabel, now);
-    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(id, userId) as SuggestionRow;
+    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(id, userId) as unknown as SuggestionRow;
     return publicSuggestion(row);
   }
 
   confirm(userId: string, suggestionId: string): OutcomeInboxSuggestion | null {
-    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as SuggestionRow | undefined;
+    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as unknown as SuggestionRow | undefined;
     if (!row) return null;
     if (row.dismissed_at) throw new Error('Sugestia została odrzucona przez użytkownika.');
     if (row.confirmed_at) return publicSuggestion(row);
     const application = this.application(userId, row.application_id);
     if (!application) return null;
-    if (application.status !== row.suggested_status && !canTransitionApplication(application.status, row.suggested_status)) {
-      throw new Error(`Nie można bezpiecznie zmienić statusu ${application.status} → ${row.suggested_status}. Zaktualizuj etap aplikacji ręcznie.`);
-    }
+    if (application.status !== row.suggested_status && !canTransitionApplication(application.status, row.suggested_status)) throw new Error(`Nie można bezpiecznie zmienić statusu ${application.status} → ${row.suggested_status}. Zaktualizuj etap aplikacji ręcznie.`);
     const now = new Date().toISOString();
     this.db.exec('BEGIN IMMEDIATE');
     try {
@@ -64,7 +62,7 @@ export class OutcomeInboxService {
       this.db.prepare('UPDATE outcome_inbox_suggestions SET confirmed_at=? WHERE id=? AND user_id=?').run(now, suggestionId, userId);
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
-    const updated = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as SuggestionRow;
+    const updated = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as unknown as SuggestionRow;
     return publicSuggestion(updated);
   }
 
@@ -72,10 +70,10 @@ export class OutcomeInboxService {
     const now = new Date().toISOString();
     const result = this.db.prepare('UPDATE outcome_inbox_suggestions SET dismissed_at=? WHERE id=? AND user_id=? AND confirmed_at IS NULL').run(now, suggestionId, userId);
     if (Number(result.changes) !== 1) {
-      const existing = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as SuggestionRow | undefined;
+      const existing = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as unknown as SuggestionRow | undefined;
       return existing ? publicSuggestion(existing) : null;
     }
-    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as SuggestionRow;
+    const row = this.db.prepare(`SELECT s.*,j.title,j.company,a.status current_status FROM outcome_inbox_suggestions s JOIN applications a ON a.id=s.application_id JOIN jobs j ON j.id=a.job_id WHERE s.id=? AND s.user_id=?`).get(suggestionId, userId) as unknown as SuggestionRow;
     return publicSuggestion(row);
   }
 }
