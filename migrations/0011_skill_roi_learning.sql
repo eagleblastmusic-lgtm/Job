@@ -27,3 +27,7 @@ INSERT OR IGNORE INTO feature_flags(key, enabled, rollout_percent, updated_at)
 VALUES ('skill_roi', 0, 0, datetime('now'));
 INSERT OR IGNORE INTO feature_flags(key, enabled, rollout_percent, updated_at)
 VALUES ('just_in_time_learning', 0, 0, datetime('now'));
+-- Outcome Inbox is implemented later on the same completion line. Seed the flag now
+-- because /api/features deliberately fails closed when a declared flag has no persisted row.
+INSERT OR IGNORE INTO feature_flags(key, enabled, rollout_percent, updated_at)
+VALUES ('outcome_inbox', 0, 0, datetime('now'));
