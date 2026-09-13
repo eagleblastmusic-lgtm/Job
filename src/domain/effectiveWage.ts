@@ -75,9 +75,10 @@ export function calculateEffectiveWage(input: EffectiveWageInput, preferences: E
     estimatedNet = salary;
     assumptions.push('Kwotę z oferty traktujemy jako netto, ponieważ tak oznaczono ją w zapisanej ofercie.');
   } else if (input.grossNet === 'GROSS') {
-    if (preferences.estimatedNetRatio !== null) {
-      estimatedNet = mapRange(salary, value => value * preferences.estimatedNetRatio!);
-      assumptions.push(`Szacunek netto używa ustawionego przez użytkownika współczynnika ${(preferences.estimatedNetRatio * 100).toFixed(1)}% kwoty brutto.`);
+    const netRatio = preferences.estimatedNetRatio;
+    if (netRatio !== null) {
+      estimatedNet = mapRange(salary, value => value * netRatio);
+      assumptions.push(`Szacunek netto używa ustawionego przez użytkownika współczynnika ${(netRatio * 100).toFixed(1)}% kwoty brutto.`);
       warnings.push('Współczynnik brutto→netto jest uproszczeniem użytkownika, a nie kalkulatorem podatkowym ani poradą finansową.');
     } else {
       warnings.push('Oferta podaje kwotę brutto, ale nie ustawiono współczynnika brutto→netto. Nie zgadujemy wynagrodzenia netto.');
@@ -90,8 +91,11 @@ export function calculateEffectiveWage(input: EffectiveWageInput, preferences: E
   const costPerKm = finiteNonNegative(preferences.vehicleCostPerKm);
   const days = Math.max(0, Math.min(31, preferences.commuteDaysPerMonth));
   const monthlyCommuteCost = roundTripKm !== null && costPerKm !== null ? roundTripKm * costPerKm * days : null;
-  if (monthlyCommuteCost !== null) assumptions.push(`Koszt dojazdu: ${roundTripKm} km dziennie × ${costPerKm.toFixed(2)} zł/km × ${days} dni/mies.`);
-  else if (roundTripKm !== null || costPerKm !== null) warnings.push('Do kosztu dojazdu potrzebne są jednocześnie kilometry w obie strony i koszt 1 km.');
+  if (roundTripKm !== null && costPerKm !== null && monthlyCommuteCost !== null) {
+    assumptions.push(`Koszt dojazdu: ${roundTripKm} km dziennie × ${costPerKm.toFixed(2)} zł/km × ${days} dni/mies.`);
+  } else if (roundTripKm !== null || costPerKm !== null) {
+    warnings.push('Do kosztu dojazdu potrzebne są jednocześnie kilometry w obie strony i koszt 1 km.');
+  }
 
   const commuteMinutes = finiteNonNegative(preferences.commuteMinutesPerDay);
   const monthlyCommuteHours = commuteMinutes === null ? null : commuteMinutes * days / 60;
