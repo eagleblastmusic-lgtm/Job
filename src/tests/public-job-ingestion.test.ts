@@ -128,11 +128,12 @@ test('Pracuj.pl importer follows public result pagination and imports detail pag
       return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
     };
 
-    const results = await new PublicJobIngestionService(app.db, app.store, fakeFetch).refresh(user.id, { query: 'magazynier', location: 'Puck', radiusKm: 30 });
+    const results = await new PublicJobIngestionService(app.db, app.store, fakeFetch).refresh(user.id, { query: 'magazynier paginacja', location: 'Puck', radiusKm: 30 });
     const pracuj = results.find(source => source.sourceKey === 'pracuj');
     assert.equal(pracuj?.status, 'IMPORTED');
     assert.equal(pracuj?.fetchedCount, 3);
     assert.equal(pracuj?.canonicalCount, 3);
+    assert.ok(requested.some(url => url.endsWith('/robots.txt')), 'Pracuj importer should verify robots.txt before live fetching.');
     assert.ok(requested.some(url => url.includes('pn=2')), 'Pracuj importer should follow the public pagination parameter.');
 
     const feed = new JobFeedService(app.db, app.store).list(user.id, 25, 0);
@@ -165,7 +166,7 @@ test('Pracuj.pl importer respects robots.txt and stops before reading job pages 
       return new Response(searchHtml, { status: 200, headers: { 'content-type': 'text/html' } });
     };
 
-    const results = await new PublicJobIngestionService(app.db, app.store, fakeFetch).refresh(user.id, { query: 'magazynier', location: 'Puck', radiusKm: 30 });
+    const results = await new PublicJobIngestionService(app.db, app.store, fakeFetch).refresh(user.id, { query: 'magazynier robots', location: 'Puck', radiusKm: 30 });
     const pracuj = results.find(source => source.sourceKey === 'pracuj');
     assert.equal(pracuj?.status, 'BLOCKED');
     assert.match(pracuj?.message ?? '', /robots\.txt/i);
