@@ -2,6 +2,7 @@ import './careerTruthControls.js';
 import './today.js';
 import './notifications.js';
 import './interviewPack.js';
+import './jobSearch.js';
 import './jobFeed.js';
 import './bottleneck.js';
 import './localLabour.js';
