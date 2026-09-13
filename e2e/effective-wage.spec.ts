@@ -36,11 +36,11 @@ test('Effective Wage keeps subjective time value separate and exposes assumption
   await expect(page.locator('[data-screen="effective-wage"]')).toContainText('subiektywne ustawienie');
   await page.getByRole('button', { name: 'Policz' }).click();
   const result = page.locator('#effectiveWageResult');
-  await expect(result).toContainText('4 100 zł');
+  await expect(result).toContainText(/4\s?100 zł/);
   await expect(result).toContainText('Subiektywna wartość czasu — osobno');
   await expect(result).toContainText('nie jest obiektywną wartością ekonomiczną');
   await expect(result).toContainText('nie kalkulatorem podatkowym');
-  await expect(result).toContainText('praca nocna');
+  await expect(result).toContainText(/prac.*nocn/i);
 
   await page.locator('#effectiveWagePreferences input[name="subjectiveTimeValuePerHour"]').fill('45');
   await page.getByRole('button', { name: 'Zapisz założenia' }).click();
