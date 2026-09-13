@@ -1,43 +1,51 @@
 # Job — Polski system zdobywania pracy
 
-**Job** jest kandydackim systemem podejmowania decyzji i nawigacji kariery. Rdzeń MVP realizuje przepływ:
+**Job** jest kandydackim systemem podejmowania decyzji i nawigacji kariery. Podstawowy przepływ to:
 
 `konto → profil/Career Truth → oferta → decyzja → pakiet aplikacyjny → CV PDF → tracker → outcome`
 
-Interfejs jest po polsku, mobile-first i unika „magicznych” procentów. System nie może wpisywać do CV faktów wywnioskowanych z CV lub oferty bez potwierdzenia użytkownika.
+Interfejs jest po polsku i mobile-first. System nie może wpisywać do CV faktów wywnioskowanych bez potwierdzenia użytkownika, a późniejsze rekomendacje pokazują niepewność zamiast udawać pewność.
 
-## Co działa w tej wersji
+## Zaimplementowany zakres
 
-- rejestracja i logowanie hasłem z `scrypt`, sesje HttpOnly,
-- onboarding i preferencje pracy,
-- Career Truth Lite z rozróżnieniem `INFERRED` / `CONFIRMED` / `NOT_POSSESSED`,
-- prywatny upload PDF/DOCX/TXT/MD oraz lokalna ekstrakcja tekstu,
-- deterministyczny parser polskich ofert,
-- explainable Decision Engine V1,
-- Decision Card z sekcjami „Dlaczego / Nie wiemy / Brakuje”,
-- override rekomendacji,
-- generowanie pakietu aplikacyjnego wyłącznie z potwierdzonych faktów,
-- generowanie CV i eksport PDF przez Python ReportLab,
-- tracker aplikacji i wyników rekrutacji,
-- wewnętrzna analityka bez surowej treści CV,
-- eksport danych i usuwanie konta,
-- 7-dniowy trial i konfiguracja planów,
-- chroniona diagnostyka administratora,
-- PWA, responsywny interfejs, podstawowe zabezpieczenia HTTP,
-- unit/integration/E2E API tests.
+### Rdzeń MVP
+
+- rejestracja/logowanie z `scrypt` i sesjami HttpOnly;
+- onboarding, Career Truth, doświadczenie, edukacja i prywatny upload CV;
+- deterministyczny parser polskich ofert i explainable Decision Engine;
+- Decision Card z niepewnością i możliwością override;
+- Application Package i CV PDF tylko z potwierdzonych faktów;
+- tracker aplikacji, outcome capture, eksport danych i usuwanie konta;
+- trial/plany lokalne, diagnostyka administratora, PWA i zabezpieczenia HTTP.
+
+### Późniejsze etapy roadmapy
+
+- **Today / Action Priority** — ranking działań w budżecie czasu;
+- **Notifications** — użyteczne powiadomienia in-app;
+- **Interview Prep Pack**;
+- **Job Sources / Feed / deduplication** z granicą legalnych źródeł;
+- **Bottleneck Engine** z progami pewności;
+- **Local Labour Intelligence** z pochodzeniem danych;
+- **Effective Wage** z jawnymi założeniami;
+- **Skill ROI** i **Just-in-Time Learning**;
+- **Career Transition Engine**;
+- **Outcome Inbox** — sugestia wyniku nigdy nie zmienia statusu bez potwierdzenia użytkownika;
+- **Strategy Engine** — brak rekomendacji przy zbyt małej próbce.
+
+Duże moduły są za feature flagami i domyślnie wyłączone. Szczegółowy stan oraz granice wdrożenia są w `IMPLEMENTATION_STATUS.md`.
 
 ## Lokalny start
 
 Wymagania:
 
 - Node.js 22+
-- `python3 + ReportLab` dla bezpośredniego PDF
-- `pdftotext` (pakiet `poppler-utils`) dla PDF CV
+- `python3 + ReportLab` dla PDF
+- `pdftotext` (`poppler-utils`) dla PDF CV
 - `unzip` dla DOCX
 
 ```bash
 cp .env.example .env
-npm install
+npm ci
 npm run check
 npm start
 ```
@@ -50,52 +58,66 @@ Zobacz `.env.example`. Sekrety nie mogą trafić do repozytorium.
 
 Najważniejsze wartości:
 
-- `DATABASE_PATH` — plik SQLite obecnego MVP,
-- `DATA_DIR` — prywatne uploady,
-- `APP_ORIGIN` — źródło akceptowane dla mutujących żądań,
-- `ADMIN_EMAILS` — lista e-maili adminów rozdzielona przecinkami,
-- `AI_*` — opcjonalny OpenAI-compatible AI Gateway; rdzeń działa deterministycznie bez AI,
-- `PDF_RENDERER_BIN` — interpreter Python używany przez renderer PDF (domyślnie `python3`).
+- `DATABASE_PATH` — plik SQLite obecnego runtime;
+- `DATA_DIR` — prywatne pliki i dane runtime;
+- `APP_ORIGIN` — dozwolony origin dla mutujących żądań;
+- `AI_*` — opcjonalny OpenAI-compatible AI Gateway; krytyczny rdzeń działa deterministycznie bez AI;
+- `PDF_RENDERER_BIN` — interpreter Python dla renderera PDF;
+- ustawienia malware scanning — opcjonalne lokalnie, możliwe do ustawienia jako wymagane/fail-closed w docelowym środowisku.
 
-## Testy
+Publiczna rejestracja nie może nadać roli `ADMIN`. Administrator jest provisionowany poza publicznym flow zgodnie z `docs/ADMIN_PROVISIONING.md`.
+
+## Testy i CI
 
 ```bash
+npm run lint
 npm run typecheck
+npm run validate:migrations
 npm test
+npm run test:e2e
 ```
 
-Test E2E API przechodzi przez krytyczny przepływ od rejestracji do zapisania outcome i eksportu danych.
+CI dodatkowo wykonuje semantyczny backup/restore, mobilny i desktopowy Playwright + axe, build obrazu produkcyjnego oraz smoke test uruchomionego kontenera.
 
 ## Architektura
 
-To modularny monolit. Logika domenowa nie zależy od UI i znajduje się w `src/domain`. Serwer HTTP, auth, baza i integracje są w `src/server`. Klient PWA jest w `src/client` i `public`.
+Aplikacja jest modularnym monolitem:
 
-Szczegóły: `docs/ARCHITECTURE.md`.
+- `src/domain` — reguły domenowe i silniki;
+- `src/server` — HTTP, auth, persistence, upload, PDF i integracje;
+- `src/client` + `public` — PWA/UI;
+- `migrations` — wykonywalne migracje danych.
 
-## Ważna decyzja techniczna — SQLite zamiast PostgreSQL w pierwszym wykonaniu
+Reguły biznesowe pozostają poza komponentami prezentacji. Szczegóły: `docs/ARCHITECTURE.md`.
 
-Plan rekomenduje PostgreSQL. W tej gałęzi runtime MVP używa `node:sqlite`, ponieważ repozytorium było puste, a środowisko wykonawcze nie miało dostępu do rejestru npm podczas implementacji. Pozwoliło to uruchomić i przetestować rzeczywisty pełny przepływ bez udawanych adapterów.
+## Persistence i skalowanie
 
-**Wpływ:** ta wersja nadaje się do jednego trwałego procesu/VPS lub zamkniętych testów, ale przed zewnętrzną betą na środowisku stateless należy przenieść schemat do PostgreSQL i S3-compatible storage. Warstwa domenowa i identyfikatory są przygotowane do migracji. Decyzja jest jawnie zapisana w `IMPLEMENTATION_STATUS.md`.
+Obecny wykonywalny runtime używa `node:sqlite`. Jest to świadoma decyzja dla pojedynczej instancji/zamkniętych testów i nie jest przedstawiana jako dowód gotowości do dużego publicznego wdrożenia. Plan przejścia do zarządzanego PostgreSQL i prywatnego object storage należy zamknąć wraz z docelową topologią produkcyjną.
 
 ## Deployment
 
-Najprostsza wspierana ścieżka obecnej wersji to Docker z trwałym volume pod `/app/data`:
+Obecna ścieżka kontenerowa:
 
 ```bash
 docker build -t job-app .
 docker run --rm -p 3000:3000 -v job-data:/app/data --env-file .env job-app
 ```
 
-Przed publicznym wdrożeniem ustaw TLS przez reverse proxy i `APP_ORIGIN` na właściwy origin HTTPS.
+Repozytorium może przejść CI i być użyte do staging/closed beta, ale szeroki publiczny launch nadal wymaga zewnętrznych bramek z `docs/PRODUCTION_READINESS.md`: legal, live payment/provider, monitoring/backups, manual accessibility, security review i reprezentatywne testy użytkowników.
+
+## Roadmap boundary
+
+- **V2.5 native mobile**: zgodnie z planem dopiero po potwierdzeniu PWA product-market fit; domeny nie należy duplikować.
+- **V3 cross-user intelligence**: dopiero po privacy/legal review, minimalnych kohortach, agregacji i fairness monitoring.
 
 ## Dokumentacja
 
+- `IMPLEMENTATION_STATUS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY_PRIVACY.md`
 - `docs/DEPLOYMENT.md`
 - `docs/AI_EVALUATION.md`
 - `docs/ADMIN.md`
-- `docs/RELEASE_NOTES.md`
+- `docs/FEATURE_FLAGS.md`
+- `docs/V2_RELEASE_NOTES.md`
 - `docs/PRODUCTION_READINESS.md`
-- `IMPLEMENTATION_STATUS.md`
