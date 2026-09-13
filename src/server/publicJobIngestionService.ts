@@ -90,14 +90,15 @@ class PublicWebJobConnector implements JobSourceConnector {
 
     const provider = buildJobSearchProviders(this.criteria).find(item => item.key === this.key);
     if (!provider?.searchUrl) throw new Error(`Brak URL wyszukiwania dla źródła ${this.key}.`);
+    const searchUrl = provider.searchUrl;
 
     try {
-      const searchHtml = await this.fetchHtml(provider.searchUrl);
+      const searchHtml = await this.fetchHtml(searchUrl);
       const directPostings = extractJobPostingJsonLd(searchHtml)
-        .map(posting => jobPostingToSourceInput(posting, provider.searchUrl))
+        .map(posting => jobPostingToSourceInput(posting, searchUrl))
         .filter((item): item is JobSourceInput => item !== null);
 
-      const links = extractDetailLinks(searchHtml, provider.searchUrl, this.key, MAX_DETAIL_PAGES);
+      const links = extractDetailLinks(searchHtml, searchUrl, this.key, MAX_DETAIL_PAGES);
       const detailResults = await Promise.allSettled(links.map(async link => {
         const html = await this.fetchHtml(link);
         const structured = extractJobPostingJsonLd(html)
