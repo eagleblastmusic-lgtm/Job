@@ -45,9 +45,11 @@ Configurable in-app follow-up/deadline notifications with persisted read/dismiss
 Uses saved job/application and confirmed Career Truth only. Unknown information remains explicit rather than fabricated.
 
 ### Job Sources / Live Search / Feed / deduplication
-Connector abstraction, provenance and source registry; canonical observations, feed state, deterministic duplicate/repost handling and admin source disablement. The search UI covers Pracuj.pl, LinkedIn Jobs, OLX Praca, Indeed, RocketJobs, Just Join IT and direct employer career pages. Search criteria are prefilled from Career Truth.
+Connector abstraction, provenance and source registry; canonical observations, feed state, deterministic duplicate/repost handling and admin source disablement. The search UI covers an official Polish aggregate API plus Pracuj.pl, LinkedIn Jobs, OLX Praca, Indeed, RocketJobs, Just Join IT and direct employer career pages. Search criteria are prefilled from Career Truth.
 
-For the six public job boards, Job now attempts a bounded automatic read of public result/detail pages, extracts Schema.org `JobPosting` when present, normalizes the records through the existing parser and Decision Engine, then feeds them through the same per-user canonical dedup pipeline. Each source is isolated: 401/403/429, CAPTCHA/human-verification, layout changes or HTTP failures do not stop the remaining sources. The adapter does not log in, use private credentials, bypass CAPTCHA/rate limits, or use private endpoints. Runtime source status is visible in the UI; the official search URL remains a manual fallback. Direct employer career pages still require explicit allowlist/feed configuration. Detailed boundaries are documented in `docs/FEDERATED_JOB_SEARCH.md`.
+**Jooble Polska** is implemented as an `OFFICIAL_API` connector. When `JOOBLE_API_KEY_PL` is configured, Job queries Jooble's documented Polish REST endpoint, maps the response to the existing source model and sends the results through the same parser, Decision Engine and per-user dedup pipeline. The API key remains environment-only and is not written to source provenance or logs. A 30-minute query cache limits repeated requests. Missing/rejected keys and rate limits fail only this source.
+
+For the six direct public job boards, Job additionally attempts a bounded automatic read of public result/detail pages, extracts Schema.org `JobPosting` when present, normalizes the records through the existing parser and Decision Engine, then feeds them through the same canonical dedup pipeline. Each source is isolated: 401/403/429, CAPTCHA/human-verification, layout changes or HTTP failures do not stop Jooble or the remaining sources. The adapter does not log in, use private credentials, bypass CAPTCHA/rate limits, or use private endpoints. Runtime source status is visible in the UI; the official search URL remains a manual fallback. Direct employer career pages still require explicit allowlist/feed configuration. Detailed boundaries are documented in `docs/FEDERATED_JOB_SEARCH.md`.
 
 ### Bottleneck Engine
 Evidence-limited funnel diagnostics with shared confidence vocabulary: `ZA_MALO_DANYCH`, `WCZESNY_SYGNAL`, `PRAWDOPODOBNY_WNIOSEK`, `SILNY_WNIOSEK`. Tiny samples cannot become strong diagnoses.
@@ -103,12 +105,13 @@ CI validates sequential SQLite migrations:
 - `0014_strategy_engine.sql`
 - `0015_federated_job_search.sql`
 - `0016_live_public_job_ingestion.sql`
+- `0017_jooble_official_api.sql`
 
 `postgres_0001_reference.sql` remains a production-target reference, not evidence of a completed PostgreSQL production migration.
 
 ## Feature flags
 
-Large features are disabled by default and support controlled 0/10/50/100 rollout with immediate rollback. Current post-MVP keys include Today, Notifications, Interview Pack, Job Feed (including live multi-source search), Bottleneck, Local Labour, Effective Wage, Skill ROI, Just-in-Time Learning, Career Transition, Outcome Inbox and Strategy Engine.
+Large features are disabled by default and support controlled 0/10/50/100 rollout with immediate rollback. Current post-MVP keys include Today, Notifications, Interview Pack, Job Feed (including official-API and live multi-source search), Bottleneck, Local Labour, Effective Wage, Skill ROI, Just-in-Time Learning, Career Transition, Outcome Inbox and Strategy Engine.
 
 ## Automated quality gate
 
@@ -130,9 +133,10 @@ These cannot be truthfully completed from repository code alone:
 8. live required malware scanner in the chosen hosting architecture;
 9. manual assistive-technology/WCAG 2.2 AA review;
 10. penetration/security review before broad public launch;
-11. production review of each third-party source's current terms/licensing plus monitoring for layout/access-policy changes; official API/feed/partnership remains preferred where available;
-12. broad scheduled public-market data refresh and direct-employer allowlist/feed operations;
-13. PWA product-market-fit evidence before native mobile;
-14. privacy/legal/fairness review before any cross-user intelligence.
+11. a user-owned Polish Jooble API key must be provisioned in the deployment environment for that official connector to become live;
+12. production review of each remaining third-party source's current terms/licensing plus monitoring for layout/access-policy changes; site-specific official API/feed/partnership remains preferred where available;
+13. broad scheduled public-market data refresh and direct-employer allowlist/feed operations;
+14. PWA product-market-fit evidence before native mobile;
+15. privacy/legal/fairness review before any cross-user intelligence.
 
 These are external gates, not fabricated as completed work.
