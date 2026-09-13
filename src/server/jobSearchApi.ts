@@ -14,7 +14,7 @@ function parseRadius(value: string | null): number | null {
   return parsed;
 }
 
-export function handleJobSearchApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, db: JobDatabase, config: AppConfig): boolean {
+export async function handleJobSearchApi(req: IncomingMessage, res: ServerResponse, pathname: string, store: AppStore, db: JobDatabase, config: AppConfig): Promise<boolean> {
   if (pathname !== '/api/job-search') return false;
   if ((req.method ?? 'GET') !== 'GET') {
     sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Nie znaleziono endpointu.' } });
@@ -30,8 +30,15 @@ export function handleJobSearchApi(req: IncomingMessage, res: ServerResponse, pa
   if (query.length < 2) throw new HttpError(400, 'Wpisz co najmniej 2 znaki wyszukiwanej pracy.', 'INVALID_JOB_SEARCH_QUERY');
   const service = new JobSearchService(db, store);
   try {
-    const result = service.search(user.id, { query, location, radiusKm });
-    store.analytics(user.id, 'federated_job_search', { queryLength: query.length, hasLocation: Boolean(location), radiusKm, providerCount: result.providers.length });
+    const result = await service.search(user.id, { query, location, radiusKm });
+    store.analytics(user.id, 'federated_job_search', {
+      queryLength: query.length,
+      hasLocation: Boolean(location),
+      radiusKm,
+      providerCount: result.providers.length,
+      importedCount: result.importedCount,
+      newCanonicalCount: result.newCanonicalCount
+    });
     sendJson(res, 200, result);
   } catch (error) {
     if (error instanceof Error) throw new HttpError(400, error.message, 'INVALID_JOB_SEARCH');
