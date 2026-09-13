@@ -44,8 +44,8 @@ Configurable in-app follow-up/deadline notifications with persisted read/dismiss
 ### Interview Prep Pack
 Uses saved job/application and confirmed Career Truth only. Unknown information remains explicit rather than fabricated.
 
-### Job Sources / Feed / deduplication
-Connector abstraction, provenance and source registry; user-provided legal source path; canonical observations, feed state, deterministic duplicate/repost handling and admin source disablement. No unauthorized scraping.
+### Job Sources / Federated Search / Feed / deduplication
+Connector abstraction, provenance and source registry; user-provided legal source path; canonical observations, feed state, deterministic duplicate/repost handling and admin source disablement. The federated-search UI now covers Pracuj.pl, LinkedIn Jobs, OLX Praca, Indeed, RocketJobs, Just Join IT and direct employer career pages. Search criteria are prefilled from Career Truth and local known jobs are filtered in one view. External sources are exposed through safe outbound search links until a confirmed API/feed/licence/partnership exists. No unauthorized scraping and no false claim of automatic ingestion. Source-specific boundaries are documented in `docs/FEDERATED_JOB_SEARCH.md`.
 
 ### Bottleneck Engine
 Evidence-limited funnel diagnostics with shared confidence vocabulary: `ZA_MALO_DANYCH`, `WCZESNY_SYGNAL`, `PRAWDOPODOBNY_WNIOSEK`, `SILNY_WNIOSEK`. Tiny samples cannot become strong diagnoses.
@@ -99,12 +99,13 @@ CI validates sequential SQLite migrations:
 - `0012_career_transition.sql`
 - `0013_outcome_inbox.sql`
 - `0014_strategy_engine.sql`
+- `0015_federated_job_search.sql`
 
 `postgres_0001_reference.sql` remains a production-target reference, not evidence of a completed PostgreSQL production migration.
 
 ## Feature flags
 
-Large features are disabled by default and support controlled 0/10/50/100 rollout with immediate rollback. Current post-MVP keys include Today, Notifications, Interview Pack, Job Feed, Bottleneck, Local Labour, Effective Wage, Skill ROI, Just-in-Time Learning, Career Transition, Outcome Inbox and Strategy Engine.
+Large features are disabled by default and support controlled 0/10/50/100 rollout with immediate rollback. Current post-MVP keys include Today, Notifications, Interview Pack, Job Feed (including Federated Search), Bottleneck, Local Labour, Effective Wage, Skill ROI, Just-in-Time Learning, Career Transition, Outcome Inbox and Strategy Engine.
 
 ## Automated quality gate
 
@@ -126,7 +127,7 @@ These cannot be truthfully completed from repository code alone:
 8. live required malware scanner in the chosen hosting architecture;
 9. manual assistive-technology/WCAG 2.2 AA review;
 10. penetration/security review before broad public launch;
-11. source partnerships/licences and broad scheduled public-market data refresh;
+11. source partnerships/licences and broad scheduled public-market data refresh, including live automated ingestion for third-party job boards where permitted;
 12. PWA product-market-fit evidence before native mobile;
 13. privacy/legal/fairness review before any cross-user intelligence.
 
