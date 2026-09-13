@@ -16,6 +16,7 @@ async function makeFixture(email: string) {
     databasePath: join(dir, 'test.sqlite'),
     adminEmails: new Set()
   });
+  await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
   const user = app.store.createUser({
     email,
     name: 'Jooble Tester',
