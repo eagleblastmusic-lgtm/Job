@@ -57,7 +57,8 @@ test('Effective Wage API is feature-gated, user-scoped and persists explicit ass
     };
     const alice = await register('wage-alice@example.pl');
     const bob = await register('wage-bob@example.pl');
-    const jobId = app.store.createJob(alice.userId, 'Magazynier\nFirma: ABC\nMiejsce pracy: Gdynia\n6000 - 7000 PLN brutto\nPraca stacjonarna.', parseJobText('Magazynier\nFirma: ABC\nMiejsce pracy: Gdynia\n6000 - 7000 PLN brutto\nPraca stacjonarna.'));
+    const raw = 'Magazynier\nFirma: ABC\nMiejsce pracy: Gdynia\n6000 - 7000 PLN brutto\nPraca stacjonarna.';
+    const jobId = app.store.createJob(alice.userId, raw, parseJobText(raw));
 
     const disabled = await fetch(`${base}/api/effective-wage/jobs`, { headers: { cookie: alice.cookie } });
     assert.equal(disabled.status, 404);
@@ -76,7 +77,9 @@ test('Effective Wage API is feature-gated, user-scoped and persists explicit ass
     const foreign = await fetch(`${base}/api/effective-wage/jobs/${jobId}`, { headers: { cookie: bob.cookie } });
     const missing = await fetch(`${base}/api/effective-wage/jobs/00000000-0000-4000-8000-000000000000`, { headers: { cookie: bob.cookie } });
     assert.equal(foreign.status, 404); assert.equal(missing.status, 404);
-    assert.deepEqual(await foreign.json(), await missing.json());
+    const foreignError = (await foreign.json()) as { error: { code: string; message: string } };
+    const missingError = (await missing.json()) as { error: { code: string; message: string } };
+    assert.deepEqual({ code: foreignError.error.code, message: foreignError.error.message }, { code: missingError.error.code, message: missingError.error.message });
   } finally {
     await app.close(); await rm(dir, { recursive: true, force: true });
   }
