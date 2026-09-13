@@ -3,6 +3,7 @@ import './today.js';
 import './notifications.js';
 import './interviewPack.js';
 import './jobFeed.js';
+import './bottleneck.js';
 
 export {};
 
