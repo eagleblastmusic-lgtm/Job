@@ -1,7 +1,9 @@
+import type { AppConfig } from './config.js';
 import type { JobDatabase } from './db.js';
 import type { AppStore } from './store.js';
 import { JobFeedService, type JobFeedCard } from './jobFeedService.js';
 import { PublicJobIngestionService, type LiveSourceRefreshResult } from './publicJobIngestionService.js';
+import { JoobleJobIngestionService, type JoobleRefreshResult } from './joobleJobService.js';
 import { buildJobSearchProviders, validateJobSearchCriteria, type JobSearchCriteria, type JobSearchProvider } from '../domain/jobSearch.js';
 import { normalizeText } from '../domain/ontology.js';
 
@@ -9,7 +11,7 @@ export interface FederatedJobSearchResult {
   criteria: JobSearchCriteria;
   providers: JobSearchProvider[];
   localJobs: JobFeedCard[];
-  sourceRefresh: LiveSourceRefreshResult[];
+  sourceRefresh: Array<LiveSourceRefreshResult | JoobleRefreshResult>;
   externalSearchCount: number;
   automaticIngestionCount: number;
   importedCount: number;
@@ -31,17 +33,23 @@ function matchesLocation(job: JobFeedCard, location: string | null): boolean {
 
 export class JobSearchService {
   private readonly feed: JobFeedService;
-  private readonly ingestion: PublicJobIngestionService;
+  private readonly publicIngestion: PublicJobIngestionService;
+  private readonly joobleIngestion: JoobleJobIngestionService;
 
-  constructor(database: JobDatabase, store: AppStore) {
+  constructor(database: JobDatabase, store: AppStore, config: AppConfig) {
     this.feed = new JobFeedService(database, store);
-    this.ingestion = new PublicJobIngestionService(database, store);
+    this.publicIngestion = new PublicJobIngestionService(database, store);
+    this.joobleIngestion = new JoobleJobIngestionService(database, store, config.joobleApiKeyPl, config.joobleTimeoutMs);
   }
 
   async search(userId: string, input: JobSearchCriteria): Promise<FederatedJobSearchResult> {
     const criteria = validateJobSearchCriteria(input);
-    const providers = buildJobSearchProviders(criteria);
-    const sourceRefresh = await this.ingestion.refresh(userId, criteria);
+    const providers = buildJobSearchProviders(criteria, { joobleApiConfigured: Boolean(this.joobleIngestionApiConfigured()) });
+    const [joobleRefresh, publicRefresh] = await Promise.all([
+      this.joobleIngestion.refresh(userId, criteria),
+      this.publicIngestion.refresh(userId, criteria)
+    ]);
+    const sourceRefresh: Array<LiveSourceRefreshResult | JoobleRefreshResult> = [joobleRefresh, ...publicRefresh];
     const localJobs = this.feed.list(userId, 50, 0).filter(job => matchesQuery(job, criteria.query) && matchesLocation(job, criteria.location));
     const importedCount = sourceRefresh.reduce((sum, source) => sum + source.fetchedCount, 0);
     const newCanonicalCount = sourceRefresh.reduce((sum, source) => sum + source.canonicalCount, 0);
@@ -54,7 +62,11 @@ export class JobSearchService {
       automaticIngestionCount: providers.filter(provider => provider.canIngestAutomatically).length,
       importedCount,
       newCanonicalCount,
-      boundary: 'Job automatycznie próbuje pobrać publiczne oferty z każdego aktywnego źródła, normalizuje je i przepuszcza przez istniejącą deduplikację. Jeśli serwis zwraca blokadę, CAPTCHA lub wymaga logowania, to źródło zostaje pominięte bez obchodzenia zabezpieczeń; pozostałe źródła nadal działają.'
+      boundary: 'Job preferuje oficjalne API i dozwolone feedy, a wyniki ze wszystkich źródeł trafiają do jednej normalizacji i deduplikacji. Bezpośredni odczyt publicznych stron pozostaje dodatkowym kanałem fail-closed: 403, 429, CAPTCHA albo logowanie nie są obchodzone i nie zatrzymują wyników z oficjalnych źródeł.'
     };
+  }
+
+  private joobleIngestionApiConfigured(): boolean {
+    return this.joobleIngestion.isConfigured();
   }
 }
