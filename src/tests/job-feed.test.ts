@@ -80,7 +80,7 @@ test('Job Feed is feature-gated, deduplicates URL/identity, tracks reposts and i
     assert.equal(feed.status, 200);
     const card = ((await feed.json()) as { jobs: Array<{ jobId: string; duplicateCount: number; repostCount: number; decisionState: { recommendation: string | null } }> }).jobs[0];
     assert.equal(card?.jobId, jobId);
-    assert.equal(card?.duplicateCount, 1);
+    assert.equal(card?.duplicateCount, 0, 'Ponowny import tego samego kanonicznego URL aktualizuje last_seen_at zamiast tworzyć kolejną obserwację.');
     assert.equal(card?.repostCount, 1);
     assert.ok(card?.decisionState.recommendation);
 
@@ -99,7 +99,7 @@ test('Job Feed is feature-gated, deduplicates URL/identity, tracks reposts and i
     const exported = await requestJson(base, '/api/export', alice, 'GET');
     assert.equal(exported.status, 200);
     const exportBody = await exported.json() as { job_source_observations: unknown[]; job_feed_states: unknown[] };
-    assert.equal(exportBody.job_source_observations.length, 3);
+    assert.equal(exportBody.job_source_observations.length, 2, 'Dokładnie ten sam URL jest idempotentną obserwacją; nowy rekord powstaje dopiero dla odrębnego źródłowego URL/repostu.');
     assert.equal(exportBody.job_feed_states.length, 1);
   } finally {
     await app.close();
