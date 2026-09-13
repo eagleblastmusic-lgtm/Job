@@ -102,6 +102,60 @@ export class UserProvidedJobConnector implements JobSourceConnector {
   }
 }
 
+export class BrowserAssistedJobConnector implements JobSourceConnector {
+  readonly kind: JobSourceKind = 'PARTNERSHIP';
+
+  constructor(
+    readonly key: string,
+    readonly label: string,
+    private readonly pageUrl: string,
+    private readonly items: JobSourceInput[]
+  ) {}
+
+  async fetch(): Promise<JobSourceInput[]> {
+    return this.items;
+  }
+
+  normalize(input: JobSourceInput): NormalizedSourceJob {
+    return {
+      rawText: input.rawText.trim(),
+      sourceUrl: canonicalUrl(input.sourceUrl),
+      externalId: input.externalId?.trim() || null,
+      publishedAt: input.publishedAt?.trim() || null,
+      provenance: this.provenance(input)
+    };
+  }
+
+  provenance(input: JobSourceInput): Record<string, unknown> {
+    return {
+      connector: this.key,
+      basis: this.kind,
+      accessMode: 'BROWSER_ASSISTED_VISIBLE_DOM',
+      userInitiated: true,
+      pageUrl: canonicalUrl(this.pageUrl),
+      sourceUrl: canonicalUrl(input.sourceUrl),
+      hasExternalId: Boolean(input.externalId?.trim())
+    };
+  }
+
+  termsMetadata(): JobSourceTermsMetadata {
+    return {
+      basis: this.kind,
+      referenceUrl: canonicalUrl(this.pageUrl),
+      notes: 'Import przeglądarkowy odczytuje wyłącznie treść już wyrenderowaną w kartach otwartych przez użytkownika. Nie loguje się za użytkownika, nie rozwiązuje CAPTCHA, nie obchodzi 403/429 i nie wykonuje ukrytych zapytań do prywatnych endpointów.',
+      checkedAt: new Date().toISOString()
+    };
+  }
+
+  healthStatus(): JobSourceHealth {
+    return {
+      status: 'HEALTHY',
+      message: `Odebrano ${this.items.length} rekordów z widocznej treści przeglądarki.`,
+      checkedAt: new Date().toISOString()
+    };
+  }
+}
+
 export function normalizeSourceUrl(value: string | null | undefined): string | null {
   return canonicalUrl(value);
 }
