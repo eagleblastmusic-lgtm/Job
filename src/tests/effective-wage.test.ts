@@ -31,7 +31,7 @@ test('Effective Wage separates objective cash costs from optional subjective tim
   assert.deepEqual(result.cashAfterCommuteAndSubjectiveTime, { min: 3500, max: 4250 });
   assert.ok(result.assumptions.some(value => /subiektywna|Opcjonalna wartość czasu/i.test(value)));
   assert.ok(result.warnings.some(value => /nie kalkulatorem podatkowym/i.test(value)));
-  assert.ok(result.shiftContext.some(value => /praca nocna/i.test(value)));
+  assert.ok(result.shiftContext.some(value => /prac[ęa] nocn[ąa]/i.test(value)));
 });
 
 test('Effective Wage refuses to invent net salary when gross/net context or net ratio is missing', () => {
