@@ -28,7 +28,7 @@ export async function handleJobSearchApi(req: IncomingMessage, res: ServerRespon
   const location = (url.searchParams.get('location') ?? '').trim() || null;
   const radiusKm = parseRadius(url.searchParams.get('radiusKm'));
   if (query.length < 2) throw new HttpError(400, 'Wpisz co najmniej 2 znaki wyszukiwanej pracy.', 'INVALID_JOB_SEARCH_QUERY');
-  const service = new JobSearchService(db, store);
+  const service = new JobSearchService(db, store, config);
   try {
     const result = await service.search(user.id, { query, location, radiusKm });
     store.analytics(user.id, 'federated_job_search', {

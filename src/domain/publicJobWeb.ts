@@ -1,7 +1,7 @@
 import type { JobSourceInput } from './jobSources.js';
 import type { JobSearchCriteria, JobSearchProviderKey } from './jobSearch.js';
 
-export type PublicJobBoardKey = Exclude<JobSearchProviderKey, 'employer_careers'>;
+export type PublicJobBoardKey = Exclude<JobSearchProviderKey, 'employer_careers' | 'jooble_pl'>;
 
 const ENTITY_MAP: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '
