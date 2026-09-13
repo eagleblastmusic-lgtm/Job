@@ -5,6 +5,7 @@ import type { AppConfig } from './config.js';
 import { HttpError, sendJson } from './http.js';
 import { handleExtendedApi } from './extendedApi.js';
 import { handleBottleneckApi } from './bottleneckApi.js';
+import { handleLocalLabourApi } from './localLabourApi.js';
 
 function securityHeaders(res: ServerResponse, config: AppConfig): void {
   res.setHeader('x-content-type-options', 'nosniff');
@@ -18,7 +19,7 @@ function securityHeaders(res: ServerResponse, config: AppConfig): void {
 }
 
 function isExtendedPath(pathname: string): boolean {
-  return pathname === '/api/features' || pathname === '/api/export' || pathname === '/api/bottleneck' || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications') || pathname.startsWith('/api/job-feed') || pathname.startsWith('/api/admin/job-sources') || /^\/api\/applications\/[^/]+\/interview-pack$/.test(pathname);
+  return pathname === '/api/features' || pathname === '/api/export' || pathname === '/api/bottleneck' || pathname === '/api/local-labour' || pathname.startsWith('/api/admin/local-labour/') || pathname.startsWith('/api/today') || pathname.startsWith('/api/notifications') || pathname.startsWith('/api/job-feed') || pathname.startsWith('/api/admin/job-sources') || /^\/api\/applications\/[^/]+\/interview-pack$/.test(pathname);
 }
 
 export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
@@ -36,6 +37,7 @@ export function createExtendedJobApp(overrides: Partial<AppConfig> = {}) {
     res.setHeader('cache-control', 'no-store');
     res.setHeader('pragma', 'no-cache');
     try {
+      if (await handleLocalLabourApi(req, res, url.pathname, app.store, app.db, app.config)) return;
       if (handleBottleneckApi(req, res, url.pathname, app.store, app.db)) return;
       if (await handleExtendedApi(req, res, url.pathname, app.store, app.db, app.config)) return;
       original(req, res);
