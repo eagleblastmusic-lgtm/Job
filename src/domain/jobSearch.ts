@@ -1,6 +1,6 @@
-export type JobSearchProviderKey = 'pracuj' | 'linkedin' | 'olx' | 'indeed' | 'rocketjobs' | 'justjoinit' | 'employer_careers';
+export type JobSearchProviderKey = 'jooble_pl' | 'pracuj' | 'linkedin' | 'olx' | 'indeed' | 'rocketjobs' | 'justjoinit' | 'employer_careers';
 export type JobSearchMode = 'AUTO_IMPORT' | 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
-export type JobIngestionStatus = 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
+export type JobIngestionStatus = 'OFFICIAL_API_ACTIVE' | 'OFFICIAL_API_REQUIRED' | 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
 
 export interface JobSearchCriteria {
   query: string;
@@ -95,6 +95,11 @@ const autoNotes = 'Job automatycznie próbuje odczytać publicznie dostępne str
 
 const DEFINITIONS: readonly ProviderDefinition[] = [
   {
+    key: 'jooble_pl', label: 'Jooble Polska API', homepageUrl: 'https://pl.jooble.org/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'OFFICIAL_API_REQUIRED',
+    notes: 'Oficjalny REST API Jooble dla rynku polskiego. Jest stabilnym agregatorem ofert z wielu źródeł i nie wymaga scrapowania portali; do aktywacji potrzebny jest JOOBLE_API_KEY_PL.',
+    checkedAt: CHECKED_AT, buildSearchUrl: () => 'https://pl.jooble.org/'
+  },
+  {
     key: 'pracuj', label: 'Pracuj.pl', homepageUrl: 'https://www.pracuj.pl/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
     notes: autoNotes, checkedAt: CHECKED_AT, buildSearchUrl: pracujUrl
   },
@@ -135,19 +140,22 @@ export function validateJobSearchCriteria(input: JobSearchCriteria): JobSearchCr
   return { query, location, radiusKm };
 }
 
-export function buildJobSearchProviders(input: JobSearchCriteria): JobSearchProvider[] {
+export function buildJobSearchProviders(input: JobSearchCriteria, options: { joobleApiConfigured?: boolean } = {}): JobSearchProvider[] {
   const criteria = validateJobSearchCriteria(input);
-  return DEFINITIONS.map(definition => ({
-    key: definition.key,
-    label: definition.label,
-    homepageUrl: definition.homepageUrl,
-    searchMode: definition.searchMode,
-    ingestionStatus: definition.ingestionStatus,
-    searchUrl: definition.buildSearchUrl(criteria),
-    canIngestAutomatically: definition.searchMode === 'AUTO_IMPORT',
-    notes: definition.notes,
-    checkedAt: definition.checkedAt
-  }));
+  return DEFINITIONS.map(definition => {
+    const joobleConfigured = definition.key !== 'jooble_pl' || options.joobleApiConfigured === true;
+    return {
+      key: definition.key,
+      label: definition.label,
+      homepageUrl: definition.homepageUrl,
+      searchMode: definition.searchMode,
+      ingestionStatus: definition.key === 'jooble_pl' ? (joobleConfigured ? 'OFFICIAL_API_ACTIVE' : 'OFFICIAL_API_REQUIRED') : definition.ingestionStatus,
+      searchUrl: definition.buildSearchUrl(criteria),
+      canIngestAutomatically: definition.searchMode === 'AUTO_IMPORT' && joobleConfigured,
+      notes: definition.notes,
+      checkedAt: definition.checkedAt
+    };
+  });
 }
 
 export function jobSearchProviderKeys(): JobSearchProviderKey[] {
