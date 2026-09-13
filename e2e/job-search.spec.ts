@@ -19,17 +19,29 @@ async function mockAuthenticatedUser(page: Page): Promise<void> {
   }));
 }
 
-test('federated search shows all providers, pre-fills Career Truth and exposes honest integration boundaries', async ({ page }) => {
+test('job search auto-imports source results, pre-fills Career Truth and shows per-source health', async ({ page }) => {
   await mockAuthenticatedUser(page);
   await page.route('**/api/job-feed**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs: [], limit: 25, offset: 0 }) }));
+  const autoProvider = (key: string, label: string, searchUrl: string) => ({
+    key, label, homepageUrl: searchUrl, searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE', searchUrl,
+    canIngestAutomatically: true, notes: 'Automatyczny odczyt publicznych stron.', checkedAt: '2026-09-13'
+  });
   const providers = [
-    { key: 'pracuj', label: 'Pracuj.pl', homepageUrl: 'https://www.pracuj.pl/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://www.pracuj.pl/praca/magazynier;kw/Puck;wp', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
-    { key: 'linkedin', label: 'LinkedIn Jobs', homepageUrl: 'https://www.linkedin.com/jobs/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://www.linkedin.com/jobs/search/?keywords=magazynier&location=Puck&distance=30', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
-    { key: 'olx', label: 'OLX Praca', homepageUrl: 'https://www.olx.pl/praca/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://www.olx.pl/praca/q-magazynier/', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
-    { key: 'indeed', label: 'Indeed', homepageUrl: 'https://pl.indeed.com/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://pl.indeed.com/jobs?q=magazynier&l=Puck&radius=30', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
-    { key: 'rocketjobs', label: 'RocketJobs', homepageUrl: 'https://rocketjobs.pl/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://rocketjobs.pl/?keyword=magazynier&location=Puck', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
-    { key: 'justjoinit', label: 'Just Join IT', homepageUrl: 'https://justjoin.it/', searchMode: 'OUTBOUND_SEARCH', ingestionStatus: 'PARTNER_REQUIRED', searchUrl: 'https://justjoin.it/job-offers/all-locations?keyword=magazynier', canIngestAutomatically: false, notes: 'Import wymaga potwierdzonego dostępu.', checkedAt: '2026-09-13' },
+    autoProvider('pracuj', 'Pracuj.pl', 'https://www.pracuj.pl/praca/magazynier;kw/Puck;wp'),
+    autoProvider('linkedin', 'LinkedIn Jobs', 'https://www.linkedin.com/jobs/search/?keywords=magazynier&location=Puck&distance=30'),
+    autoProvider('olx', 'OLX Praca', 'https://www.olx.pl/praca/puck/q-magazynier/'),
+    autoProvider('indeed', 'Indeed', 'https://pl.indeed.com/jobs?q=magazynier&l=Puck&radius=30'),
+    autoProvider('rocketjobs', 'RocketJobs', 'https://rocketjobs.pl/oferty-pracy/wszystkie-lokalizacje?keyword=magazynier&location=Puck'),
+    autoProvider('justjoinit', 'Just Join IT', 'https://justjoin.it/job-offers/all-locations?q=magazynier%40keyword'),
     { key: 'employer_careers', label: 'Strony karier pracodawców', homepageUrl: 'about:blank', searchMode: 'DIRECT_CAREER_PAGES', ingestionStatus: 'PERMITTED_SOURCE_REQUIRED', searchUrl: null, canIngestAutomatically: false, notes: 'Tylko jawnie dozwolone źródła.', checkedAt: '2026-09-13' }
+  ];
+  const sourceRefresh = [
+    { sourceKey: 'pracuj', status: 'IMPORTED', fetchedCount: 8, canonicalCount: 5, message: 'Pobrano 8 ofert; 5 nowych po deduplikacji.' },
+    { sourceKey: 'linkedin', status: 'BLOCKED', fetchedCount: 0, canonicalCount: 0, message: 'Źródło LinkedIn Jobs zablokowało automatyczny odczyt (HTTP 403).' },
+    { sourceKey: 'olx', status: 'NO_RESULTS', fetchedCount: 0, canonicalCount: 0, message: 'Brak ofert do importu z bieżącej odpowiedzi źródła.' },
+    { sourceKey: 'indeed', status: 'FAILED', fetchedCount: 0, canonicalCount: 0, message: 'Źródło Indeed zwróciło HTTP 503.' },
+    { sourceKey: 'rocketjobs', status: 'IMPORTED', fetchedCount: 7, canonicalCount: 4, message: 'Pobrano 7 ofert; 4 nowych po deduplikacji.' },
+    { sourceKey: 'justjoinit', status: 'IMPORTED', fetchedCount: 6, canonicalCount: 3, message: 'Pobrano 6 ofert; 3 nowe po deduplikacji.' }
   ];
   await page.route('**/api/job-search**', route => route.fulfill({
     status: 200,
@@ -37,10 +49,13 @@ test('federated search shows all providers, pre-fills Career Truth and exposes h
     body: JSON.stringify({
       criteria: { query: 'magazynier', location: 'Puck', radiusKm: 30 },
       providers,
-      localJobs: [{ jobId: 'job-1', title: 'Magazynier', company: 'Port Logistics', location: 'Puck', sourceKeys: ['user_provided'], sourceUrl: 'https://jobs.example.pl/puck', freshness: '2026-09-13T08:00:00.000Z', decisionState: { recommendation: 'APPLY', override: null } }],
+      localJobs: [{ jobId: 'job-1', title: 'Magazynier', company: 'Port Logistics', location: 'Puck', sourceKeys: ['pracuj', 'rocketjobs'], sourceUrl: 'https://jobs.example.pl/puck', freshness: '2026-09-13T08:00:00.000Z', decisionState: { recommendation: 'APPLY', override: null } }],
+      sourceRefresh,
       externalSearchCount: 6,
-      automaticIngestionCount: 0,
-      boundary: 'Zewnętrzne serwisy są otwierane przez oficjalne wyszukiwarki; automatyczne pobieranie wymaga potwierdzonego dostępu.'
+      automaticIngestionCount: 6,
+      importedCount: 21,
+      newCanonicalCount: 12,
+      boundary: 'Job automatycznie próbuje pobrać publiczne oferty; źródła z blokadą są pomijane bez obchodzenia zabezpieczeń.'
     })
   }));
 
@@ -51,18 +66,19 @@ test('federated search shows all providers, pre-fills Career Truth and exposes h
   await expect(page.locator('#federatedSearchForm input[name="q"]')).toHaveValue('magazynier');
   await expect(page.locator('#federatedSearchForm input[name="location"]')).toHaveValue('Puck');
   await expect(page.locator('#federatedSearchForm input[name="radiusKm"]')).toHaveValue('30');
-  await page.getByRole('button', { name: 'Szukaj we wszystkich źródłach' }).click();
+  await page.getByRole('button', { name: 'Pobierz oferty ze wszystkich źródeł' }).click();
 
+  await expect(page.locator('#jobSearchSummary')).toContainText('pobrano 21 rekordów');
+  await expect(page.locator('#jobSearchSummary')).toContainText('12 nowych po deduplikacji');
   await expect(page.locator('#jobSearchProviders')).toContainText('Pracuj.pl');
+  await expect(page.locator('#jobSearchProviders')).toContainText('pobrano 8');
   await expect(page.locator('#jobSearchProviders')).toContainText('LinkedIn Jobs');
-  await expect(page.locator('#jobSearchProviders')).toContainText('OLX Praca');
-  await expect(page.locator('#jobSearchProviders')).toContainText('Indeed');
+  await expect(page.locator('#jobSearchProviders')).toContainText('źródło blokuje odczyt');
   await expect(page.locator('#jobSearchProviders')).toContainText('RocketJobs');
   await expect(page.locator('#jobSearchProviders')).toContainText('Just Join IT');
   await expect(page.locator('#jobSearchProviders')).toContainText('Strony karier pracodawców');
-  await expect(page.locator('#jobSearchProviders')).toContainText('import wymaga partnerstwa/API');
   await expect(page.locator('#jobSearchLocalJobs')).toContainText('Port Logistics');
-  await expect(page.locator('#jobSearchSummary')).toContainText('6 gotowych wyszukiwań zewnętrznych');
+  await expect(page.locator('#jobSearchLocalJobs')).toContainText('pracuj, rocketjobs');
 
   const results = await new AxeBuilder({ page }).include('[data-screen="job-search"]').analyze();
   expect(results.violations).toEqual([]);
