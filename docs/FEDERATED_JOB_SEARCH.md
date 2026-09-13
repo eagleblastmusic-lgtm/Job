@@ -1,12 +1,14 @@
-# Federated Job Search
+# Federated Job Search + Live Public Ingestion
 
 Stan: 2026-09-13
 
 ## Cel
 
-Job ma jedną wyszukiwarkę, która wykorzystuje Career Truth (rola, lokalizacja, promień), filtruje oferty już zapisane w Job i przygotowuje równoległe wyszukiwanie w uzgodnionych serwisach. Duplikaty, które później trafią do Job przez dozwolone feedy/import, nadal przechodzą przez istniejący kanoniczny Job Feed i deduplikację.
+Job ma jedną wyszukiwarkę, która wykorzystuje Career Truth (rola, lokalizacja, promień), automatycznie próbuje odczytać publiczne oferty z aktywnych źródeł, normalizuje je do wspólnego modelu i przekazuje do istniejącego kanonicznego Job Feed/deduplikacji. Użytkownik nie musi otwierać każdego portalu osobno, żeby zobaczyć wyniki w Job.
 
-## Źródła obecne w UI
+## Źródła
+
+Automatyczny, ograniczony odczyt publicznych stron jest aktywny dla:
 
 - Pracuj.pl
 - LinkedIn Jobs
@@ -14,51 +16,58 @@ Job ma jedną wyszukiwarkę, która wykorzystuje Career Truth (rola, lokalizacja
 - Indeed
 - RocketJobs
 - Just Join IT
-- bezpośrednie strony karier pracodawców
 
-## Tryby dostępu
+Bezpośrednie strony karier pracodawców pozostają osobnym kanałem wymagającym jawnej allowlisty lub feedu konkretnego pracodawcy.
 
-### OUTBOUND_SEARCH
+## Jak działa odczyt
 
-Job buduje bezpieczny link do oficjalnej wyszukiwarki danego serwisu z frazą/lokalizacją, gdy serwis wspiera takie parametry. Nie kopiuje wyników przez nieautoryzowany scraper.
+1. Job buduje URL wyszukiwania z frazą, lokalizacją i promieniem tam, gdzie źródło obsługuje te parametry.
+2. Backend wykonuje zwykłe publiczne `GET` do strony wyników — bez logowania i bez prywatnych endpointów.
+3. Najpierw szuka `application/ld+json` / Schema.org `JobPosting`.
+4. Jeśli lista nie zawiera pełnego `JobPosting`, Job wyciąga ograniczoną liczbę publicznych linków do szczegółów i odczytuje ich strony.
+5. `JobPosting` jest zamieniany na wspólny tekst źródłowy i przepuszczany przez istniejący `JobSourceConnector` → parser → Decision Engine → obserwacje źródłowe → deduplikację.
+6. Odświeżenie tego samego wyniku jest idempotentne: ten sam URL/external ID nie tworzy kolejnej kanonicznej oferty.
 
-### PARTNER_REQUIRED
+## Granice bezpieczeństwa źródeł
 
-Automatyczny import może zostać uruchomiony dopiero po uzyskaniu oficjalnego API/feedu/umowy/licencji i potwierdzeniu warunków wykorzystania danych. Sam fakt, że strona jest publicznie widoczna, nie jest traktowany jako zgoda na hurtowe pobieranie ofert.
+Adapter publicznych stron:
 
-### PERMITTED_SOURCE_REQUIRED
+- nie loguje się do serwisu;
+- nie używa cudzych kont/cookies/tokenów;
+- nie omija CAPTCHA ani challenge typu „verify you are human”;
+- nie obchodzi HTTP 401/403/429;
+- nie próbuje korzystać z nieudokumentowanych prywatnych API jako substytutu oficjalnego dostępu;
+- ma timeout 8 s na żądanie, limit 2 MB HTML, maksymalnie 8 stron szczegółów na źródło i cache 10 minut;
+- awaria jednego źródła nie zatrzymuje pozostałych.
 
-Dla bezpośrednich stron karier automatyczne pobieranie będzie możliwe wyłącznie z jawnie skonfigurowanej allowlisty i po potwierdzeniu, że dany kanał jest dozwolony (np. oficjalny ATS feed, publiczny RSS/JSON feed albo zgoda pracodawcy).
+Przy 401/403/429 lub wykryciu CAPTCHA źródło zwraca status `BLOCKED`, a UI pokazuje to użytkownikowi. Dostępny pozostaje ręczny link do oficjalnej wyszukiwarki.
 
-## Zweryfikowane ograniczenia źródeł
+## Oficjalne API a publiczne strony
 
-- LinkedIn Job Posting API wymaga zatwierdzonej integracji partnerskiej i nie jest otwartym API do dowolnego wyszukiwania ofert.
-- Indeed udostępnia integracje job/candidate przez Partner Docs/Partner Console; automatyczne użycie wymaga odpowiedniego dostępu partnerskiego.
-- OLX Developer Portal wymaga rejestracji i zatwierdzenia aplikacji. FAQ OLX stwierdza, że API nie pozwala pobierać ogłoszeń innych użytkowników; można zarządzać własnymi ogłoszeniami.
-- Pracuj.pl, RocketJobs i Just Join IT są obecne jako oficjalne wyszukiwarki wychodzące. Automatyczny import pozostaje wyłączony do czasu potwierdzenia legalnego i stabilnego kanału danych.
+Live ingestion nie oznacza, że Job otrzymał partnerski dostęp API. To dwa różne kanały.
 
-## Oficjalne materiały referencyjne
-
-- LinkedIn Job Posting API: https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview
-- Indeed Partner Docs: https://docs.indeed.com/
-- OLX Developer Portal: https://developer.olx.pl/
-- OLX FAQ: https://developer.olx.pl/artykuly/czeste-pytania
-- Pracuj.pl: https://www.pracuj.pl/
-- RocketJobs: https://rocketjobs.pl/
-- Just Join IT: https://justjoin.it/
+- LinkedIn Job Posting API pozostaje ograniczone do zatwierdzonych integracji partnerskich. Public-page adapter nie używa tego API.
+- Indeed API wymaga partnerstwa/OAuth. Public-page adapter nie używa partnerskiego GraphQL jako obejścia.
+- OLX Developer API nie jest używane do pobierania cudzych ogłoszeń; adapter czyta wyłącznie publiczne strony WWW i zatrzymuje się przy blokadzie.
+- Pracuj.pl, RocketJobs i Just Join IT mają publicznie dostępne strony list i szczegółów ofert; adapter wykorzystuje tylko publiczny HTML/structured data.
 
 ## API Job
 
 `GET /api/job-search?q=<fraza>&location=<lokalizacja>&radiusKm=<0..300>`
 
-Endpoint jest chroniony przez istniejący feature flag `job_feed`. Odpowiedź zawiera:
+Endpoint jest chroniony przez feature flag `job_feed`. W czasie jednego żądania:
 
-- znormalizowane kryteria,
-- listę dostawców i ich bezpieczne linki wyszukiwania,
-- status możliwości automatycznego importu,
-- oferty już znane Job, przefiltrowane po frazie/lokalizacji,
-- jawny komunikat granicy integracji.
+- waliduje kryteria;
+- uruchamia refresh wszystkich aktywnych źródeł równolegle;
+- importuje i deduplikuje wyniki per użytkownik;
+- zwraca wspólny feed pasujących ofert;
+- zwraca `sourceRefresh` dla każdego źródła (`IMPORTED`, `NO_RESULTS`, `BLOCKED`, `FAILED`, `DISABLED`);
+- zwraca `importedCount` oraz `newCanonicalCount`.
 
-## Następny etap automatycznego importu
+## Stan źródeł w UI
 
-Dla każdego źródła osobno wymagane są: potwierdzony kanał danych, warunki licencji/partnerstwa, dane uwierzytelniające przechowywane poza repo, limity zapytań, healthcheck, retry/backoff, mapowanie do `NormalizedSourceJob`, provenance oraz testy kontraktowe. Dopiero wtedy `canIngestAutomatically` może zostać ustawione na `true` dla konkretnego adaptera.
+UI nie pokazuje już wyłącznie „Szukaj w ...”. Głównym przepływem jest przycisk **„Pobierz oferty ze wszystkich źródeł”**. Karty źródeł są diagnostyczne: pokazują ile rekordów pobrano albo dlaczego konkretne źródło nie odpowiedziało. Link ręczny pozostaje fallbackiem.
+
+## Bezpośrednie strony pracodawców
+
+`employer_careers` nadal jest wyłączone do czasu dodania jawnej konfiguracji pracodawców/ATS. Następny bezpieczny krok dla tego kanału to adaptery oficjalnych publicznych feedów (np. JSON/RSS/ATS) z allowlistą domen i testami kontraktowymi.
