@@ -24,11 +24,20 @@ async function request(base: string, path: string, cookie: string, method = 'GET
   return fetch(`${base}${path}`, init);
 }
 
-test('provider catalog includes all agreed sources and enables bounded public-page ingestion', () => {
-  const providers = buildJobSearchProviders({ query: 'magazynier', location: 'Puck', radiusKm: 30 });
-  assert.deepEqual(providers.map(provider => provider.key), ['pracuj', 'linkedin', 'olx', 'indeed', 'rocketjobs', 'justjoinit', 'employer_careers']);
+test('provider catalog includes Jooble official API plus all agreed direct sources', () => {
+  const criteria = { query: 'magazynier', location: 'Puck', radiusKm: 30 };
+  const providers = buildJobSearchProviders(criteria);
+  assert.deepEqual(providers.map(provider => provider.key), ['jooble_pl', 'pracuj', 'linkedin', 'olx', 'indeed', 'rocketjobs', 'justjoinit', 'employer_careers']);
   assert.equal(providers.filter(provider => provider.canIngestAutomatically).length, 6);
-  assert.equal(providers.filter(provider => provider.searchUrl !== null).length, 6);
+  assert.equal(providers.filter(provider => provider.searchUrl !== null).length, 7);
+
+  const jooble = providers.find(provider => provider.key === 'jooble_pl');
+  assert.equal(jooble?.canIngestAutomatically, false);
+  assert.equal(jooble?.ingestionStatus, 'OFFICIAL_API_REQUIRED');
+  const configured = buildJobSearchProviders(criteria, { joobleApiConfigured: true }).find(provider => provider.key === 'jooble_pl');
+  assert.equal(configured?.canIngestAutomatically, true);
+  assert.equal(configured?.ingestionStatus, 'OFFICIAL_API_ACTIVE');
+
   const linkedin = providers.find(provider => provider.key === 'linkedin');
   assert.ok(linkedin?.searchUrl?.includes('keywords=magazynier'));
   assert.ok(linkedin?.searchUrl?.includes('location=Puck'));
@@ -38,7 +47,7 @@ test('provider catalog includes all agreed sources and enables bounded public-pa
   assert.equal(careers?.canIngestAutomatically, false);
 });
 
-test('job search is feature-gated and keeps working when all live sources are administratively disabled', async () => {
+test('job search is feature-gated and keeps working when direct live sources are administratively disabled', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-search-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
@@ -64,25 +73,26 @@ test('job search is feature-gated and keeps working when all live sources are ad
     const body = await response.json() as {
       providers: Array<{ key: string; searchUrl: string | null; canIngestAutomatically: boolean }>;
       localJobs: Array<{ title: string | null; company: string | null; location: string | null }>;
-      sourceRefresh: Array<{ status: string }>;
+      sourceRefresh: Array<{ sourceKey: string; status: string }>;
       externalSearchCount: number;
       automaticIngestionCount: number;
       importedCount: number;
       boundary: string;
     };
-    assert.equal(body.providers.length, 7);
-    assert.equal(body.externalSearchCount, 6);
+    assert.equal(body.providers.length, 8);
+    assert.equal(body.externalSearchCount, 7);
     assert.equal(body.automaticIngestionCount, 6);
     assert.equal(body.importedCount, 0);
-    assert.equal(body.sourceRefresh.length, 6);
-    assert.ok(body.sourceRefresh.every(source => source.status === 'DISABLED'));
+    assert.equal(body.sourceRefresh.length, 7);
+    assert.equal(body.sourceRefresh.find(source => source.sourceKey === 'jooble_pl')?.status, 'DISABLED');
+    assert.ok(body.sourceRefresh.filter(source => source.sourceKey !== 'jooble_pl').every(source => source.status === 'DISABLED'));
     assert.equal(body.localJobs.length, 1);
     assert.equal(body.localJobs[0]?.company, 'Port Logistics');
     assert.equal(body.localJobs[0]?.location, 'Puck');
-    assert.match(body.boundary, /automatycznie próbuje pobrać/i);
+    assert.match(body.boundary, /oficjalne API/i);
 
-    const registryKeys = (app.db.db.prepare("SELECT key FROM job_source_registry WHERE key IN ('pracuj','linkedin','olx','indeed','rocketjobs','justjoinit','employer_careers') ORDER BY key").all() as unknown as Array<{ key: string }>).map(row => row.key);
-    assert.deepEqual(registryKeys, ['employer_careers', 'indeed', 'justjoinit', 'linkedin', 'olx', 'pracuj', 'rocketjobs']);
+    const registryKeys = (app.db.db.prepare("SELECT key FROM job_source_registry WHERE key IN ('jooble_pl','pracuj','linkedin','olx','indeed','rocketjobs','justjoinit','employer_careers') ORDER BY key").all() as unknown as Array<{ key: string }>).map(row => row.key);
+    assert.deepEqual(registryKeys, ['employer_careers', 'indeed', 'jooble_pl', 'justjoinit', 'linkedin', 'olx', 'pracuj', 'rocketjobs']);
   } finally {
     await app.close();
     await rm(dir, { recursive: true, force: true });
