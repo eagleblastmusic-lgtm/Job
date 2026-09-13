@@ -6,12 +6,19 @@ type SearchProvider = {
   key: string;
   label: string;
   homepageUrl: string;
-  searchMode: 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
-  ingestionStatus: 'PARTNER_REQUIRED' | 'PERMITTED_SOURCE_REQUIRED';
+  searchMode: 'AUTO_IMPORT' | 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
+  ingestionStatus: 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
   searchUrl: string | null;
   canIngestAutomatically: boolean;
   notes: string;
   checkedAt: string;
+};
+type SourceRefresh = {
+  sourceKey: string;
+  status: 'IMPORTED' | 'NO_RESULTS' | 'BLOCKED' | 'FAILED' | 'DISABLED';
+  fetchedCount: number;
+  canonicalCount: number;
+  message: string;
 };
 type SearchJob = {
   jobId: string;
@@ -27,8 +34,11 @@ type SearchResponse = {
   criteria: { query: string; location: string | null; radiusKm: number | null };
   providers: SearchProvider[];
   localJobs: SearchJob[];
+  sourceRefresh: SourceRefresh[];
   externalSearchCount: number;
   automaticIngestionCount: number;
+  importedCount: number;
+  newCanonicalCount: number;
   boundary: string;
 };
 
@@ -49,9 +59,14 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium' }).format(date);
 }
 
-function ingestionLabel(provider: SearchProvider): string {
-  if (provider.canIngestAutomatically) return 'automatyczny import aktywny';
-  return provider.ingestionStatus === 'PARTNER_REQUIRED' ? 'import wymaga partnerstwa/API' : 'import tylko z dozwolonego źródła';
+function sourceStatusLabel(refresh: SourceRefresh | undefined, provider: SearchProvider): string {
+  if (!provider.canIngestAutomatically) return 'wymaga konfiguracji';
+  if (!refresh) return 'automatyczny import';
+  if (refresh.status === 'IMPORTED') return `pobrano ${refresh.fetchedCount}`;
+  if (refresh.status === 'NO_RESULTS') return 'brak wyników';
+  if (refresh.status === 'BLOCKED') return 'źródło blokuje odczyt';
+  if (refresh.status === 'DISABLED') return 'wyłączone';
+  return 'błąd źródła';
 }
 
 function ensureUi(): HTMLElement {
@@ -81,25 +96,25 @@ function ensureUi(): HTMLElement {
   screen.dataset.screen = 'job-search';
   screen.innerHTML = `
     <div class="screen-heading">
-      <p class="eyebrow">Wiele źródeł, jedna decyzja</p>
+      <p class="eyebrow">Wiele źródeł, jeden feed</p>
       <h2>Wyszukiwarka ofert</h2>
-      <p>Wpisz stanowisko i lokalizację. Job przeszuka zapisane już oferty oraz przygotuje to samo wyszukiwanie w największych serwisach.</p>
+      <p>Wpisz stanowisko i lokalizację. Job sam spróbuje pobrać publiczne oferty ze wszystkich aktywnych źródeł, połączy duplikaty i pokaże je w jednym miejscu.</p>
     </div>
     <form id="federatedSearchForm" class="card form-grid">
       <label class="span-2">Stanowisko, firma lub słowo kluczowe<input name="q" required minlength="2" maxlength="120" placeholder="np. magazynier, Java developer"></label>
       <label>Lokalizacja<input name="location" maxlength="120" placeholder="np. Puck"></label>
       <label>Promień (km)<input name="radiusKm" type="number" min="0" max="300" step="1" placeholder="30"></label>
-      <button class="button button-primary span-2" type="submit">Szukaj we wszystkich źródłach</button>
+      <button id="jobSearchSubmit" class="button button-primary span-2" type="submit">Pobierz oferty ze wszystkich źródeł</button>
     </form>
     <div id="jobSearchMessage" class="message" aria-live="polite"></div>
     <div id="jobSearchSummary" class="section-gap"></div>
-    <section class="section-gap" aria-labelledby="jobSearchProvidersHeading">
-      <div class="row-between"><div><h3 id="jobSearchProvidersHeading">Źródła</h3><p class="hint">Automatyczny import jest uruchamiany tylko tam, gdzie mamy potwierdzone prawo i techniczny kanał dostępu.</p></div></div>
-      <div id="jobSearchProviders" class="grid two"></div>
-    </section>
     <section class="section-gap" aria-labelledby="jobSearchLocalHeading">
-      <div class="row-between"><div><h3 id="jobSearchLocalHeading">Oferty już w Job</h3><p class="hint">To kanoniczne, zdeduplikowane rekordy, które system już zna.</p></div><button id="openJobFeed" class="button button-secondary" type="button">Otwórz pełny feed</button></div>
+      <div class="row-between"><div><h3 id="jobSearchLocalHeading">Znalezione oferty</h3><p class="hint">Oferty są normalizowane i deduplikowane przez Job przed pokazaniem na liście.</p></div><button id="openJobFeed" class="button button-secondary" type="button">Otwórz pełny feed</button></div>
       <div id="jobSearchLocalJobs" class="stack"></div>
+    </section>
+    <section class="section-gap" aria-labelledby="jobSearchProvidersHeading">
+      <div class="row-between"><div><h3 id="jobSearchProvidersHeading">Stan źródeł</h3><p class="hint">Blokada jednego serwisu nie zatrzymuje pozostałych. Job nie obchodzi CAPTCHA ani logowania.</p></div></div>
+      <div id="jobSearchProviders" class="grid two"></div>
     </section>`;
   content.append(screen);
 
@@ -133,21 +148,29 @@ function render(result: SearchResponse): void {
   const providers = document.querySelector<HTMLElement>('#jobSearchProviders');
   const jobs = document.querySelector<HTMLElement>('#jobSearchLocalJobs');
   if (!summary || !providers || !jobs) return;
-  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.providers.length)} źródeł</strong> · ${esc(result.externalSearchCount)} gotowych wyszukiwań zewnętrznych · ${esc(result.localJobs.length)} ofert już w Job<p class="hint">${esc(result.boundary)}</p></div>`;
-  providers.innerHTML = result.providers.map(provider => `
-    <article class="card">
-      <div class="row-between"><h3>${esc(provider.label)}</h3><span class="badge">${esc(ingestionLabel(provider))}</span></div>
-      <p class="hint">${esc(provider.notes)}</p>
-      <p class="hint">Stan dostępu sprawdzony: ${esc(provider.checkedAt)}</p>
-      ${provider.searchUrl ? `<a class="button button-secondary" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Szukaj w ${esc(provider.label)}</a>` : '<span class="hint">Strony karier będą dodawane z jawnej allowlisty pracodawców.</span>'}
-    </article>`).join('');
+
+  const importedSources = result.sourceRefresh.filter(item => item.status === 'IMPORTED').length;
+  const blockedSources = result.sourceRefresh.filter(item => item.status === 'BLOCKED' || item.status === 'FAILED').length;
+  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.localJobs.length)} pasujących ofert</strong> · pobrano ${esc(result.importedCount)} rekordów · ${esc(result.newCanonicalCount)} nowych po deduplikacji · ${esc(importedSources)} źródeł odpowiedziało${blockedSources ? ` · ${esc(blockedSources)} źródeł niedostępnych` : ''}<p class="hint">${esc(result.boundary)}</p></div>`;
+
+  const refreshBySource = new Map(result.sourceRefresh.map(item => [item.sourceKey, item]));
+  providers.innerHTML = result.providers.map(provider => {
+    const refresh = refreshBySource.get(provider.key);
+    return `
+      <article class="card">
+        <div class="row-between"><h3>${esc(provider.label)}</h3><span class="badge">${esc(sourceStatusLabel(refresh, provider))}</span></div>
+        <p class="hint">${esc(refresh?.message ?? provider.notes)}</p>
+        ${provider.searchUrl ? `<a class="button button-secondary" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Otwórz ${esc(provider.label)} ręcznie</a>` : '<span class="hint">Strony karier wymagają skonfigurowanej allowlisty pracodawców.</span>'}
+      </article>`;
+  }).join('');
+
   jobs.innerHTML = result.localJobs.length ? result.localJobs.map(job => `
     <article class="card">
       <div class="row-between"><div><span class="badge">${esc(job.decisionState.override ?? job.decisionState.recommendation ?? 'bez decyzji')}</span><h3>${esc(job.title ?? 'Oferta bez rozpoznanego tytułu')}</h3></div><span class="hint">${esc(formatDate(job.freshness))}</span></div>
       <p><strong>${esc(job.company ?? 'Firma nieustalona')}</strong>${job.location ? ` · ${esc(job.location)}` : ''}</p>
       <p class="hint">Źródła: ${esc(job.sourceKeys.join(', '))}</p>
-      ${job.sourceUrl ? `<a href="${esc(job.sourceUrl)}" target="_blank" rel="noopener noreferrer">Otwórz źródło</a>` : ''}
-    </article>`).join('') : '<div class="card"><strong>Brak zapisanych ofert pasujących do tego wyszukiwania.</strong><p class="hint">Użyj źródeł powyżej. Po dodaniu/importowaniu oferty Job połączy duplikaty i wykona analizę dopasowania.</p></div>';
+      ${job.sourceUrl ? `<a href="${esc(job.sourceUrl)}" target="_blank" rel="noopener noreferrer">Otwórz oryginalną ofertę</a>` : ''}
+    </article>`).join('') : '<div class="card"><strong>Nie znaleziono jeszcze pasujących ofert.</strong><p class="hint">Sprawdź status źródeł poniżej. Jeśli serwis zablokował automatyczny odczyt, możesz otworzyć go ręcznie; pozostałe źródła nadal działają niezależnie.</p></div>';
 }
 
 async function prefill(): Promise<void> {
@@ -167,6 +190,7 @@ async function prefill(): Promise<void> {
 
 async function search(): Promise<void> {
   const form = document.querySelector<HTMLFormElement>('#federatedSearchForm');
+  const submit = document.querySelector<HTMLButtonElement>('#jobSearchSubmit');
   if (!form) return;
   const data = new FormData(form);
   const q = String(data.get('q') ?? '').trim();
@@ -176,12 +200,15 @@ async function search(): Promise<void> {
   if (searchLocation) params.set('location', searchLocation);
   if (radius) params.set('radiusKm', radius);
   try {
-    message('Szukam…');
+    if (submit) submit.disabled = true;
+    message('Pobieram publiczne oferty ze źródeł, normalizuję i usuwam duplikaty…');
     const result = await api<SearchResponse>(`/api/job-search?${params.toString()}`);
     render(result);
-    message(`Gotowe. Przygotowano wyszukiwanie w ${result.externalSearchCount} zewnętrznych źródłach.`);
+    message(`Gotowe. Job pobrał ${result.importedCount} rekordów i dodał ${result.newCanonicalCount} nowych ofert po deduplikacji.`);
   } catch (error) {
     message((error as Error).message, true);
+  } finally {
+    if (submit) submit.disabled = false;
   }
 }
 
