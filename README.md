@@ -23,7 +23,7 @@ Interfejs jest po polsku i mobile-first. System nie może wpisywać do CV faktó
 - **Today / Action Priority** — ranking działań w budżecie czasu;
 - **Notifications** — użyteczne powiadomienia in-app;
 - **Interview Prep Pack**;
-- **Job Sources / Feed / deduplication** z granicą legalnych źródeł;
+- **Job Sources / Feed / deduplication** z oficjalnym Jooble Polska API, wieloźródłowym wyszukiwaniem i granicą legalnych źródeł;
 - **Bottleneck Engine** z progami pewności;
 - **Local Labour Intelligence** z pochodzeniem danych;
 - **Effective Wage** z jawnymi założeniami;
@@ -62,8 +62,12 @@ Najważniejsze wartości:
 - `DATA_DIR` — prywatne pliki i dane runtime;
 - `APP_ORIGIN` — dozwolony origin dla mutujących żądań;
 - `AI_*` — opcjonalny OpenAI-compatible AI Gateway; krytyczny rdzeń działa deterministycznie bez AI;
+- `JOOBLE_API_KEY_PL` — opcjonalny klucz oficjalnego Jooble REST API dla rynku polskiego; po ustawieniu zasila wspólną wyszukiwarkę ofert przez kanał API;
+- `JOOBLE_TIMEOUT_MS` — timeout Jooble API, domyślnie 8000 ms;
 - `PDF_RENDERER_BIN` — interpreter Python dla renderera PDF;
 - ustawienia malware scanning — opcjonalne lokalnie, możliwe do ustawienia jako wymagane/fail-closed w docelowym środowisku.
+
+Klucz Jooble uzyskuje się przez formularz na `https://pl.jooble.org/api/about`. Klucza nie należy commitować; wpisuje się go wyłącznie do lokalnego/produkcyjnego środowiska jako `JOOBLE_API_KEY_PL`.
 
 Publiczna rejestracja nie może nadać roli `ADMIN`. Administrator jest provisionowany poza publicznym flow zgodnie z `docs/ADMIN_PROVISIONING.md`.
 
@@ -74,7 +78,7 @@ npm run lint
 npm run typecheck
 npm run validate:migrations
 npm test
-npm run test:e2e
+npm run test:browser
 ```
 
 CI dodatkowo wykonuje semantyczny backup/restore, mobilny i desktopowy Playwright + axe, build obrazu produkcyjnego oraz smoke test uruchomionego kontenera.
@@ -119,5 +123,6 @@ Repozytorium może przejść CI i być użyte do staging/closed beta, ale szerok
 - `docs/AI_EVALUATION.md`
 - `docs/ADMIN.md`
 - `docs/FEATURE_FLAGS.md`
+- `docs/FEDERATED_JOB_SEARCH.md`
 - `docs/V2_RELEASE_NOTES.md`
 - `docs/PRODUCTION_READINESS.md`
