@@ -174,7 +174,7 @@ export class JobFeedService {
   }
 
   list(userId: string, limit = 25, offset = 0): JobFeedCard[] {
-    const boundedLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+    const boundedLimit = Math.max(1, Math.min(250, Math.floor(limit)));
     const boundedOffset = Math.max(0, Math.floor(offset));
     const rows = this.database.db.prepare(`
       SELECT j.id,j.title,j.company,j.location,j.source,j.source_url,j.published_at,j.parsed_at,j.deadline,j.fingerprint,s.state,

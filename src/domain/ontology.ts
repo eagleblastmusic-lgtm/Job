@@ -34,6 +34,8 @@ export const ONTOLOGY: OntologyEntry[] = [
 
 export function normalizeText(value: string): string {
   return value
+    .replace(/ł/g, 'l')
+    .replace(/Ł/g, 'L')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()

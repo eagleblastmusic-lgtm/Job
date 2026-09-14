@@ -15,7 +15,7 @@ async function walk(dir) {
       continue;
     }
     if (!TEXT_EXTENSIONS.has(extname(entry.name))) continue;
-    if (path.endsWith('scripts/lint.mjs')) continue;
+    if (path.replace(/\\/g, '/').endsWith('scripts/lint.mjs')) continue;
     const text = await readFile(path, 'utf8');
     const lines = text.split('\n');
     lines.forEach((line, index) => {

@@ -116,12 +116,15 @@ function requireAdmin(req: IncomingMessage, store: AppStore): UserRecord {
 function parseProfile(body: Record<string, unknown>): CareerProfile {
   const shiftsRaw = body.shiftPreferences;
   const shifts = shiftsRaw && typeof shiftsRaw === 'object' && !Array.isArray(shiftsRaw) ? shiftsRaw as Record<string, unknown> : {};
+  const salaryModeRaw = body.salaryMode;
+  const salaryMode = salaryModeRaw === 'DISCLOSED_ONLY' ? 'DISCLOSED_ONLY' : 'EXCLUDE_LOWER';
   return {
     desiredRoles: boundedStringArrayField(body, 'desiredRoles', 20, 120),
     location: boundedStringField(body, 'location', 200, false),
     commuteKm: nullableNumberField(body, 'commuteKm'),
     remotePreferences: boundedStringArrayField(body, 'remotePreferences', 10, 80),
     salaryMin: nullableNumberField(body, 'salaryMin'),
+    salaryMode,
     contractPreferences: boundedStringArrayField(body, 'contractPreferences', 10, 80),
     shiftPreferences: {
       nights: nullableBooleanField(shifts, 'nights'),

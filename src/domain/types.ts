@@ -9,6 +9,7 @@ export type CareerFactStatus =
 export type RequirementImportance = 'MUST_HAVE' | 'NICE_TO_HAVE' | 'UNKNOWN';
 export type Recommendation = 'APPLY_NOW' | 'APPLY' | 'CONSIDER' | 'PROBABLY_SKIP' | 'LOW_FIT';
 export type ApplicationStatus = 'SAVED' | 'APPLIED' | 'CONTACTED' | 'INTERVIEW' | 'OFFER' | 'CLOSED';
+export type SalaryMode = 'EXCLUDE_LOWER' | 'DISCLOSED_ONLY';
 
 export interface CareerProfile {
   desiredRoles: string[];
@@ -16,6 +17,7 @@ export interface CareerProfile {
   commuteKm: number | null;
   remotePreferences: string[];
   salaryMin: number | null;
+  salaryMode?: SalaryMode;
   contractPreferences: string[];
   shiftPreferences: {
     nights: boolean | null;

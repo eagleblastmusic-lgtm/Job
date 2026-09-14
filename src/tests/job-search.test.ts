@@ -47,6 +47,16 @@ test('provider catalog includes Jooble official API plus all agreed direct sourc
   assert.equal(careers?.canIngestAutomatically, false);
 });
 
+test('buildJobSearchProviders generates normalized OLX search URL with diacritics stripped', () => {
+  const providers = buildJobSearchProviders({ query: 'programista java', location: 'Kraków', radiusKm: 15 });
+  const olx = providers.find(p => p.key === 'olx');
+  assert.equal(olx?.searchUrl, 'https://www.olx.pl/praca/krakow/q-programista-java/?search%5Bdist%5D=15');
+
+  const lodz = buildJobSearchProviders({ query: 'kierowca', location: 'Łódź', radiusKm: null });
+  const olxLodz = lodz.find(p => p.key === 'olx');
+  assert.equal(olxLodz?.searchUrl, 'https://www.olx.pl/praca/lodz/q-kierowca/');
+});
+
 test('job search is feature-gated and keeps working when direct live sources are administratively disabled', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-search-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
@@ -90,6 +100,17 @@ test('job search is feature-gated and keeps working when direct live sources are
     assert.equal(body.localJobs[0]?.company, 'Port Logistics');
     assert.equal(body.localJobs[0]?.location, 'Puck');
     assert.match(body.boundary, /oficjalne API/i);
+
+    const multiRoleResponse = await request(base, '/api/job-search?q=kierowca,%20magazynier&location=Puck&radiusKm=30', cookie);
+    assert.equal(multiRoleResponse.status, 200);
+    const multiRoleBody = await multiRoleResponse.json() as { localJobs: Array<{ title: string | null; company: string | null }> };
+    assert.equal(multiRoleBody.localJobs.length, 1);
+    assert.equal(multiRoleBody.localJobs[0]?.company, 'Port Logistics');
+
+    const noMatchResponse = await request(base, '/api/job-search?q=kierowca,%20programista&location=Puck&radiusKm=30', cookie);
+    assert.equal(noMatchResponse.status, 200);
+    const noMatchBody = await noMatchResponse.json() as { localJobs: unknown[] };
+    assert.equal(noMatchBody.localJobs.length, 0);
 
     const registryKeys = (app.db.db.prepare("SELECT key FROM job_source_registry WHERE key IN ('jooble_pl','pracuj','linkedin','olx','indeed','rocketjobs','justjoinit','employer_careers') ORDER BY key").all() as unknown as Array<{ key: string }>).map(row => row.key);
     assert.deepEqual(registryKeys, ['employer_careers', 'indeed', 'jooble_pl', 'justjoinit', 'linkedin', 'olx', 'pracuj', 'rocketjobs']);

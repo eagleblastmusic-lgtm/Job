@@ -61,7 +61,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     aiTimeoutMs: overrides.aiTimeoutMs ?? intEnv('AI_TIMEOUT_MS', 15000),
     joobleApiKeyPl: overrides.joobleApiKeyPl ?? (process.env.JOOBLE_API_KEY_PL?.trim() || null),
     joobleTimeoutMs: overrides.joobleTimeoutMs ?? intEnv('JOOBLE_TIMEOUT_MS', 8000),
-    pdfRendererBin: overrides.pdfRendererBin ?? (process.env.PDF_RENDERER_BIN?.trim() || 'python3'),
+    pdfRendererBin: overrides.pdfRendererBin ?? (process.env.PDF_RENDERER_BIN?.trim() || (process.platform === 'win32' ? 'python' : 'python3')),
     maxUploadBytes: overrides.maxUploadBytes ?? intEnv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024)
   };
 }

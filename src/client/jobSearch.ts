@@ -101,8 +101,10 @@ function ensureUi(): HTMLElement {
       <h2>Wyszukiwarka ofert</h2>
       <p>Wpisz stanowisko i lokalizację. Job najpierw korzysta z dostępnych oficjalnych API, równolegle próbuje publiczne źródła, łączy duplikaty i pokazuje wszystko w jednym miejscu.</p>
     </div>
+
     <form id="federatedSearchForm" class="card form-grid">
-      <label class="span-2">Stanowisko, firma lub słowo kluczowe<input name="q" required minlength="2" maxlength="120" placeholder="np. magazynier, Java developer"></label>
+      <label class="span-2">Stanowisko, firma lub słowo kluczowe (możesz podać kilka po przecinku)<input name="q" required minlength="2" maxlength="120" placeholder="np. magazynier, kierowca"></label>
+      <div id="jobSearchRoleChips" class="role-quick-chips span-2 hidden" aria-live="polite"></div>
       <label>Lokalizacja<input name="location" maxlength="120" placeholder="np. Puck"></label>
       <label>Promień (km)<input name="radiusKm" type="number" min="0" max="300" step="1" placeholder="30"></label>
       <button id="jobSearchSubmit" class="button button-primary span-2" type="submit">Pobierz oferty ze wszystkich źródeł</button>
@@ -115,7 +117,7 @@ function ensureUi(): HTMLElement {
     </section>
     <section class="section-gap" aria-labelledby="jobSearchProvidersHeading">
       <div class="row-between"><div><h3 id="jobSearchProvidersHeading">Stan źródeł</h3><p class="hint">Oficjalne API i feedy zmniejszają zależność od blokad portali. Blokada jednego serwisu nie zatrzymuje pozostałych źródeł.</p></div></div>
-      <div id="jobSearchProviders" class="grid two"></div>
+      <div id="jobSearchProviders" class="provider-grid"></div>
     </section>`;
   content.append(screen);
 
@@ -123,6 +125,17 @@ function ensureUi(): HTMLElement {
     location.hash = 'job-search';
     show();
     void prefill();
+  });
+  screen.querySelector<HTMLElement>('#jobSearchRoleChips')?.addEventListener('click', event => {
+    const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('.role-quick-btn');
+    if (!btn || !btn.dataset.role) return;
+    const form = screen.querySelector<HTMLFormElement>('#federatedSearchForm');
+    if (!form) return;
+    const qInput = form.elements.namedItem('q') as HTMLInputElement;
+    if (qInput) {
+      qInput.value = btn.dataset.role;
+      void search();
+    }
   });
   screen.querySelector<HTMLFormElement>('#federatedSearchForm')?.addEventListener('submit', event => {
     event.preventDefault();
@@ -142,6 +155,40 @@ function message(text: string, error = false): void {
   if (!element) return;
   element.textContent = text;
   element.className = `message ${error ? 'error' : 'success'}`;
+  element.removeAttribute('role');
+}
+
+function showLoader(): void {
+  const element = document.querySelector<HTMLElement>('#jobSearchMessage');
+  if (!element) return;
+  element.className = 'job-search-loader';
+  element.setAttribute('role', 'status');
+  element.innerHTML = `
+    <div class="loader-spinner-wrapper">
+      <div class="loader-spinner" aria-hidden="true"></div>
+    </div>
+    <div class="loader-content">
+      <div class="loader-title">
+        <strong>Przeszukuję portale z ofertami…</strong>
+        <span class="loader-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+      </div>
+      <p class="loader-subtitle">Pobieram publiczne oferty z Pracuj.pl, OLX, LinkedIn, Indeed i innych, normalizuję i usuwam duplikaty.</p>
+      <div class="loader-progress-track" aria-hidden="true">
+        <div class="loader-progress-indeterminate"></div>
+      </div>
+    </div>`;
+}
+
+function showSkeletons(): void {
+  const jobs = document.querySelector<HTMLElement>('#jobSearchLocalJobs');
+  if (!jobs) return;
+  jobs.innerHTML = [1, 2, 3].map(() => `
+    <div class="skeleton-card" aria-hidden="true">
+      <div class="skeleton-line skeleton-badge"></div>
+      <div class="skeleton-line skeleton-title"></div>
+      <div class="skeleton-line skeleton-meta"></div>
+      <div class="skeleton-line skeleton-source"></div>
+    </div>`).join('');
 }
 
 function render(result: SearchResponse): void {
@@ -152,19 +199,31 @@ function render(result: SearchResponse): void {
 
   const importedSources = result.sourceRefresh.filter(item => item.status === 'IMPORTED').length;
   const unavailableSources = result.sourceRefresh.filter(item => item.status === 'BLOCKED' || item.status === 'FAILED').length;
-  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.localJobs.length)} pasujących ofert</strong> · pobrano ${esc(result.importedCount)} rekordów · ${esc(result.newCanonicalCount)} nowych po deduplikacji · ${esc(importedSources)} źródeł odpowiedziało${unavailableSources ? ` · ${esc(unavailableSources)} źródeł niedostępnych` : ''}<p class="hint">${esc(result.boundary)}</p></div>`;
+  const newCountText = result.newCanonicalCount > 0
+    ? `${esc(result.newCanonicalCount)} nowych po deduplikacji`
+    : 'wszystkie zsynchronizowane w Twojej bazie';
+  summary.innerHTML = `<div class="card status-card"><strong>${esc(result.localJobs.length)} pasujących ofert</strong> · pobrano ${esc(result.importedCount)} rekordów · ${newCountText} · ${esc(importedSources)} źródeł odpowiedziało${unavailableSources ? ` · ${esc(unavailableSources)} źródeł niedostępnych` : ''}${result.boundary ? `<p class="hint">${esc(result.boundary)}</p>` : ''}</div>`;
 
   const refreshBySource = new Map(result.sourceRefresh.map(item => [item.sourceKey, item]));
   providers.innerHTML = result.providers.map(provider => {
     const refresh = refreshBySource.get(provider.key);
+    const isBlocked = refresh?.status === 'BLOCKED';
+    const statusLabel = sourceStatusLabel(refresh, provider);
+    const badgeClass = isBlocked ? 'badge-warn' : (refresh?.status === 'IMPORTED' ? 'badge-good' : '');
     const fallbackText = provider.key === 'employer_careers'
       ? '<span class="hint">Strony karier wymagają skonfigurowanej allowlisty pracodawców.</span>'
       : '';
     return `
-      <article class="card">
-        <div class="row-between"><h3>${esc(provider.label)}</h3><span class="badge">${esc(sourceStatusLabel(refresh, provider))}</span></div>
-        <p class="hint">${esc(refresh?.message ?? provider.notes)}</p>
-        ${provider.searchUrl ? `<a class="button button-secondary" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Otwórz ${esc(provider.label)}</a>` : fallbackText}
+      <article class="provider-card">
+        <div class="provider-header">
+          <h4>${esc(provider.label)}</h4>
+          <span class="badge ${badgeClass}">${esc(statusLabel)}</span>
+        </div>
+        <p class="provider-msg">${esc(refresh?.message ?? provider.notes)}</p>
+        <div class="provider-actions">
+          ${provider.searchUrl ? `<a class="provider-btn ${isBlocked ? 'primary' : 'secondary'}" href="${esc(provider.searchUrl)}" target="_blank" rel="noopener noreferrer">Otwórz ${isBlocked ? 'w nowej karcie ↗' : 'ręcznie ↗'}</a>` : fallbackText}
+          ${isBlocked ? `<a class="provider-btn secondary" href="#job-feed" title="Przejdź do feedu, aby wkleić znalezioną ofertę">Wklej w Feedzie 📋</a>` : ''}
+        </div>
       </article>`;
   }).join('');
 
@@ -186,9 +245,20 @@ async function prefill(): Promise<void> {
     const me = await api<MeResponse>('/api/me');
     const locationInput = form.elements.namedItem('location') as HTMLInputElement;
     const radiusInput = form.elements.namedItem('radiusKm') as HTMLInputElement;
-    q.value = me.profile?.desiredRoles?.[0] ?? '';
+    const roles = me.profile?.desiredRoles ?? [];
+    q.value = roles[0] ?? '';
     locationInput.value = me.profile?.location ?? '';
     radiusInput.value = me.profile?.commuteKm?.toString() ?? '';
+
+    const chipsContainer = document.querySelector<HTMLElement>('#jobSearchRoleChips');
+    if (chipsContainer && roles.length > 1) {
+      chipsContainer.classList.remove('hidden');
+      chipsContainer.innerHTML = `
+        <span class="hint" style="margin-right: 2px;">Twoje role:</span>
+        ${roles.map(r => `<button type="button" class="mini-button role-quick-btn" data-role="${esc(r)}">${esc(r)}</button>`).join('')}
+        <button type="button" class="mini-button role-quick-btn" data-role="${esc(roles.join(', '))}">Wszystkie naraz</button>
+      `;
+    }
   } catch { /* auth state is owned by the main app */ }
 }
 
@@ -204,15 +274,24 @@ async function search(): Promise<void> {
   if (searchLocation) params.set('location', searchLocation);
   if (radius) params.set('radiusKm', radius);
   try {
-    if (submit) submit.disabled = true;
-    message('Pobieram oferty z oficjalnych API i aktywnych źródeł, normalizuję i usuwam duplikaty…');
+    if (submit) {
+      submit.disabled = true;
+      submit.classList.add('button-loading');
+      submit.innerHTML = '<span class="btn-inline-spinner" aria-hidden="true"></span>Pobieram oferty…';
+    }
+    showLoader();
+    showSkeletons();
     const result = await api<SearchResponse>(`/api/job-search?${params.toString()}`);
     render(result);
-    message(`Gotowe. Job pobrał ${result.importedCount} rekordów i dodał ${result.newCanonicalCount} nowych ofert po deduplikacji.`);
+    message(`Gotowe. Pobrano ${result.importedCount} rekordów (${result.newCanonicalCount > 0 ? `${result.newCanonicalCount} nowych po deduplikacji` : 'wszystkie zsynchronizowane w Twojej bazie'}).`);
   } catch (error) {
     message((error as Error).message, true);
   } finally {
-    if (submit) submit.disabled = false;
+    if (submit) {
+      submit.disabled = false;
+      submit.classList.remove('button-loading');
+      submit.textContent = 'Pobierz oferty ze wszystkich źródeł';
+    }
   }
 }
 

@@ -160,7 +160,372 @@ export function jobPostingToSourceInput(posting: Record<string, unknown>, fallba
   };
 }
 
+function formatOlxSalary(salaryValue: unknown): string | null {
+  const salary = objectValue(salaryValue);
+  if (!salary) return null;
+  const currency = stringValue(salary.currency) ?? stringValue(salary.currencyCode) ?? stringValue(salary.currencySymbol) ?? 'PLN';
+  const rawPeriod = stringValue(salary.period) ?? stringValue(salary.type) ?? '';
+  const period = /hour|godz/i.test(rawPeriod) ? 'godz.' : /month|mies/i.test(rawPeriod) ? 'mies.' : rawPeriod;
+  const grossNet = salary.gross === true ? 'brutto' : salary.gross === false ? 'netto' : '';
+  const from = salary.from;
+  const to = salary.to;
+  const hasFrom = (typeof from === 'number' && from > 0) || (typeof from === 'string' && from.trim() !== '' && from.trim() !== '0');
+  const hasTo = (typeof to === 'number' && to > 0) || (typeof to === 'string' && to.trim() !== '' && to.trim() !== '0');
+  if (hasFrom && hasTo && from !== to) {
+    return `${from} - ${to} ${currency} ${grossNet} ${period ? `/ ${period}` : ''}`.replace(/\s+/g, ' ').trim();
+  }
+  if (hasFrom || hasTo) {
+    const val = hasFrom ? from : to;
+    return `${val} ${currency} ${grossNet} ${period ? `/ ${period}` : ''}`.replace(/\s+/g, ' ').trim();
+  }
+  return null;
+}
+
+function olxCompanyText(ad: Record<string, unknown>): string | null {
+  const employer = objectValue(ad.employer);
+  if (employer) {
+    const name = stringValue(employer.name);
+    if (name) return name;
+  }
+  const user = objectValue(ad.user);
+  if (user) {
+    const companyName = stringValue(user.company_name);
+    if (companyName) return companyName;
+    if (ad.isBusiness === true || ad.business === true) {
+      const name = stringValue(user.name);
+      if (name) return name;
+    }
+  }
+  const partner = objectValue(ad.partner);
+  if (partner) {
+    const name = stringValue(partner.name) ?? stringValue(partner.code);
+    if (name) return name;
+  }
+  return null;
+}
+
+function olxLocationText(ad: Record<string, unknown>): string | null {
+  const loc = objectValue(ad.location);
+  if (!loc) return null;
+  const pathName = stringValue(loc.pathName);
+  if (pathName) return pathName;
+  const cityObj = objectValue(loc.city);
+  const cityName = cityObj ? stringValue(cityObj.name) : stringValue(loc.cityName);
+  const regionObj = objectValue(loc.region);
+  const regionName = regionObj ? stringValue(regionObj.name) : stringValue(loc.regionName);
+  const parts = [cityName, regionName].filter((part): part is string => Boolean(part));
+  return parts.length ? parts.join(', ') : null;
+}
+
+function olxParamsLines(ad: Record<string, unknown>): string[] {
+  const params = Array.isArray(ad.params) ? ad.params : Array.isArray(ad.parameters) ? ad.parameters : [];
+  const lines: string[] = [];
+  for (const item of params) {
+    const param = objectValue(item);
+    if (!param) continue;
+    const key = stringValue(param.key) ?? '';
+    if (key === 'salary' || key === 'price') continue;
+    const name = stringValue(param.name) ?? key;
+    let textVal: string | null = null;
+    if (typeof param.value === 'string' && param.value.trim()) {
+      textVal = param.value.trim();
+    } else if (typeof param.value === 'object' && param.value !== null) {
+      const valObj = param.value as Record<string, unknown>;
+      textVal = stringValue(valObj.label) ?? stringValue(valObj.name) ?? null;
+      if (!textVal && Array.isArray(valObj.label)) {
+        textVal = valObj.label.filter((x): x is string => typeof x === 'string').join(', ');
+      }
+    }
+    if (textVal) lines.push(`${name}: ${textVal}`);
+  }
+  return lines;
+}
+
+export function extractOlxPrerenderedAds(html: string): Array<Record<string, unknown>> {
+  const match = /window\.__PRERENDERED_STATE__\s*=\s*(["'])([\s\S]*?)\1\s*;/i.exec(html);
+  if (!match || !match[2]) return [];
+  try {
+    const raw = JSON.parse(`"${match[2]}"`) as string;
+    const state = JSON.parse(raw) as Record<string, unknown>;
+    const listing = objectValue(state.listing);
+    const nestedListing = listing ? objectValue(listing.listing) ?? listing : null;
+    const ads = nestedListing && Array.isArray(nestedListing.ads) ? nestedListing.ads : null;
+    if (ads && ads.length > 0) {
+      return ads.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null);
+    }
+    const jobAd = objectValue(state.jobAd);
+    if (jobAd) {
+      const single = objectValue(jobAd.job) ?? objectValue(jobAd.ad) ?? jobAd;
+      if (single) return [single];
+    }
+    const singleAd = objectValue(state.ad);
+    if (singleAd) {
+      const single = objectValue(singleAd.ad) ?? singleAd;
+      if (single) return [single];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export function olxAdToSourceInput(ad: Record<string, unknown>, fallbackUrl: string): JobSourceInput | null {
+  const title = stringValue(ad.title);
+  if (!title) return null;
+
+  const company = olxCompanyText(ad);
+  const location = olxLocationText(ad);
+  const salaryFromObj = formatOlxSalary(ad.salary);
+  const salaryFromParam = formatOlxSalary(Array.isArray(ad.params) ? (ad.params.find(p => typeof p === 'object' && p !== null && (p as Record<string, unknown>).key === 'salary') as Record<string, unknown> | undefined)?.value : null);
+  const salary = salaryFromObj ?? salaryFromParam;
+  const paramLines = olxParamsLines(ad);
+  const description = htmlToText(stringValue(ad.description) ?? '');
+
+  const lines = [
+    `Stanowisko: ${title}`,
+    company ? `Firma: ${company}` : null,
+    location ? `Miejsce pracy: ${location}` : null,
+    salary ? `Wynagrodzenie: ${salary}` : null,
+    ...paramLines,
+    description ? `Opis: ${description}` : null
+  ].filter((line): line is string => Boolean(line));
+
+  const rawText = lines.join('\n').slice(0, 50_000);
+  if (rawText.length < 20) return null;
+
+  const rawUrl = stringValue(ad.url) ?? (stringValue(ad.urlPath) ? `https://www.olx.pl${ad.urlPath}` : null);
+  const sourceUrl = rawUrl ?? fallbackUrl;
+  const externalId = ad.id !== undefined && ad.id !== null ? String(ad.id).trim() : postingId(ad, sourceUrl);
+  const publishedAt = stringValue(ad.last_refresh_time)
+    ?? stringValue(ad.lastRefreshTime)
+    ?? stringValue(ad.created_time)
+    ?? stringValue(ad.createdTime)
+    ?? stringValue(ad.addedAt);
+
+  return {
+    rawText,
+    sourceUrl,
+    externalId,
+    publishedAt
+  };
+}
+
+export function linkedInGuestSearchUrl(criteria: JobSearchCriteria): string {
+  const url = new URL('https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search');
+  if (criteria.query) url.searchParams.set('keywords', criteria.query.trim());
+  if (criteria.location) url.searchParams.set('location', criteria.location.trim());
+  if (criteria.radiusKm !== null && criteria.radiusKm !== undefined) {
+    url.searchParams.set('distance', String(Math.floor(criteria.radiusKm)));
+  }
+  return url.toString();
+}
+
+export function parseLinkedInGuestCards(html: string, fallbackUrl?: string): JobSourceInput[] {
+  const items: JobSourceInput[] = [];
+  const cardPattern = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+  for (const match of html.matchAll(cardPattern)) {
+    const card = match[1];
+    if (!card || !card.includes('base-search-card__title')) continue;
+    const titleMatch = /<h3[^>]*class=["'][^"']*base-search-card__title[^"']*["'][^>]*>([\s\S]*?)<\/h3>/i.exec(card);
+    const companyMatch = /<h4[^>]*class=["'][^"']*base-search-card__subtitle[^"']*["'][^>]*>([\s\S]*?)<\/h4>/i.exec(card);
+    const locationMatch = /<span[^>]*class=["'][^"']*job-search-card__location[^"']*["'][^>]*>([\s\S]*?)<\/span>/i.exec(card);
+    const linkMatch = /<a[^>]*class=["'][^"']*base-card__full-link[^"']*["'][^>]*href=["']([^"']+)["']/i.exec(card);
+    const timeMatch = /<time[^>]*datetime=["']([^"']+)["']/i.exec(card);
+    const idMatch = /data-entity-urn=["']urn:li:jobPosting:(\d+)["']/i.exec(card);
+    const benefitsMatch = /<span[^>]*class=["'][^"']*job-posting-benefits__text[^"']*["'][^>]*>([\s\S]*?)<\/span>/i.exec(card);
+
+    const title = titleMatch?.[1] ? htmlToText(titleMatch[1]) : '';
+    if (!title) continue;
+    const company = companyMatch?.[1] ? htmlToText(companyMatch[1]) : '';
+    const location = locationMatch?.[1] ? htmlToText(locationMatch[1]) : '';
+    const benefits = benefitsMatch?.[1] ? htmlToText(benefitsMatch[1]) : '';
+    const publishedAt = timeMatch?.[1]?.trim() || null;
+    const externalId = idMatch?.[1]?.trim() || null;
+
+    let sourceUrl = fallbackUrl ?? 'https://www.linkedin.com/jobs/';
+    if (linkMatch?.[1]) {
+      const rawUrl = decodeEntities(linkMatch[1]);
+      try {
+        const u = new URL(rawUrl);
+        u.search = '';
+        sourceUrl = u.toString();
+      } catch {
+        sourceUrl = rawUrl.split('?')[0] || sourceUrl;
+      }
+    }
+
+    const lines = [
+      `Stanowisko: ${title}`,
+      company ? `Firma: ${company}` : null,
+      location ? `Miejsce pracy: ${location}` : null,
+      benefits ? `Dodatkowe informacje: ${benefits}` : null,
+      'Źródło: LinkedIn Jobs'
+    ].filter((l): l is string => Boolean(l));
+
+    const rawText = lines.join('\n');
+    if (rawText.length < 20) continue;
+
+    items.push({
+      rawText,
+      sourceUrl,
+      externalId,
+      publishedAt
+    });
+  }
+  return items;
+}
+
+export function parseLinkedInGuestDetail(html: string, sourceUrl: string): JobSourceInput | null {
+  if (!html.includes('top-card-layout') && !html.includes('show-more-less-html')) return null;
+  const titleMatch = /<h[12][^>]*class=["'][^"']*top-card-layout__title[^"']*["'][^>]*>([\s\S]*?)<\/h[12]>/i.exec(html)
+    ?? /<h2[^>]*>([\s\S]*?)<\/h2>/i.exec(html);
+  const companyMatch = /<a[^>]*class=["'][^"']*topcard__org-name-link[^"']*["'][^>]*>([\s\S]*?)<\/a>/i.exec(html);
+  const locationMatch = /<span[^>]*class=["'][^"']*topcard__flavor--bullet[^"']*["'][^>]*>([\s\S]*?)<\/span>/i.exec(html);
+  const descMatch = /<div[^>]*class=["'][^"']*show-more-less-html__markup[^"']*["'][^>]*>([\s\S]*?)<\/div>/i.exec(html);
+
+  const title = titleMatch?.[1] ? htmlToText(titleMatch[1]) : null;
+  if (!title) return null;
+  const company = companyMatch?.[1] ? htmlToText(companyMatch[1]) : null;
+  const location = locationMatch?.[1] ? htmlToText(locationMatch[1]) : null;
+  const description = descMatch?.[1] ? htmlToText(descMatch[1]) : null;
+
+  const lines = [
+    `Stanowisko: ${title}`,
+    company ? `Firma: ${company}` : null,
+    location ? `Miejsce pracy: ${location}` : null,
+    'Źródło: LinkedIn Jobs',
+    description ? `Opis: ${description}` : null
+  ].filter((l): l is string => Boolean(l));
+
+  const rawText = lines.join('\n').slice(0, 50_000);
+  if (rawText.length < 20) return null;
+
+  let externalId: string | null = null;
+  const idMatch = /\/view\/(?:[^\/]+-)?(\d+)/i.exec(sourceUrl) ?? /jobPosting\/(\d+)/i.exec(sourceUrl);
+  if (idMatch) externalId = idMatch[1] ?? null;
+
+  return {
+    rawText,
+    sourceUrl,
+    externalId,
+    publishedAt: null
+  };
+}
+
+export function extractPracujNextDataAds(html: string): JobSourceInput[] {
+  const match = /<script id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i.exec(html);
+  if (!match || !match[1]) return [];
+  try {
+    const data = JSON.parse(match[1]) as Record<string, unknown>;
+    const props = objectValue(data.props);
+    const pageProps = objectValue(props?.pageProps);
+    const dehydratedState = objectValue(pageProps?.dehydratedState);
+    const queries = Array.isArray(dehydratedState?.queries) ? dehydratedState.queries : [];
+    const offerQuery = queries.find(q => {
+      const qObj = objectValue(q);
+      const queryKey = Array.isArray(qObj?.queryKey) ? qObj.queryKey as unknown[] : [];
+      return queryKey[0] === 'jobOffers';
+    }) as Record<string, unknown> | undefined;
+    const queryData = objectValue(objectValue(offerQuery?.state)?.data);
+    const grouped = Array.isArray(queryData?.groupedOffers) ? queryData.groupedOffers : [];
+
+    const items: JobSourceInput[] = [];
+    for (const item of grouped) {
+      const g = objectValue(item);
+      if (!g) continue;
+      const title = stringValue(g.jobTitle);
+      if (!title) continue;
+      const company = stringValue(g.companyName);
+      const subOffers = Array.isArray(g.offers) ? g.offers : [];
+      const sub = objectValue(subOffers[0]);
+      const location = sub ? stringValue(sub.displayWorkplace) ?? 'Polska' : 'Polska';
+      const sourceUrl = sub ? stringValue(sub.offerAbsoluteUri) ?? 'https://www.pracuj.pl' : 'https://www.pracuj.pl';
+      const externalId = sub ? String(sub.partitionId ?? g.groupId ?? '') : String(g.groupId ?? '');
+      const salary = stringValue(g.salaryDisplayText);
+      const contract = Array.isArray(g.typesOfContract) ? g.typesOfContract.filter((c): c is string => typeof c === 'string').join(', ') : null;
+      const description = stringValue(g.jobDescription);
+
+      const lines = [
+        `Stanowisko: ${title}`,
+        company ? `Firma: ${company}` : null,
+        `Miejsce pracy: ${location}`,
+        salary ? `Wynagrodzenie: ${salary}` : null,
+        contract ? `Forma zatrudnienia: ${contract}` : null,
+        'Źródło: Pracuj.pl',
+        description ? `Opis: ${description}` : null
+      ].filter((line): line is string => Boolean(line));
+
+      items.push({
+        rawText: lines.join('\n'),
+        sourceUrl,
+        externalId: externalId || null,
+        publishedAt: stringValue(g.lastPublicated) ?? stringValue(g.initialPublicated)
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+export function extractIndeedMosaicAds(html: string): JobSourceInput[] {
+  const match = /window\.mosaic\.providerData\[["']mosaic-provider-jobcards["']\]\s*=\s*({[\s\S]*?});/i.exec(html);
+  if (!match || !match[1]) return [];
+  try {
+    const data = JSON.parse(match[1]) as Record<string, unknown>;
+    const metaData = objectValue(data.metaData);
+    const model = objectValue(metaData?.mosaicProviderJobCardsModel);
+    const results = Array.isArray(model?.results) ? model.results : [];
+
+    const items: JobSourceInput[] = [];
+    for (const item of results) {
+      const r = objectValue(item);
+      if (!r) continue;
+      const title = stringValue(r.displayTitle) ?? stringValue(r.title);
+      if (!title) continue;
+      const company = stringValue(r.company);
+      const location = stringValue(r.formattedLocation) ?? 'Polska';
+      const snippet = stringValue(r.snippet);
+      const desc = snippet ? htmlToText(snippet) : null;
+      const rawLink = stringValue(r.link);
+      const sourceUrl = rawLink ? (rawLink.startsWith('http') ? rawLink : `https://pl.indeed.com${rawLink}`) : 'https://pl.indeed.com';
+      const externalId = stringValue(r.jobkey);
+      const salaryObj = objectValue(r.salarySnippet);
+      const salary = salaryObj ? stringValue(salaryObj.text) : null;
+      const pubDate = typeof r.pubDate === 'number' ? new Date(r.pubDate).toISOString()
+        : typeof r.createDate === 'number' ? new Date(r.createDate).toISOString()
+        : null;
+
+      const lines = [
+        `Stanowisko: ${title}`,
+        company ? `Firma: ${company}` : null,
+        `Miejsce pracy: ${location}`,
+        salary ? `Wynagrodzenie: ${salary}` : null,
+        'Źródło: Indeed',
+        desc ? `Opis: ${desc}` : null
+      ].filter((line): line is string => Boolean(line));
+
+      items.push({
+        rawText: lines.join('\n'),
+        sourceUrl,
+        externalId: externalId || null,
+        publishedAt: pubDate
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 export function fallbackDetailToSourceInput(html: string, sourceUrl: string): JobSourceInput | null {
+  const olxAds = extractOlxPrerenderedAds(html);
+  if (olxAds.length > 0 && olxAds[0]) {
+    const input = olxAdToSourceInput(olxAds[0], sourceUrl);
+    if (input) return input;
+  }
+  const linkedInDetail = parseLinkedInGuestDetail(html, sourceUrl);
+  if (linkedInDetail) return linkedInDetail;
   const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
   const descriptionMatch = /<meta\s+[^>]*name=["']description["'][^>]*content=["']([^"']+)["'][^>]*>/i.exec(html)
     ?? /<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']description["'][^>]*>/i.exec(html);
@@ -195,7 +560,7 @@ function isDetailUrl(source: PublicJobBoardKey, value: string): boolean {
   if (source === 'pracuj') return host.endsWith('pracuj.pl') && path.startsWith('/praca/') && path.includes('oferta');
   if (source === 'rocketjobs') return host.endsWith('rocketjobs.pl') && path.startsWith('/oferta-pracy/');
   if (source === 'justjoinit') return host.endsWith('justjoin.it') && path.startsWith('/job-offer/');
-  if (source === 'olx') return host.endsWith('olx.pl') && path.includes('/d/oferta/');
+  if (source === 'olx') return host.endsWith('olx.pl') && (path.includes('/d/oferta/') || path.includes('/oferta/praca/') || path.startsWith('/oferta/'));
   if (source === 'indeed') return host.endsWith('indeed.com') && (path.includes('/viewjob') || url.searchParams.has('jk'));
   return host.endsWith('linkedin.com') && path.includes('/jobs/view/');
 }

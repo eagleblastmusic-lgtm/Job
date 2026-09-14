@@ -86,3 +86,57 @@ test('job search prefers official API results and shows direct-source health ind
   const results = await new AxeBuilder({ page }).include('[data-screen="job-search"]').analyze();
   expect(results.violations).toEqual([]);
 });
+
+test('job search displays loading animation and skeleton placeholders while fetching', async ({ page }) => {
+  await mockAuthenticatedUser(page);
+  await page.route('**/api/job-feed**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs: [], limit: 25, offset: 0 }) }));
+
+  let resolveRoute: () => void = () => {};
+  const routePromise = new Promise<void>(res => { resolveRoute = res; });
+
+  await page.route('**/api/job-search**', async route => {
+    await routePromise;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        criteria: { query: 'magazynier', location: 'Puck', radiusKm: 30 },
+        providers: [],
+        localJobs: [],
+        sourceRefresh: [],
+        externalSearchCount: 0,
+        automaticIngestionCount: 0,
+        importedCount: 0,
+        newCanonicalCount: 0,
+        boundary: ''
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.locator('[data-view="job-search"]:visible').first().click();
+  await page.getByRole('button', { name: 'Pobierz oferty ze wszystkich źródeł' }).click();
+
+  // Verify animated loader card is visible
+  await expect(page.locator('.job-search-loader')).toBeVisible();
+  await expect(page.locator('.job-search-loader .loader-spinner')).toBeVisible();
+  await expect(page.locator('.job-search-loader strong')).toContainText('Przeszukuję portale z ofertami');
+
+  // Verify skeleton placeholders in job list area
+  const skeletons = page.locator('#jobSearchLocalJobs .skeleton-card');
+  await expect(skeletons).toHaveCount(3);
+
+  // Verify button loading state
+  await expect(page.locator('#jobSearchSubmit')).toHaveClass(/button-loading/);
+  await expect(page.locator('#jobSearchSubmit .btn-inline-spinner')).toBeVisible();
+
+  // Accessibility during loading state
+  const loadingAxe = await new AxeBuilder({ page }).include('[data-screen="job-search"]').analyze();
+  expect(loadingAxe.violations).toEqual([]);
+
+  // Resolve search and check normal completion
+  resolveRoute();
+  await expect(page.locator('.job-search-loader')).not.toBeVisible();
+  await expect(page.locator('#jobSearchSubmit')).not.toHaveClass(/button-loading/);
+});
+

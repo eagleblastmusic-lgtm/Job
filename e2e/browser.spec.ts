@@ -23,6 +23,9 @@ test('critical user flow reaches Decision Card, application and outcome', async 
   await page.locator('#profileForm input[name="location"]').fill('Gdynia');
   await page.locator('#profileForm input[name="commuteKm"]').fill('25');
   await page.locator('#profileForm input[name="salaryMin"]').fill('5500');
+  await expect(page.locator('#profileForm input[name="salaryMode"][value="EXCLUDE_LOWER"]')).toBeChecked();
+  await page.locator('#profileForm input[name="salaryMode"][value="DISCLOSED_ONLY"]').check();
+  await expect(page.locator('#profileForm input[name="salaryMode"][value="DISCLOSED_ONLY"]')).toBeChecked();
   await page.locator('#profileForm input[name="contract"][value="UOP"]').check();
   await page.locator('#profileForm input[name="remote"][value="ONSITE"]').check();
   await page.getByRole('button', { name: 'Zapisz profil' }).click();
@@ -138,4 +141,61 @@ test('layout does not overflow the viewport', async ({ page }) => {
   const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
   await expect(page.getByRole('heading', { name: 'Wklej ofertę i sprawdź, czy warto aplikować.' })).toBeVisible();
+});
+
+test('onboarding wizard guides user through preferences, career truth, and first offer evaluation', async ({ page }) => {
+  await register(page, uniqueEmail('wizard-test'), 'Kamil Kreator');
+
+  // Wizard is displayed on start screen
+  await expect(page.locator('#onboardingWizard')).toBeVisible();
+  await expect(page.locator('#wizardStep1')).toBeVisible();
+  await expect(page.locator('#wizardStep2')).toHaveClass(/hidden/);
+  await expect(page.locator('#wizardStep3')).toHaveClass(/hidden/);
+
+  // Step 1: Fill preferences
+  await page.locator('#wizardFormStep1 input[name="wizardDesiredRoles"]').fill('Magazynier, Kierowca');
+  await expect(page.locator('#wizardRolesChips .role-chip')).toHaveCount(2);
+  await expect(page.locator('#wizardRolesChips .role-chip').first()).toContainText('Magazynier');
+  await expect(page.locator('#wizardRolesChips .role-chip').nth(1)).toContainText('Kierowca');
+
+  // Test chip deletion
+  await page.locator('#wizardRolesChips .role-chip-remove').nth(1).click();
+  await expect(page.locator('#wizardRolesChips .role-chip')).toHaveCount(1);
+  await expect(page.locator('#wizardFormStep1 input[name="wizardDesiredRoles"]')).toHaveValue('Magazynier');
+
+  // Add second role back
+  await page.locator('#wizardFormStep1 input[name="wizardDesiredRoles"]').fill('Magazynier, Operator wózka');
+  await expect(page.locator('#wizardRolesChips .role-chip')).toHaveCount(2);
+
+  await page.locator('#wizardFormStep1 input[name="wizardLocation"]').fill('Gdynia');
+  await page.locator('#wizardFormStep1 input[name="wizardCommuteKm"]').fill('20');
+  await page.locator('#wizardFormStep1 input[name="wizardSalaryMin"]').fill('5000');
+  await expect(page.locator('#wizardFormStep1 input[name="wizardSalaryMode"][value="EXCLUDE_LOWER"]')).toBeChecked();
+  await expect(page.locator('#wizardFormStep1 input[name="wizardSalaryMode"][value="DISCLOSED_ONLY"]')).not.toBeChecked();
+  await page.locator('#wizardFormStep1 input[name="wizardSalaryMode"][value="DISCLOSED_ONLY"]').check();
+  await expect(page.locator('#wizardFormStep1 input[name="wizardSalaryMode"][value="DISCLOSED_ONLY"]')).toBeChecked();
+  await page.locator('#wizardFormStep1').getByRole('button', { name: /Zapisz i przejdź do atutów/ }).click();
+
+  // Advances to Step 2
+  await expect(page.locator('#wizardStep2')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#wizardTab2')).toHaveClass(/active/);
+
+  // Step 2: Add skill manually
+  await page.locator('#wizardFactForm input[name="value"]').fill('UDT wózki widłowe');
+  await page.locator('#wizardFactForm').getByRole('button', { name: 'Dodaj do profilu' }).click();
+  await expect(page.locator('#wizardFactsPreview')).toBeVisible();
+  await expect(page.locator('#wizardFactsSummary')).toContainText('1 fakt');
+
+  // Advance to Step 3
+  await page.locator('#wizardGoToStep3').click();
+  await expect(page.locator('#wizardStep3')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#wizardTab3')).toHaveClass(/active/);
+
+  // Step 3: Insert sample offer and analyze
+  await page.locator('#wizardInsertSampleOffer').click();
+  await expect(page.locator('#wizardJobText')).toHaveValue(/Stanowisko: Magazynier/);
+  await page.locator('#wizardJobForm').getByRole('button', { name: /Przeanalizuj ofertę/ }).click();
+
+  // Results in Decision Card
+  await expect(page.locator('#decisionArea .decision-card')).toBeVisible();
 });

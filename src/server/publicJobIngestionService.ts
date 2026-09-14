@@ -5,13 +5,21 @@ import type { JobSearchCriteria } from '../domain/jobSearch.js';
 import { buildJobSearchProviders } from '../domain/jobSearch.js';
 import type { JobSourceConnector, JobSourceHealth, JobSourceInput, JobSourceTermsMetadata, NormalizedSourceJob } from '../domain/jobSources.js';
 import { normalizeSourceUrl } from '../domain/jobSources.js';
+import { tlsFetch } from './tlsFetch.js';
+import { browserFetch } from './browserFetch.js';
 import {
   criteriaCacheKey,
   extractDetailLinks,
+  extractIndeedMosaicAds,
   extractJobPostingJsonLd,
+  extractOlxPrerenderedAds,
+  extractPracujNextDataAds,
   fallbackDetailToSourceInput,
   htmlToText,
   jobPostingToSourceInput,
+  linkedInGuestSearchUrl,
+  olxAdToSourceInput,
+  parseLinkedInGuestCards,
   publicSourceKeys,
   type PublicJobBoardKey
 } from '../domain/publicJobWeb.js';
@@ -155,7 +163,6 @@ class PublicWebJobConnector implements JobSourceConnector {
 
     const provider = buildJobSearchProviders(this.criteria).find(item => item.key === this.key);
     if (!provider?.searchUrl) throw new Error(`Brak URL wyszukiwania dla źródła ${this.key}.`);
-
     try {
       const items = this.key === 'pracuj'
         ? await this.fetchPracuj(provider.searchUrl)
@@ -304,25 +311,64 @@ class PublicWebJobConnector implements JobSourceConnector {
   }
 
   private async fetchHtml(url: string): Promise<string> {
+    if (this.fetchImpl !== tlsFetch) {
+      const response = await this.fetchImpl(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(8_000),
+        headers: {
+          accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'accept-language': 'pl-PL,pl;q=0.9,en;q=0.7',
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      });
+      if ([401, 403, 429].includes(response.status)) {
+        throw new SourceBlockedError(`Źródło ${this.label} zablokowało automatyczny odczyt (HTTP ${response.status}). Job nie obchodzi tej blokady.`);
+      }
+      if (!response.ok) throw new Error(`Źródło ${this.label} zwróciło HTTP ${response.status}.`);
+      return responseTextBounded(response);
+    }
+
+    if (this.key === 'pracuj' || this.key === 'indeed') {
+      try {
+        const html = await browserFetch(url);
+        return html.slice(0, MAX_HTML_BYTES);
+      } catch (browserError) {
+        throw new SourceBlockedError(`Źródło ${this.label} nie odpowiedziało: ${browserError instanceof Error ? browserError.message : String(browserError)}`);
+      }
+    }
+
     const response = await this.fetchImpl(url, {
       method: 'GET',
       redirect: 'follow',
       signal: AbortSignal.timeout(8_000),
       headers: {
-        accept: 'text/html,application/xhtml+xml',
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'accept-language': 'pl-PL,pl;q=0.9,en;q=0.7',
         'user-agent': TRANSPARENT_USER_AGENT
       }
     });
-    if ([401, 403, 429].includes(response.status)) throw new SourceBlockedError(`Źródło ${this.label} zablokowało automatyczny odczyt (HTTP ${response.status}). Job nie obchodzi tej blokady.`);
+    if ([401, 403, 429].includes(response.status)) {
+      try {
+        const html = await browserFetch(url);
+        return html.slice(0, MAX_HTML_BYTES);
+      } catch {
+        throw new SourceBlockedError(`Źródło ${this.label} zablokowało automatyczny odczyt (HTTP ${response.status}).`);
+      }
+    }
     if (!response.ok) throw new Error(`Źródło ${this.label} zwróciło HTTP ${response.status}.`);
     const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
     if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
       throw new Error(`Źródło ${this.label} zwróciło nieobsługiwany typ danych: ${contentType}.`);
     }
     const html = await responseTextBounded(response);
-    if (/captcha|verify you are human|access denied|robot check/i.test(html.slice(0, 30_000))) {
-      throw new SourceBlockedError(`Źródło ${this.label} wymaga weryfikacji człowieka/CAPTCHA. Job nie próbuje jej omijać.`);
+    if (/captcha|verify you are human|access denied|robot check|just a moment/i.test(html.slice(0, 30_000))) {
+      try {
+        const browserHtml = await browserFetch(url);
+        return browserHtml.slice(0, MAX_HTML_BYTES);
+      } catch {
+        throw new SourceBlockedError(`Źródło ${this.label} wymaga weryfikacji człowieka.`);
+      }
     }
     return html;
   }
@@ -335,13 +381,44 @@ export class PublicJobIngestionService {
   constructor(
     database: JobDatabase,
     store: AppStore,
-    private readonly fetchImpl: FetchLike = fetch
+    private readonly fetchImpl: FetchLike = tlsFetch
   ) {
     this.feed = new JobFeedService(database, store);
     this.registry = new JobSourceRegistryService(database);
   }
 
   async refresh(userId: string, criteria: JobSearchCriteria): Promise<LiveSourceRefreshResult[]> {
+    const subQueries = criteria.query.split(',').map(s => s.trim()).filter(Boolean);
+    if (subQueries.length <= 1) {
+      return this.refreshSingle(userId, criteria);
+    }
+    const queries = subQueries.slice(0, 3);
+    const allResults = await Promise.all(queries.map(q => this.refreshSingle(userId, { ...criteria, query: q })));
+    const merged = new Map<PublicJobBoardKey, LiveSourceRefreshResult>();
+    for (const batch of allResults) {
+      for (const res of batch) {
+        const existing = merged.get(res.sourceKey);
+        if (!existing) {
+          merged.set(res.sourceKey, { ...res });
+        } else {
+          existing.fetchedCount += res.fetchedCount;
+          existing.canonicalCount += res.canonicalCount;
+          if (res.status === 'IMPORTED') existing.status = 'IMPORTED';
+          const dedupeNotice = existing.canonicalCount === existing.fetchedCount
+            ? 'wszystkie nowe w bazie'
+            : existing.canonicalCount > 0
+              ? `${existing.canonicalCount} nowych, ${existing.fetchedCount - existing.canonicalCount} zaktualizowanych w bazie`
+              : 'wszystkie aktualne w Twojej bazie';
+          existing.message = existing.fetchedCount > 0
+            ? `Pobrano ${existing.fetchedCount} ofert (${dedupeNotice}).`
+            : existing.message;
+        }
+      }
+    }
+    return Array.from(merged.values());
+  }
+
+  private async refreshSingle(userId: string, criteria: JobSearchCriteria): Promise<LiveSourceRefreshResult[]> {
     return Promise.all(publicSourceKeys().map(async sourceKey => {
       if (!this.registry.isEnabled(sourceKey)) {
         return { sourceKey, status: 'DISABLED', fetchedCount: 0, canonicalCount: 0, message: 'Źródło jest wyłączone administracyjnie.' } as const;
@@ -350,12 +427,17 @@ export class PublicJobIngestionService {
       try {
         const results = await this.feed.importFromConnector(userId, connector);
         const canonicalCount = results.filter(result => result.createdCanonicalJob).length;
+        const dedupeNotice = canonicalCount === results.length
+          ? 'wszystkie nowe w bazie'
+          : canonicalCount > 0
+            ? `${canonicalCount} nowych, ${results.length - canonicalCount} zaktualizowanych w bazie`
+            : 'wszystkie aktualne w Twojej bazie';
         return {
           sourceKey,
           status: results.length ? 'IMPORTED' : 'NO_RESULTS',
           fetchedCount: results.length,
           canonicalCount,
-          message: results.length ? `Pobrano ${results.length} ofert; ${canonicalCount} nowych po deduplikacji.` : 'Brak ofert do importu z bieżącej odpowiedzi źródła.'
+          message: results.length ? `Pobrano ${results.length} ofert (${dedupeNotice}).` : 'Brak ofert do importu z bieżącej odpowiedzi źródła.'
         } as const;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Nieznany błąd źródła.';

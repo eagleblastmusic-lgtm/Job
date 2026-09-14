@@ -16,7 +16,14 @@ export default defineConfig({
     { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] } }
   ],
   webServer: {
-    command: 'PORT=4173 APP_ORIGIN=http://127.0.0.1:4173 DATA_DIR=.playwright-data DATABASE_PATH=.playwright-data/job.sqlite NODE_ENV=test npm start',
+    command: 'node --enable-source-maps dist/server/index.js',
+    env: {
+      PORT: '4173',
+      APP_ORIGIN: 'http://127.0.0.1:4173',
+      DATA_DIR: '.playwright-data',
+      DATABASE_PATH: '.playwright-data/job.sqlite',
+      NODE_ENV: 'test'
+    },
     url: 'http://127.0.0.1:4173/api/health',
     reuseExistingServer: !process.env.CI,
     timeout: 20_000

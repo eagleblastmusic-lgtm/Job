@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import type { JobDatabase } from './db.js';
 import type {
   ApplicationStatus, CareerExperience, CareerFact, CareerFactStatus, CareerProfile,
-  EducationRecord, JobDecisionResult, ParsedJob, ParsedJobRequirement
+  EducationRecord, JobDecisionResult, ParsedJob, ParsedJobRequirement, SalaryMode
 } from '../domain/types.js';
 
 const now = (): string => new Date().toISOString();
 const json = (value: unknown): string => JSON.stringify(value);
 
 interface UserRow { id: string; email: string; password_hash: string; name: string; locale: string; timezone: string; role: 'USER' | 'ADMIN'; created_at: string; updated_at: string }
-interface ProfileRow { user_id: string; desired_roles: string; location: string | null; commute_km: number | null; remote_preferences: string; salary_min: number | null; contract_preferences: string; shift_preferences: string; availability: string | null }
+interface ProfileRow { user_id: string; desired_roles: string; location: string | null; commute_km: number | null; remote_preferences: string; salary_min: number | null; salary_mode?: string | null; contract_preferences: string; shift_preferences: string; availability: string | null }
 interface FactRow { id: string; type: string; value: string; normalized_value: string; level: string | null; source: string; status: CareerFactStatus; confidence: number; evidence: string | null; allowed_for_cv: number }
 interface JobRow {
   id: string; source: string; source_url: string | null; raw_text: string; title: string | null; normalized_title: string | null; company: string | null; industry: string | null;
@@ -27,14 +27,16 @@ interface ConsentRow { consent_type: string; granted: number; version: string; c
 export interface ConsentRecord { type: string; granted: boolean; version: string; createdAt: string }
 
 function profileFromRow(row: ProfileRow | undefined): CareerProfile {
-  if (!row) return { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null };
+  if (!row) return { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, salaryMode: 'EXCLUDE_LOWER', contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null };
   const shifts = JSON.parse(row.shift_preferences) as { nights?: boolean | null; weekends?: boolean | null };
+  const salaryMode = (row.salary_mode === 'DISCLOSED_ONLY' ? 'DISCLOSED_ONLY' : 'EXCLUDE_LOWER') as SalaryMode;
   return {
     desiredRoles: JSON.parse(row.desired_roles) as string[],
     location: row.location,
     commuteKm: row.commute_km,
     remotePreferences: JSON.parse(row.remote_preferences) as string[],
     salaryMin: row.salary_min,
+    salaryMode,
     contractPreferences: JSON.parse(row.contract_preferences) as string[],
     shiftPreferences: { nights: shifts.nights ?? null, weekends: shifts.weekends ?? null },
     availability: row.availability
@@ -107,9 +109,10 @@ export class AppStore {
 
   updateProfile(userId: string, profile: CareerProfile): void {
     const timestamp = now();
-    this.db.prepare(`INSERT INTO career_profiles(user_id,desired_roles,location,commute_km,remote_preferences,salary_min,contract_preferences,shift_preferences,availability,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET desired_roles=excluded.desired_roles,location=excluded.location,commute_km=excluded.commute_km,remote_preferences=excluded.remote_preferences,salary_min=excluded.salary_min,contract_preferences=excluded.contract_preferences,shift_preferences=excluded.shift_preferences,availability=excluded.availability,updated_at=excluded.updated_at`).run(
-      userId, json(profile.desiredRoles), profile.location, profile.commuteKm, json(profile.remotePreferences), profile.salaryMin, json(profile.contractPreferences), json(profile.shiftPreferences), profile.availability, timestamp, timestamp
+    const salaryMode = profile.salaryMode === 'DISCLOSED_ONLY' ? 'DISCLOSED_ONLY' : 'EXCLUDE_LOWER';
+    this.db.prepare(`INSERT INTO career_profiles(user_id,desired_roles,location,commute_km,remote_preferences,salary_min,salary_mode,contract_preferences,shift_preferences,availability,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET desired_roles=excluded.desired_roles,location=excluded.location,commute_km=excluded.commute_km,remote_preferences=excluded.remote_preferences,salary_min=excluded.salary_min,salary_mode=excluded.salary_mode,contract_preferences=excluded.contract_preferences,shift_preferences=excluded.shift_preferences,availability=excluded.availability,updated_at=excluded.updated_at`).run(
+      userId, json(profile.desiredRoles), profile.location, profile.commuteKm, json(profile.remotePreferences), profile.salaryMin, salaryMode, json(profile.contractPreferences), json(profile.shiftPreferences), profile.availability, timestamp, timestamp
     );
   }
 

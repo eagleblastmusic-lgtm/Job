@@ -55,3 +55,47 @@ test('application status transitions are constrained', () => {
   assert.equal(canTransitionApplication('SAVED', 'OFFER'), false);
   assert.equal(canTransitionApplication('INTERVIEW', 'OFFER'), true);
 });
+
+test('decision engine respects salaryMode: EXCLUDE_LOWER and DISCLOSED_ONLY', () => {
+  const baseProfile: CareerProfile = {
+    desiredRoles: ['magazynier'],
+    location: 'Gdynia',
+    commuteKm: 20,
+    remotePreferences: ['ONSITE'],
+    salaryMin: 5500,
+    contractPreferences: ['UOP'],
+    shiftPreferences: { nights: false, weekends: true },
+    availability: 'od zaraz'
+  };
+
+  const jobWithoutSalary = parseJobText(`Magazynier\nFirma: XYZ\nMiejsce pracy: Gdynia\nUmowa o pracę\nWymagania: prawo jazdy kat. B`);
+  const jobWithLowSalary = parseJobText(`Magazynier\nFirma: XYZ\nMiejsce pracy: Gdynia\nWynagrodzenie: 4000 - 4500 PLN brutto\nUmowa o pracę\nWymagania: prawo jazdy kat. B`);
+  const jobWithGoodSalary = parseJobText(`Magazynier\nFirma: XYZ\nMiejsce pracy: Gdynia\nWynagrodzenie: 6000 - 7000 PLN brutto\nUmowa o pracę\nWymagania: prawo jazdy kat. B`);
+
+  // Default / EXCLUDE_LOWER mode
+  const decExcludeWithoutSalary = decideJob({ ...baseProfile, salaryMode: 'EXCLUDE_LOWER' }, [], jobWithoutSalary);
+  assert.equal(decExcludeWithoutSalary.dimensions.salaryFit, 0.6);
+  assert.ok(!decExcludeWithoutSalary.explanation.missing.some(m => m.includes('wynagrodzen')));
+
+  const decExcludeLowSalary = decideJob({ ...baseProfile, salaryMode: 'EXCLUDE_LOWER' }, [], jobWithLowSalary);
+  assert.equal(decExcludeLowSalary.dimensions.salaryFit, 0.2);
+  assert.ok(decExcludeLowSalary.explanation.missing.some(m => m.includes('niższe od Twojego minimum')));
+
+  const decExcludeGoodSalary = decideJob({ ...baseProfile, salaryMode: 'EXCLUDE_LOWER' }, [], jobWithGoodSalary);
+  assert.equal(decExcludeGoodSalary.dimensions.salaryFit, 1);
+  assert.ok(decExcludeGoodSalary.explanation.why.some(w => w.includes('mieści się w Twoich oczekiwaniach')));
+
+  // DISCLOSED_ONLY mode
+  const decDisclosedWithoutSalary = decideJob({ ...baseProfile, salaryMode: 'DISCLOSED_ONLY' }, [], jobWithoutSalary);
+  assert.equal(decDisclosedWithoutSalary.dimensions.salaryFit, 0.2);
+  assert.ok(decDisclosedWithoutSalary.explanation.missing.some(m => m.includes('tylko z podaną płacą')));
+
+  const decDisclosedGoodSalary = decideJob({ ...baseProfile, salaryMode: 'DISCLOSED_ONLY' }, [], jobWithGoodSalary);
+  assert.equal(decDisclosedGoodSalary.dimensions.salaryFit, 1);
+  assert.ok(decDisclosedGoodSalary.explanation.why.some(w => w.includes('mieści się w Twoich oczekiwaniach')));
+
+  const decDisclosedLowSalary = decideJob({ ...baseProfile, salaryMode: 'DISCLOSED_ONLY' }, [], jobWithLowSalary);
+  assert.equal(decDisclosedLowSalary.dimensions.salaryFit, 0.2);
+  assert.ok(decDisclosedLowSalary.explanation.missing.some(m => m.includes('niższe od Twojego minimum')));
+});
+

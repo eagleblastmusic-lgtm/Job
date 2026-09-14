@@ -26,12 +26,17 @@ interface ObservationRow {
 
 function matchesQuery(job: JobFeedCard, query: string): boolean {
   const haystack = normalizeText([job.title, job.company, job.location].filter(Boolean).join(' '));
-  const tokens = normalizeText(query).split(/\s+/).filter(Boolean);
-  return tokens.length === 0 || tokens.every(token => haystack.includes(token));
+  const subQueries = query.split(',').map(s => s.trim()).filter(Boolean);
+  if (subQueries.length === 0) return true;
+  return subQueries.some(sub => {
+    const tokens = normalizeText(sub).split(/\s+/).filter(Boolean);
+    return tokens.length === 0 || tokens.every(token => haystack.includes(token));
+  });
 }
 
-function matchesLocation(job: JobFeedCard, location: string | null): boolean {
+function matchesLocation(job: JobFeedCard, location: string | null, radiusKm: number | null): boolean {
   if (!location) return true;
+  if (radiusKm !== null && radiusKm > 0) return true;
   const normalizedLocation = normalizeText(location);
   return normalizeText(job.location ?? '').includes(normalizedLocation);
 }
@@ -70,10 +75,10 @@ export class JobSearchService {
     ]);
     const sourceRefresh: Array<LiveSourceRefreshResult | JoobleRefreshResult> = [joobleRefresh, ...publicRefresh];
     const scopedJobIds = this.currentSearchJobIds(userId, criteria);
-    const feedJobs = this.feed.list(userId, 50, 0);
+    const feedJobs = this.feed.list(userId, 200, 0);
     const localJobs = scopedJobIds.size > 0
       ? feedJobs.filter(job => scopedJobIds.has(job.jobId))
-      : feedJobs.filter(job => matchesQuery(job, criteria.query) && matchesLocation(job, criteria.location));
+      : feedJobs.filter(job => matchesQuery(job, criteria.query) && matchesLocation(job, criteria.location, criteria.radiusKm));
     const importedCount = sourceRefresh.reduce((sum, source) => sum + source.fetchedCount, 0);
     const newCanonicalCount = sourceRefresh.reduce((sum, source) => sum + source.canonicalCount, 0);
     return {

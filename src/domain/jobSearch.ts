@@ -1,3 +1,5 @@
+import { normalizeText } from './ontology.js';
+
 export type JobSearchProviderKey = 'jooble_pl' | 'pracuj' | 'linkedin' | 'olx' | 'indeed' | 'rocketjobs' | 'justjoinit' | 'employer_careers';
 export type JobSearchMode = 'AUTO_IMPORT' | 'OUTBOUND_SEARCH' | 'DIRECT_CAREER_PAGES';
 export type JobIngestionStatus = 'OFFICIAL_API_ACTIVE' | 'OFFICIAL_API_REQUIRED' | 'PUBLIC_WEB_ACTIVE' | 'PERMITTED_SOURCE_REQUIRED';
@@ -46,7 +48,8 @@ function pathToken(value: string): string {
 }
 
 function pracujUrl(criteria: JobSearchCriteria): string {
-  const keyword = pathToken(criteria.query);
+  const query = (criteria.query.split(',')[0] ?? criteria.query).trim();
+  const keyword = pathToken(query);
   const location = criteria.location ? `/${pathToken(criteria.location)};wp` : '';
   return `https://www.pracuj.pl/praca/${keyword};kw${location}`;
 }
@@ -60,9 +63,10 @@ function linkedinUrl(criteria: JobSearchCriteria): string {
 }
 
 function olxUrl(criteria: JobSearchCriteria): string {
-  const keyword = pathToken(criteria.query).toLowerCase();
-  const location = criteria.location ? `/${pathToken(criteria.location).toLowerCase()}` : '';
-  const url = new URL(`https://www.olx.pl/praca${location}/q-${keyword}/`);
+  const query = (criteria.query.split(',')[0] ?? criteria.query).trim();
+  const keyword = normalizeText(query).replace(/\s+/g, '-');
+  const locationSlug = criteria.location ? `/${normalizeText(criteria.location).replace(/\s+/g, '-')}` : '';
+  const url = new URL(`https://www.olx.pl/praca${locationSlug}/q-${keyword}/`);
   if (criteria.radiusKm !== null) url.searchParams.set('search[dist]', String(criteria.radiusKm));
   return url.toString();
 }
@@ -101,19 +105,19 @@ const DEFINITIONS: readonly ProviderDefinition[] = [
   },
   {
     key: 'pracuj', label: 'Pracuj.pl', homepageUrl: 'https://www.pracuj.pl/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
-    notes: autoNotes, checkedAt: CHECKED_AT, buildSearchUrl: pracujUrl
+    notes: `${autoNotes} Pracuj.pl stosuje ochronę Cloudflare Turnstile – w przypadku blokady automatycznego odczytu użyj bezpośredniego linku do serwisu.`, checkedAt: CHECKED_AT, buildSearchUrl: pracujUrl
   },
   {
     key: 'linkedin', label: 'LinkedIn Jobs', homepageUrl: 'https://www.linkedin.com/jobs/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
-    notes: `${autoNotes} Oficjalne Jobs API nadal wymaga partnerstwa; ten adapter nie używa partnerskiego API.`, checkedAt: CHECKED_AT, buildSearchUrl: linkedinUrl
+    notes: `${autoNotes} Job pobiera publiczne ogłoszenia z LinkedIn przez interfejs gościa (LinkedIn Guest API) i mapuje je do ujednoliconego feedu.`, checkedAt: CHECKED_AT, buildSearchUrl: linkedinUrl
   },
   {
     key: 'olx', label: 'OLX Praca', homepageUrl: 'https://www.olx.pl/praca/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
-    notes: `${autoNotes} Adapter nie korzysta z ograniczonego API OLX do pobierania cudzych ogłoszeń.`, checkedAt: CHECKED_AT, buildSearchUrl: olxUrl
+    notes: `${autoNotes} Job pobiera publiczne ogłoszenia bezpośrednio ze stron OLX Praca i normalizuje wynagrodzenia, typy umów oraz opisy.`, checkedAt: CHECKED_AT, buildSearchUrl: olxUrl
   },
   {
     key: 'indeed', label: 'Indeed', homepageUrl: 'https://pl.indeed.com/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',
-    notes: `${autoNotes} Oficjalne API Indeed pozostaje partnerskie; adapter publicznych stron działa niezależnie i zatrzymuje się przy blokadzie.`, checkedAt: CHECKED_AT, buildSearchUrl: indeedUrl
+    notes: `${autoNotes} Indeed stosuje ochronę Cloudflare Bot Management – w przypadku blokady skorzystaj z bezpośredniego linku do wyników.`, checkedAt: CHECKED_AT, buildSearchUrl: indeedUrl
   },
   {
     key: 'rocketjobs', label: 'RocketJobs', homepageUrl: 'https://rocketjobs.pl/', searchMode: 'AUTO_IMPORT', ingestionStatus: 'PUBLIC_WEB_ACTIVE',

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createJobApp } from '../server/app.js';
+import type { CareerProfile } from '../domain/types.js';
 
 async function jsonRequest<T>(base: string, path: string, options: { method?: string; body?: unknown; cookie?: string } = {}): Promise<{ data: T; cookie?: string }> {
   const init: RequestInit = {
@@ -30,7 +31,8 @@ test('critical API flow: signup → profile → Career Truth → education → j
     assert.ok(registered.cookie);
     const cookie = registered.cookie ?? '';
 
-    await jsonRequest(base, '/api/profile', { method: 'PUT', cookie, body: { desiredRoles: ['magazynier'], location: 'Gdynia', commuteKm: 25, remotePreferences: ['ONSITE'], salaryMin: 5500, contractPreferences: ['UOP'], shiftPreferences: { nights: false, weekends: true }, availability: 'od zaraz' } });
+    const profileRes = await jsonRequest<{ profile: CareerProfile }>(base, '/api/profile', { method: 'PUT', cookie, body: { desiredRoles: ['magazynier'], location: 'Gdynia', commuteKm: 25, remotePreferences: ['ONSITE'], salaryMin: 5500, salaryMode: 'DISCLOSED_ONLY', contractPreferences: ['UOP'], shiftPreferences: { nights: false, weekends: true }, availability: 'od zaraz' } });
+    assert.equal(profileRes.data.profile.salaryMode, 'DISCLOSED_ONLY');
     await jsonRequest(base, '/api/career-truth/facts', { method: 'POST', cookie, body: { type: 'CREDENTIAL', value: 'UDT' } });
     await jsonRequest(base, '/api/experiences', { method: 'POST', cookie, body: { employer: 'Magazyn Sp. z o.o.', title: 'Magazynier', startDate: '2024-01', current: true, description: 'Przyjęcie i wydanie towaru', achievements: [] } });
     const education = await jsonRequest<{ education: { id: string; institution: string; field: string | null; degree: string | null; startDate: string | null; endDate: string | null; description: string | null } }>(base, '/api/education', {

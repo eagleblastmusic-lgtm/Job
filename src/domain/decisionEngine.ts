@@ -40,9 +40,28 @@ function requirementFit(job: ParsedJob, facts: CareerFact[]): { score: number; u
 }
 
 function salaryFit(profile: CareerProfile, job: ParsedJob): { score: number; message?: string } {
-  if (!profile.salaryMin || !job.salaryMax) return { score: 0.6 };
-  if (job.salaryMax < profile.salaryMin) return { score: 0.2, message: `Maksymalne wynagrodzenie ${job.salaryMax} zł jest niższe od Twojego minimum ${profile.salaryMin} zł.` };
-  if ((job.salaryMin ?? job.salaryMax) >= profile.salaryMin) return { score: 1, message: 'Wynagrodzenie mieści się w Twoich oczekiwaniach.' };
+  const mode = profile.salaryMode ?? 'EXCLUDE_LOWER';
+  const minRequired = profile.salaryMin;
+
+  if (mode === 'DISCLOSED_ONLY') {
+    if (!job.salaryMin && !job.salaryMax) {
+      return { score: 0.2, message: 'Oferta nie podaje stawek wynagrodzenia, a wybrano opcję wyświetlania ofert tylko z podaną płacą.' };
+    }
+    if (minRequired && job.salaryMax && job.salaryMax < minRequired) {
+      return { score: 0.2, message: `Maksymalne wynagrodzenie ${job.salaryMax} zł jest niższe od Twojego minimum ${minRequired} zł.` };
+    }
+    if (minRequired && (job.salaryMin ?? job.salaryMax ?? 0) >= minRequired) {
+      return { score: 1, message: 'Wynagrodzenie mieści się w Twoich oczekiwaniach.' };
+    }
+    if (minRequired) {
+      return { score: 0.7, message: 'Zakres wynagrodzenia częściowo pokrywa się z Twoimi oczekiwaniami.' };
+    }
+    return { score: 1, message: 'Oferta podaje stawkę wynagrodzenia.' };
+  }
+
+  if (!minRequired || !job.salaryMax) return { score: 0.6 };
+  if (job.salaryMax < minRequired) return { score: 0.2, message: `Maksymalne wynagrodzenie ${job.salaryMax} zł jest niższe od Twojego minimum ${minRequired} zł.` };
+  if ((job.salaryMin ?? job.salaryMax) >= minRequired) return { score: 1, message: 'Wynagrodzenie mieści się w Twoich oczekiwaniach.' };
   return { score: 0.7, message: 'Zakres wynagrodzenia częściowo pokrywa się z Twoimi oczekiwaniami.' };
 }
 
