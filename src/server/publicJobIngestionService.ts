@@ -10,16 +10,10 @@ import { browserFetch } from './browserFetch.js';
 import {
   criteriaCacheKey,
   extractDetailLinks,
-  extractIndeedMosaicAds,
   extractJobPostingJsonLd,
-  extractOlxPrerenderedAds,
-  extractPracujNextDataAds,
   fallbackDetailToSourceInput,
   htmlToText,
   jobPostingToSourceInput,
-  linkedInGuestSearchUrl,
-  olxAdToSourceInput,
-  parseLinkedInGuestCards,
   publicSourceKeys,
   type PublicJobBoardKey
 } from '../domain/publicJobWeb.js';
