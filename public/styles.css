@@ -901,6 +901,7 @@ fieldset label:hover {
 }
 
 .decision-block h4 {
+  margin: 0 0 8px;
   font-size: 1rem;
 }
 
