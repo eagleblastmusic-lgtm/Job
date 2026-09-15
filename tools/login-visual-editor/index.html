@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job — Login Visual Editor</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="editor-shell">
+    <aside class="controls" aria-label="Panel edycji">
+      <div class="controls-header">
+        <div>
+          <p class="kicker">JOB / prototype</p>
+          <h1>Login Visual Editor</h1>
+        </div>
+        <button id="resetButton" class="button secondary" type="button">Reset</button>
+      </div>
+
+      <section class="panel-section">
+        <h2>Tło</h2>
+        <label class="field">
+          <span>Wgraj obraz</span>
+          <input id="backgroundFile" type="file" accept="image/*">
+        </label>
+        <div class="field-row">
+          <label class="field compact">
+            <span>Kolor tła</span>
+            <input id="backgroundColor" type="color" value="#0b1020">
+          </label>
+          <button id="useDefaultBackground" class="button secondary stretch" type="button">Domyślne tło</button>
+        </div>
+        <label class="field">
+          <span>Pozycja pozioma <strong id="positionXValue">50%</strong></span>
+          <input id="positionX" type="range" min="0" max="100" value="50">
+        </label>
+        <label class="field">
+          <span>Pozycja pionowa <strong id="positionYValue">50%</strong></span>
+          <input id="positionY" type="range" min="0" max="100" value="50">
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-title-row">
+          <h2>Ciemna warstwa</h2>
+          <label class="switch">
+            <input id="overlayEnabled" type="checkbox" checked>
+            <span aria-hidden="true"></span>
+          </label>
+        </div>
+        <label class="field">
+          <span>Przyciemnienie <strong id="overlayOpacityValue">46%</strong></span>
+          <input id="overlayOpacity" type="range" min="0" max="90" value="46">
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h2>Teksty</h2>
+        <label class="field"><span>Logo</span><input id="brandText" type="text" value="JOB"></label>
+        <label class="field"><span>Nadtytuł</span><input id="eyebrowText" type="text" value="Twój inteligentny system kariery"></label>
+        <label class="field"><span>Nagłówek</span><textarea id="headlineText" rows="3">Nie szukaj pracy po omacku</textarea></label>
+        <label class="field"><span>Opis</span><textarea id="leadText" rows="3">Porównamy oferty z Twoim doświadczeniem i warunkami, których szukasz.</textarea></label>
+        <label class="field"><span>Punkt 1</span><input id="bullet1Text" type="text" value="Najpierw fakty o Tobie, potem rekomendacja"></label>
+        <label class="field"><span>Punkt 2</span><input id="bullet2Text" type="text" value="Zero wymyślonego doświadczenia"></label>
+        <label class="field"><span>Punkt 3</span><input id="bullet3Text" type="text" value="Możesz zawsze podjąć własną decyzję"></label>
+        <label class="field"><span>Zakładka</span><input id="tabText" type="text" value="Logowanie"></label>
+        <label class="field"><span>Przycisk</span><input id="buttonText" type="text" value="Zaloguj się"></label>
+      </section>
+
+      <div class="footer-actions">
+        <button id="saveButton" class="button primary" type="button">Zapisz ustawienia</button>
+        <button id="exportButton" class="button secondary" type="button">Eksportuj JSON</button>
+        <p id="status" class="status" aria-live="polite"></p>
+      </div>
+    </aside>
+
+    <main class="preview-wrap">
+      <section id="preview" class="preview" aria-label="Podgląd ekranu logowania">
+        <div id="overlay" class="overlay"></div>
+        <header class="preview-topbar">
+          <div id="previewBrand" class="brand">JOB</div>
+        </header>
+
+        <div class="preview-content">
+          <div class="hero-copy">
+            <p id="previewEyebrow" class="eyebrow">Twój inteligentny system kariery</p>
+            <h2 id="previewHeadline">Nie szukaj pracy po omacku</h2>
+            <p id="previewLead" class="lead">Porównamy oferty z Twoim doświadczeniem i warunkami, których szukasz.</p>
+            <ul>
+              <li>✓ <span id="previewBullet1">Najpierw fakty o Tobie, potem rekomendacja</span></li>
+              <li>✓ <span id="previewBullet2">Zero wymyślonego doświadczenia</span></li>
+              <li>✓ <span id="previewBullet3">Możesz zawsze podjąć własną decyzję</span></li>
+            </ul>
+          </div>
+
+          <div class="login-card">
+            <div class="tabs">
+              <button id="previewTab" class="active" type="button">Logowanie</button>
+              <button type="button">Załóż konto</button>
+            </div>
+            <label>E-mail<input type="email" placeholder="ty@example.com"></label>
+            <label>Hasło<input type="password" value="password123"></label>
+            <button id="previewButton" class="login-button" type="button">Zaloguj się</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
