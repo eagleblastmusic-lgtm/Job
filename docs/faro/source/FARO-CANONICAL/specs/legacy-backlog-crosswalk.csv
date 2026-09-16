@@ -1,0 +1,73 @@
+﻿OLD ID,OLD TASK,DISPOSITION,NEW ID,NEW TASK,REASON
+D001,Kwalifikacja usług i KRAZ,SUPERSEDED — modified,K001,KRAZ: pisemna kwalifikacja i realizacja wymaganych obowiązków,"Memo per usługa na ustawie2025/620, decyzja o wpisie i wykonane obowiązki przed udostępnieniem właściwej usługi."
+D002,Polityka bezpłatnego kandydata,SUPERSEDED — modified,K002,Free-first obu stron i brak candidate checkout,Regulamin i wszystkie ekrany startowe mówią Faro jest darmowe; kandydat i firma bez opłat; brak candidate subscription w scope.
+D003,Intended purpose i klasyfikacja AI,SUPERSEDED — modified,K003,AI intended purpose i klasyfikacja każdego modułu,"Zmapowane role, ranking, evaluation, draft generation, harmonogram obowiązków i warunki GO; nie ogólny disclaimer."
+D004,DPIA i mapa administratorów,SUPERSEDED — modified,K004,"DPIA, art6/art22 i mapa ról administratorów","Podstawy per cel, ocena realnego nadzoru, dane szczególne oddzielnie, zatwierdzona retencja i prawa osoby."
+D005,Przyjąć konstytucję i stop rules,SUPERSEDED — modified,K005,"Konstytucja, rejestr decyzji i kontrola superseded",Jedna aktywna wersja canonical; zakazy przeniesione do testowalnych kontraktów; 72stare zadania rozliczone.
+D006,Wywiady kandydatów i firm,SUPERSEDED — modified,K006,Wywiady z kandydatami i firmami z wielu sytuacji,"Próba obejmuje pierwszą pracę, brak doświadczenia, przerwy i zmiany; bez z góry regionalnego produktu; zapis kontrdowodów."
+D007,Test prototypu obu ról,SUPERSEDED — modified,K007,Prototyp NO-CV i test dokładnej projekcji,"Uczestnicy rozumieją skill source, WILL_TEACH, prywatność, watch vs interest oraz dwa zegary."
+D008,Pozyskać firmy z realnym wakatem,SUPERSEDED — modified,K008,Founder Employer Program na realne wakaty,"Zweryfikowane potrzeby i zgoda na zasady; nationwide availability, bez obietnicy płatnej widoczności; żadnego automatycznego outreach."
+D009,Trwałość danych i restore,RETAIN — revalidate,K009,Trwałość danych i restore,"Restart/redeploy zachowuje dane, restore sprawdzony"
+D010,Finalny runtime image,RETAIN — revalidate,K010,Finalny runtime image,Zbudowany końcowy obraz uruchamia health i scenariusz bez lokalnych modułów
+D011,Zawiesić niedopuszczone fetch capabilities,RETAIN — revalidate,K011,Zawiesić niedopuszczone fetch capabilities,"Deny bez policy, brak maskowania i fallback po odmowie"
+D012,Naprawić czerwony CI importerów,RETAIN — revalidate,K012,Naprawić czerwony CI importerów,"Nowy pinned run zielony, błędy OLX/LinkedIn rozstrzygnięte bez wyłączania testu"
+D013,Centralna polityka egress,RETAIN — revalidate,K013,Centralna polityka egress,"Każdy redirect i finalny cel ocenione, limity czasu i bajtów"
+D014,Bezpieczne uploady,RETAIN — revalidate,K014,Bezpieczne uploady,"Kwarantanna, limity, skan, prywatne pobranie i cleanup"
+D015,Redakcja logów i błędów,RETAIN — revalidate,K015,Redakcja logów i błędów,PII i raw odpowiedzi nie trafiają do logów i analytics
+D016,PostgreSQL i model migracji,RETAIN — revalidate,K016,PostgreSQL i model migracji,"Import próbny zgodny, FK działają, rollback opisany"
+D017,Granice modularnego monolitu,RETAIN — revalidate,K017,Granice modularnego monolitu,"Moduły mają API i reguły zależności, brak billing w matching"
+D018,Membership/RBAC i tenant isolation,RETAIN — revalidate,K018,Membership/RBAC i tenant isolation,"Dwie firmy nie odczytują cudzych zasobów, cofnięcie działa natychmiast"
+D019,"MFA, recovery i revoke",RETAIN — revalidate,K019,"MFA, recovery i revoke","Step-up operacji krytycznych, recovery i unieważnienie sesji"
+D020,Outbox i idempotentny worker,RETAIN — revalidate,K020,Outbox i idempotentny worker,"Retry nie dubluje efektów, dead-letter ma obsługę"
+D021,"Regulaminy, DPA i publikacja firmy",RETAIN — revalidate,K021,"Regulaminy, DPA i publikacja firmy","Dokumenty odpowiadają ekranom, zakres licencji i praw jasny"
+D022,Candidate Skills Profile MVP,SUPERSEDED — modified,K022,Czteroczęściowy profil możliwości,Potrafię/rozwijam/chcę/doświadczenie; brak obowiązku posiadania historii lub określonej liczby skills; descriptive levels.
+D023,Taksonomia kompetencji v1,SUPERSEDED — modified,K023,ESCO foundation i polskie aliasy z rights manifest,"Stabilne URI, wersje, licencje per dataset; brak tworzenia ontologii od zera; INFO/ZRK bez importu przed prawami."
+D024,Evidence i shared snapshot,SUPERSEDED — modified,K024,Snapshot i serwerowa employer projection,"Bez CV, nazwiska/photo/age/phone pierwszego etapu; bez poprzednich firm/tytułów zawsze; preview to ten sam DTO."
+D025,Portal organizacji i zaproszenia,RETAIN — revalidate,K025,Portal organizacji i zaproszenia,"Role, invite TTL, ostatni owner i backup obsłużone"
+D026,Weryfikacja firmy i first-offer review,RETAIN — revalidate,K026,Weryfikacja firmy i first-offer review,"Sprawa, dowody, decyzja i manualna ścieżka JDG"
+D027,Kreator natywnej oferty,SUPERSEDED — modified,K027,Kreator natywnej oferty MUST/NICE/WILL_TEACH,"Jawne salary, godziny, zmiany, weekendy, etapy, assessment, dwa zegary; employer approves AI draft."
+D028,Typed salary i publication gate,SUPERSEDED — modified,K028,Typed salary options i walidacja publikacji,Podstawa kwoty osobno od umowy; gwarancja/zmienne/FTE/godziny; brak publikacji bez porównywalnej jawnej płacy.
+D029,Stare negacje i scoring hard gates,SUPERSEDED — modified,K029,Zweryfikować stare błędy scoringu i odłączyć legacy person score,Aktualny reprodukowalny test poprawności w autoryzowanym środowisku; legacy wynik nie zasila canonical UI; bez nowego magicznego %.
+D030,Matching relacji v2,SUPERSEDED — modified,K030,Explainable matching bez person score,"Status perrequirement, unknown oddzielnie, brak blokady WILL_TEACH, hardconstraint jawny; explanation z danych nie z opiniiAI."
+D031,Ranking niezależny od billing,SUPERSEDED — modified,K031,Ranking independence contract i testy metamorfizmu,"Zmiana wyłącznie billing nie zmienia inputów, cache, kolejności, dostępności ani jakości match; brak paid exposure."
+D032,Product shell obu ról,RETAIN — revalidate,K032,Product shell obu ról,"Split-view i mobile single-pane, focus i back zachowane"
+D033,Interest i state machine,RETAIN — revalidate,K033,Interest i state machine,"Przejścia, terminalne stany, version conflict i duplikaty kontrolowane"
+D034,Odpowiedź i accept/reject,SUPERSEDED — modified,K034,Structured rejection i konkretny requirement,Generyczny lepszy kandydat blokowany; requirementId i truthfulness; cancelled/filled nie udają luki umiejętności.
+D035,Powiadomienia transakcyjne,RETAIN — revalidate,K035,Powiadomienia transakcyjne,"Inbox spójny, retry, preferencje, brak PII w push"
+D036,Dzisiaj / Action Bar,RETAIN — revalidate,K036,Dzisiaj / Action Bar,"Priorytety z danych, jasny owner i due date"
+D037,Scheduling manual + ICS,SUPERSEDED — modified,K037,"Ręczna dostępność, propozycja i potwierdzenie rozmowy","Slot-only, UTC/IANA, cancel/reschedule, atomowa rezerwacja, ICS; brak pełnego kalendarza i auto no-show."
+D038,Report flow i moderation cases,RETAIN — revalidate,K038,Report flow i moderation cases,"Zgłoszenie, hold, uzasadnienie, appeal i obsada"
+D039,Deletion/export z pochodnymi,RETAIN — revalidate,K039,Deletion/export z pochodnymi,"Job trwały, tombstone działa po restore, eksport scoped"
+D040,Response SLA i capacity,SUPERSEDED — modified,K040,"Dwa zegary, capacity i przypomnienia",Autoack nie kończyresponseclock; nowy termin nie usuwa spóźnienia; zastępstwo i pauza nowych interest.
+D041,Dashboard wiarygodności firmy,SUPERSEDED — modified,K041,Jawne metryki rzetelności bez zbiorczego score,"n,okno,mianownik,unanswered obok mediany; nowa firma=mało danych; brak mnożników100/50/25."
+D042,No-show claims i appeals,RETAIN — revalidate,K042,No-show claims i appeals,"Claim nie karze, dispute wyłącza skutki, korekta odwraca projekcje"
+D043,Analytics marketplace i TPR,SUPERSEDED — modified,K043,Marketplace metrics i NSM quality gates,"Dedup pary na tydzień, realny obustronny postęp, odmowy osobno, cohorthhealth i noPII analytics."
+D044,Closed beta i diary study,SUPERSEDED — modified,K044,Bezpieczna beta procesu przed nationwide public launch,Beta testuje zakres bez zmiany nationwide publicavailability; jakościowe kryteria GO i capacity zamiast fikcyjnych wyników.
+D045,Assessment definition/version,SUPERSEDED — modified,K045,Assessment Definition draft/review/approved version,Typ/liczba/czas/termin/rubryka przed Start; AI nie publikuje; brak pól internetAllowed/aiAllowed.
+D046,Walidacja pierwszego assessmentu,SUPERSEDED — modified,K046,Walidacja pierwszego typu assessmentu,"Ekspertowa mapa konstruktu, poprawność klucza, testy UI i plan fairness; mała próba nie udaje norm populacyjnych."
+D047,"Attempt, autosave i timer",SUPERSEDED — modified,K047,"Timer serwerowy, autosave, awarie i podstawowa dostępność","Start jawny/idempotentny; deadline oddzielny; reconnect bez resetu; dostępna ścieżka pomocy, bez specjalnego modułu accommodations."
+D048,Deterministic/manual evaluation,SUPERSEDED — modified,K048,Objective/manual grading i lokalne zestawienie wyników,"Porównywalna rubryka/wersja, breakdown, unknown≠0, review/korekta; wynik nie uruchamia auto-hire/reject."
+D049,Gemini adapter i task contracts,SUPERSEDED — modified,K049,AI gateway jako generator propozycji i draftów,Schema+semantic validation; brak narzędzi publikacji/odrzucania; bezpieczny manual fallback; provider terms age/privacy checked.
+D050,AI-assisted grading shadow,SUPERSEDED — modified,K050,AI-assisted grading shadow evaluation,Najpierw porównanie do ocen ekspertów; realna możliwość korekty; brak automatycznego wpływu przed zatwierdzonym gate.
+D051,Fairness i human oversight gate,RETAIN — revalidate,K051,Fairness i human oversight gate,"Niedozwolone sygnały wykluczone, alternatywa manualna, appeal"
+D052,Polityka pracy próbnej i licencji,SUPERSEDED — modified,K052,Anty-darmowa praca i jasny czas per assessment,"Zadania syntetyczne/ocenowe, zakaz komercyjnego wykorzystania, report flow; brak narzuconego limitera łącznego czasu."
+D053,WTP i płatne pilotaże firm,SUPERSEDED — modified,K053,Późniejsza walidacja WTP pracodawców,Dopiero po wykazanej wartości i decyzji o przejściu z free-first; bez sprzedaży ranking/exposure i bez ceny uznanej z góry.
+D054,Billing i entitlements firmy,SUPERSEDED — modified,K054,Employer billing/entitlements narzędzi,Płatność tylko za zatwierdzone narzędzia; brak candidate checkout; safety/prawa/feedback bez paywall.
+D055,Dwa landingi i onboarding copy,SUPERSEDED — modified,K055,Dwie ścieżki marketingowe z inkluzywnym copy,Candidate osiem grup i B2B; Faro jest darmowe; bez gwarancji zatrudnienia i niepodpartych liczb.
+D056,SEO natywnych ofert i klastry,SUPERSEDED — modified,K056,SEO z rzeczywistą wartością i prywatnym profilem,Brak pustych programmatic pages; prywatne dane noindex; aktualne oferty i weryfikacja structureddata przed publikacją.
+D057,Kanały kandydatów w jednej komórce,SUPERSEDED — modified,K057,Facebook job groups i segmented nationwide campaigns,"Reguły grup/admin approvals, żadnego scrapingDM; grupa×podaż×potrzeba; brak ograniczenia produktu do miasta."
+D058,B2B funnel i partnerstwa,SUPERSEDED — modified,K058,Employer acquisition i jakość wakatów,Mierzyć completeactiveoffer→response→progress; nie RFPjobboards jako founderprimary; bez nieautoryzowanych wiadomości.
+D059,Referral bez boost i danych znajomych,RETAIN — revalidate,K059,Referral bez boost i danych znajomych,"Link ofertowy, brak contact import, plan nie zmienia rankingu"
+D060,Brand tokens i messaging v2,SUPERSEDED — modified,K060,Zgodny język marki i semantyczne tokens,"Umbrella Twój nawigator, promise Wiesz co dalej; bez score pierścienia osoby; kontrast i różne stany unknown/error."
+D061,PWA cache i asset update,RETAIN — revalidate,K061,PWA cache i asset update,"Public shell allowlist, logout cleanup, upgrade działa"
+D062,WCAG krytycznych ścieżek,RETAIN — revalidate,K062,WCAG krytycznych ścieżek,"Keyboard, focus, zoom, reader, errors; bez krytycznych blokad"
+D063,Performance i obserwowalność,RETAIN — revalidate,K063,Performance i obserwowalność,"Budżety i p95 na ustalonym obciążeniu, alert owner"
+D064,Supply chain i release gates,RETAIN — revalidate,K064,Supply chain i release gates,"Minimalne uprawnienia, skany, SBOM, branch protection"
+D065,Incident response i dyżury T&S,RETAIN — revalidate,K065,Incident response i dyżury T&S,"Tabletop naruszenia i scam, kontakty i zastępstwo"
+D066,Source Rights Registry v2,RETAIN — revalidate,K066,Source Rights Registry v2,"Capability-based grant, expiry i revoke egzekwowane"
+D067,Integracja źródła/ATS po licencji,RETAIN — revalidate,K067,Integracja źródła/ATS po licencji,"Jedno uprawnione źródło, kanon, obs, update i takedown"
+D068,Google/Microsoft kalendarz,SUPERSEDED — modified,K068,Integracje kalendarza po minimalnym schedulerze,"Udostępnienie dostępności, minimalne scopes; prywatne tytuły nie trafiają do firmy; providerreview."
+D069,Windows Tauri feasibility,SUPERSEDED — modified,K069,Ocena potrzeby Windows shell,Dowód potrzeby i kosztu; wspólny webcore; brak trzeciego niezależnego produktu.
+D070,Native mobile decision,SUPERSEDED — modified,K070,Ocena potrzeby native mobile,Tylko udowodniony brak PWA i analiza kosztu/dostępności; nie warunek startu.
+D071,Growth goals i przenośne evidence,SUPERSEDED — modified,K071,Standard Faro i portable verified skills wallet,Zakres/wynik/data/wersja/grant; company result niecertyfikat; brak skill expiry; aplikacja możliwa bezwallet.
+D072,Review jakości rynku i stop/go,SUPERSEDED — modified,K072,Regularny review rynku i jakości dowodów,Pierwotne źródła i daty; nie aktualizuje founderlock automatycznie; ceny konkurentów nie WTPFaro.

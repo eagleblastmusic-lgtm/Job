@@ -1,0 +1,117 @@
+[
+  {
+    "number": 0,
+    "title": "FARO vNext CANONICAL MASTER PLAN",
+    "file": "reports/00.md"
+  },
+  {
+    "number": 1,
+    "title": "FARO RESEARCH RECONCILIATION MATRIX",
+    "file": "reports/01.md"
+  },
+  {
+    "number": 2,
+    "title": "FARO CANONICAL PRODUCT DECISIONS — 2026-09-16",
+    "file": "reports/02.md"
+  },
+  {
+    "number": 3,
+    "title": "FARO PRODUCT CONSTITUTION",
+    "file": "reports/03.md"
+  },
+  {
+    "number": 4,
+    "title": "UPDATED PRODUCT ARCHITECTURE",
+    "file": "reports/04.md"
+  },
+  {
+    "number": 5,
+    "title": "UPDATED CANDIDATE PRODUCT SPECIFICATION",
+    "file": "reports/05.md"
+  },
+  {
+    "number": 6,
+    "title": "UPDATED EMPLOYER PRODUCT SPECIFICATION",
+    "file": "reports/06.md"
+  },
+  {
+    "number": 7,
+    "title": "UPDATED SKILLS / EXPERIENCE MODEL — DATA CONTRACT",
+    "file": "reports/07.md"
+  },
+  {
+    "number": 8,
+    "title": "EXPLAINABLE MATCHING & EXPERIENCE INTERPRETATION",
+    "file": "reports/08.md"
+  },
+  {
+    "number": 9,
+    "title": "UPDATED NATIVE OFFER SPECIFICATION",
+    "file": "reports/09.md"
+  },
+  {
+    "number": 10,
+    "title": "UPDATED ASSESSMENT SPECIFICATION",
+    "file": "reports/10.md"
+  },
+  {
+    "number": 11,
+    "title": "UPDATED RECRUITMENT STATE MACHINE",
+    "file": "reports/11.md"
+  },
+  {
+    "number": 12,
+    "title": "UPDATED TRUST / GHOSTING / GHOST JOBS POLICY",
+    "file": "reports/12.md"
+  },
+  {
+    "number": 13,
+    "title": "UPDATED JOB ECONOMICS SPECIFICATION",
+    "file": "reports/13.md"
+  },
+  {
+    "number": 14,
+    "title": "UPDATED CROSS-PLATFORM UX & DESIGN CONTINUITY",
+    "file": "reports/14.md"
+  },
+  {
+    "number": 15,
+    "title": "UPDATED MARKETING STRATEGY — CANDIDATE & EMPLOYER",
+    "file": "reports/15.md"
+  },
+  {
+    "number": 16,
+    "title": "UPDATED NATIONWIDE GTM & MARKETPLACE ECONOMICS",
+    "file": "reports/16.md"
+  },
+  {
+    "number": 17,
+    "title": "UPDATED LEGAL RISK MATRIX — POLSKA / UE",
+    "file": "reports/17.md"
+  },
+  {
+    "number": 18,
+    "title": "UPDATED ROADMAP — VISION / MVP / POST-MVP",
+    "file": "reports/18.md"
+  },
+  {
+    "number": 19,
+    "title": "UPDATED IMPLEMENTATION BACKLOG",
+    "file": "reports/19.md"
+  },
+  {
+    "number": 20,
+    "title": "SUPERSEDED / REJECTED DECISIONS REGISTER",
+    "file": "reports/20.md"
+  },
+  {
+    "number": 21,
+    "title": "EVIDENCE, RESEARCH PLAN & REMAINING RISKS",
+    "file": "reports/21.md"
+  },
+  {
+    "number": 22,
+    "title": "RESEARCH TRACEABILITY & PRIMARY SOURCE REGISTER",
+    "file": "reports/22.md"
+  }
+]

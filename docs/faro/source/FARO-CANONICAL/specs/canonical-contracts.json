@@ -1,0 +1,115 @@
+{
+  "version": "2026-09-16.1",
+  "status": "TARGET DESIGN",
+  "EmployerCandidateProjection": {
+    "allowed": [
+      "processId",
+      "firstName",
+      "skillClaims",
+      "taskExperience",
+      "learningIntents",
+      "availability",
+      "sharedAssessmentResults"
+    ],
+    "forbidden": [
+      "cv",
+      "surname",
+      "photo",
+      "age",
+      "phoneBeforeGrant",
+      "previousJobTitles",
+      "previousEmployerNames",
+      "privateTaxScenario",
+      "homeAddress",
+      "watchlist",
+      "otherRecruitments",
+      "unconfirmedSkillProposals"
+    ],
+    "rule": "Allowlist enforced server-side for every output surface; later phone requires stage and candidate grant."
+  },
+  "SkillProposal": {
+    "states": [
+      "PENDING",
+      "ACCEPTED",
+      "REJECTED"
+    ],
+    "invariant": "Only explicit candidate confirmation creates a versioned SkillClaim; acceptance is declaration, not independent verification."
+  },
+  "Requirement": {
+    "kind": [
+      "MUST_HAVE",
+      "NICE_TO_HAVE",
+      "WILL_TEACH"
+    ],
+    "matchState": [
+      "SATISFIED",
+      "NOT_DEMONSTRATED",
+      "KNOWN_NOT_MET",
+      "NOT_APPLICABLE"
+    ],
+    "rule": "WILL_TEACH cannot become a pre-existing skills barrier."
+  },
+  "AssessmentDefinition": {
+    "fields": [
+      "ownerType",
+      "version",
+      "tasks",
+      "skills",
+      "expectedDuration",
+      "timeLimit",
+      "deadlinePolicy",
+      "rubricVersion",
+      "scoringMode",
+      "approval"
+    ],
+    "excluded": [
+      "internetAllowed",
+      "aiAllowed",
+      "globalSkillExpiry",
+      "cumulativeTestTimeLimit",
+      "randomQuestionBank"
+    ],
+    "invariant": "Every AI output DRAFT; changed definition requires fresh approval; Start timer is server-side."
+  },
+  "RecruitmentResultRanking": {
+    "scope": [
+      "organizationId",
+      "recruitmentId",
+      "assessmentVersion",
+      "rubricVersion"
+    ],
+    "excluded": [
+      "billingPlan",
+      "globalPersonScore",
+      "protectedCharacteristics",
+      "employerPrestige"
+    ],
+    "rule": "Comparable result breakdown, human decision, no auto-hire/auto-reject."
+  },
+  "JobEconomics": {
+    "outputs": [
+      "grossOrInvoiceBasis",
+      "estimatedNetRange",
+      "carCost",
+      "transitCost",
+      "commuteTime",
+      "remainingAfterSelectedCommute",
+      "assumptions",
+      "sourceDates",
+      "rulesVersion"
+    ],
+    "excluded": [
+      "effectiveHourlyValue",
+      "lifeScore"
+    ],
+    "invariant": "Net is user scenario output, never offer fact; null is not zero."
+  },
+  "Watch": {
+    "visibleTo": "candidateOnly",
+    "createsInterest": false,
+    "employerIdentityExport": false
+  },
+  "RankingIndependence": {
+    "invariant": "Same relevance inputs with different billing plans must produce identical ranking and candidate access; entitlements never enter rank/cache/tie-break."
+  }
+}

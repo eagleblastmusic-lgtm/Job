@@ -1,0 +1,94 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "71 unique decisions and matrix IDs",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "72 prior items mapped once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "86 backlog items unique",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "All dependencies resolve",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Backlog is acyclic",
+      "pass": true,
+      "detail": "[]"
+    },
+    {
+      "check": "All source content lines covered",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Full line coverage unique",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Reconciliation statuses allowed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Source copy unchanged 01-deep-research-report-3-.md",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Source copy unchanged 02-FARO_CURRENT_MARKET_WEB_INTELLIGENCE_2026-09-16.md",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "23 HTML articles and nav targets",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Navigation regex supports numeric IDs",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "No external script dependency",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "No unresolved replacement character",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "Fuel arithmetic",
+      "pass": true,
+      "detail": "447.0316199999999"
+    },
+    {
+      "check": "Core excludes rejected features as task titles",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "not_performed": [
+    "No new repository tests or production implementation",
+    "No legal opinion or DPIA completed",
+    "No user interviews, WTP or fairness experiment",
+    "No browser-rendered visual acceptance in this iteration; HTML structure and navigation checked separately"
+  ],
+  "source_fragments": 968,
+  "source_lines": 1569,
+  "documents": 23
+}

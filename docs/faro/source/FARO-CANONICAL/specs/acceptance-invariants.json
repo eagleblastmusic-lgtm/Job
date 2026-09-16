@@ -1,0 +1,98 @@
+[
+  {
+    "ID": "INV01",
+    "RULE": "Firma nie otrzymujeCV",
+    "FAILURE CONDITION": "API/form/export/attachment flow omijaCV: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV02",
+    "RULE": "Brak historii firm/stanowisk",
+    "FAILURE CONDITION": "Portfolio metadata lubLLMsummary ujawniaetykietę: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV03",
+    "RULE": "Pierwszy etap ograniczony",
+    "FAILURE CONDITION": "EmployerDTO zawiera surname/photo/age/phone bezgrant: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV04",
+    "RULE": "PropozycjaAI nie fakt",
+    "FAILURE CONDITION": "Matching używa niezatwierdzonegoProposal: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV05",
+    "RULE": "Watch prywatny",
+    "FAILURE CONDITION": "Employerlist/analytics pokazujeidentyfikatorwatcher: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV06",
+    "RULE": "Salarytyped",
+    "FAILURE CONDITION": "B2BexVAT porównane doUoPgross bezscenariusza: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV07",
+    "RULE": "Billingnie ranking",
+    "FAILURE CONDITION": "Zmienionyplan zmienia wynik/kolejność/cache: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV08",
+    "RULE": "Draftapproval",
+    "FAILURE CONDITION": "AIwysyła test bezapprovedversion: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV09",
+    "RULE": "Timerjawny",
+    "FAILURE CONDITION": "Wejście naoverview uruchamiaczas: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV10",
+    "RULE": "Dwa zegary",
+    "FAILURE CONDITION": "Autoack zamykaresponseclock: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV11",
+    "RULE": "Rejectkonkretny",
+    "FAILURE CONDITION": "Lepszy kandydat bezrequirementId: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV12",
+    "RULE": "Symetria",
+    "FAILURE CONDITION": "Withdrawal/słabywynik pogarszareputację: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV13",
+    "RULE": "BrakEHV",
+    "FAILURE CONDITION": "Wyliczany iloraznetminuscommute przezworkpluscommutetime: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV14",
+    "RULE": "Nationwide",
+    "FAILURE CONDITION": "Publicznyflow blokujeadres spoza kampanii: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV15",
+    "RULE": "Freefirst",
+    "FAILURE CONDITION": "Wstartowymprodukcie istniejecheckout: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  },
+  {
+    "ID": "INV16",
+    "RULE": "Retentionnieexpiry",
+    "FAILURE CONDITION": "Usuniętywynik automatycznie oznacza utratękompetencji: FAIL",
+    "STATUS": "DESIGN TEST — NOT EXECUTED ON APP"
+  }
+]

@@ -1,0 +1,15 @@
+﻿ID,SOURCE,URL,TYPE,CHECKED,SUPPORT/LIMIT
+S01,"Ustawa o rynku pracy i służbach zatrudnienia, aktualny tekst",https://eli.gov.pl/api/acts/DU/2025/620/text/U/D20250620Lj.pdf,PRIMARY LAW,2026-09-16,Art305–306 i ramy agencji; kwalifikacja usług Faro nadal wymaga opinii.
+S02,Zmiana KP — informacja o wynagrodzeniu,https://eli.gov.pl/api/acts/DU/2025/807/text/T/D20250807L.pdf,PRIMARY LAW,2026-09-16,Warianty terminu informacji; nie każda oferta ustawowo musi zawierać widełki.
+S03,Kodeks pracy — aktualny tekst,https://eli.gov.pl/api/acts/DU/2025/277/text/U/D20250277Lj.pdf,PRIMARY LAW,2026-09-16,"Korekta błędnych art187/188, zakres równego traktowania."
+S04,KE — enforcement AI Act; aktualizacja24.08.2026,https://digital-strategy.ec.europa.eu/en/policies/enforcement-ai-act,PRIMARY REGULATOR,2026-09-16,Terminy AnnexIII2.12.2027/regulatedproducts2.08.2028; nie zastępuje aktu.
+S05,WP251rev.01 — automated decisions/profiling,https://ec.europa.eu/newsroom/article29/items/612053/en,PRIMARY GUIDANCE,2026-09-16,Oficjalny punkt wytycznych; nie opinia o modelu Faro.
+S06,ESCO — copyright skills/competences,https://esco.ec.europa.eu/en/copyright-notice-esco-skills-competences,PRIMARY LICENSE,2026-09-16,CCBY4 EU-owned with exceptions; różne materiały źródłowe.
+S07,O*NET Database license,https://www.onetcenter.org/license_db.html,PRIMARY LICENSE,2026-09-16,"Licencja bazy, atrybucja/zmiany; nie wszystkie narzędzia/znaki."
+S08,Google Routes — Transit route,https://developers.google.com/maps/documentation/routes/transit-route,PRIMARY TECH DOC,2026-09-16,Transit fare nie gwarantowane przy brakujących cenach kroków.
+S09,KE Weekly Oil Bulletin,https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en,PRIMARY DATA,2026-09-16,"Średnie krajowe, nie lokalna stacja; data obserwacji osobno."
+S10,Sackett i in.2022 — revised validity estimates,https://ink.library.smu.edu.sg/lkcsb_research/6894/,PRIMARY RESEARCH,2026-09-16,"Przeczytany abstrakt/rejestr publikacji, nie pełny systematyczny review; nie5xFaro."
+S11,Bertrand/Mullainathan2004 — names field experiment,https://www.aeaweb.org/articles?id=10.1257/0002828042002561,PRIMARY RESEARCH,2026-09-16,Kontekst USA/name discrimination; ograniczona przenoszalność naFaro.
+S12,Gemini API Additional Terms,https://ai.google.dev/gemini-api/terms,PRIMARY PROVIDER TERMS,2026-09-16,Warunki dostawcy wymagają oceny w konkretnej konfiguracji i wieku.
+S13,ESCO Use ESCO,https://esco.ec.europa.eu/en/use-esco,PRIMARY DATA DOC,2026-09-16,Identyfikatory/wersje i dostęp; licencje wS06.
+S14,ZRK API,https://api.kwalifikacje.gov.pl/pl/,PRIMARY API ENTRY,2026-09-16,Dostęp doAPI nie potwierdza zakresu prawa do komercyjnego importu.

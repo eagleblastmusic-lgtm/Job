@@ -1,0 +1,578 @@
+[
+  {
+    "OLD ID": "D001",
+    "OLD TASK": "Kwalifikacja usług i KRAZ",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K001",
+    "NEW TASK": "KRAZ: pisemna kwalifikacja i realizacja wymaganych obowiązków",
+    "REASON": "Memo per usługa na ustawie2025/620, decyzja o wpisie i wykonane obowiązki przed udostępnieniem właściwej usługi."
+  },
+  {
+    "OLD ID": "D002",
+    "OLD TASK": "Polityka bezpłatnego kandydata",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K002",
+    "NEW TASK": "Free-first obu stron i brak candidate checkout",
+    "REASON": "Regulamin i wszystkie ekrany startowe mówią Faro jest darmowe; kandydat i firma bez opłat; brak candidate subscription w scope."
+  },
+  {
+    "OLD ID": "D003",
+    "OLD TASK": "Intended purpose i klasyfikacja AI",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K003",
+    "NEW TASK": "AI intended purpose i klasyfikacja każdego modułu",
+    "REASON": "Zmapowane role, ranking, evaluation, draft generation, harmonogram obowiązków i warunki GO; nie ogólny disclaimer."
+  },
+  {
+    "OLD ID": "D004",
+    "OLD TASK": "DPIA i mapa administratorów",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K004",
+    "NEW TASK": "DPIA, art6/art22 i mapa ról administratorów",
+    "REASON": "Podstawy per cel, ocena realnego nadzoru, dane szczególne oddzielnie, zatwierdzona retencja i prawa osoby."
+  },
+  {
+    "OLD ID": "D005",
+    "OLD TASK": "Przyjąć konstytucję i stop rules",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K005",
+    "NEW TASK": "Konstytucja, rejestr decyzji i kontrola superseded",
+    "REASON": "Jedna aktywna wersja canonical; zakazy przeniesione do testowalnych kontraktów; 72stare zadania rozliczone."
+  },
+  {
+    "OLD ID": "D006",
+    "OLD TASK": "Wywiady kandydatów i firm",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K006",
+    "NEW TASK": "Wywiady z kandydatami i firmami z wielu sytuacji",
+    "REASON": "Próba obejmuje pierwszą pracę, brak doświadczenia, przerwy i zmiany; bez z góry regionalnego produktu; zapis kontrdowodów."
+  },
+  {
+    "OLD ID": "D007",
+    "OLD TASK": "Test prototypu obu ról",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K007",
+    "NEW TASK": "Prototyp NO-CV i test dokładnej projekcji",
+    "REASON": "Uczestnicy rozumieją skill source, WILL_TEACH, prywatność, watch vs interest oraz dwa zegary."
+  },
+  {
+    "OLD ID": "D008",
+    "OLD TASK": "Pozyskać firmy z realnym wakatem",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K008",
+    "NEW TASK": "Founder Employer Program na realne wakaty",
+    "REASON": "Zweryfikowane potrzeby i zgoda na zasady; nationwide availability, bez obietnicy płatnej widoczności; żadnego automatycznego outreach."
+  },
+  {
+    "OLD ID": "D009",
+    "OLD TASK": "Trwałość danych i restore",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K009",
+    "NEW TASK": "Trwałość danych i restore",
+    "REASON": "Restart/redeploy zachowuje dane, restore sprawdzony"
+  },
+  {
+    "OLD ID": "D010",
+    "OLD TASK": "Finalny runtime image",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K010",
+    "NEW TASK": "Finalny runtime image",
+    "REASON": "Zbudowany końcowy obraz uruchamia health i scenariusz bez lokalnych modułów"
+  },
+  {
+    "OLD ID": "D011",
+    "OLD TASK": "Zawiesić niedopuszczone fetch capabilities",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K011",
+    "NEW TASK": "Zawiesić niedopuszczone fetch capabilities",
+    "REASON": "Deny bez policy, brak maskowania i fallback po odmowie"
+  },
+  {
+    "OLD ID": "D012",
+    "OLD TASK": "Naprawić czerwony CI importerów",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K012",
+    "NEW TASK": "Naprawić czerwony CI importerów",
+    "REASON": "Nowy pinned run zielony, błędy OLX/LinkedIn rozstrzygnięte bez wyłączania testu"
+  },
+  {
+    "OLD ID": "D013",
+    "OLD TASK": "Centralna polityka egress",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K013",
+    "NEW TASK": "Centralna polityka egress",
+    "REASON": "Każdy redirect i finalny cel ocenione, limity czasu i bajtów"
+  },
+  {
+    "OLD ID": "D014",
+    "OLD TASK": "Bezpieczne uploady",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K014",
+    "NEW TASK": "Bezpieczne uploady",
+    "REASON": "Kwarantanna, limity, skan, prywatne pobranie i cleanup"
+  },
+  {
+    "OLD ID": "D015",
+    "OLD TASK": "Redakcja logów i błędów",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K015",
+    "NEW TASK": "Redakcja logów i błędów",
+    "REASON": "PII i raw odpowiedzi nie trafiają do logów i analytics"
+  },
+  {
+    "OLD ID": "D016",
+    "OLD TASK": "PostgreSQL i model migracji",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K016",
+    "NEW TASK": "PostgreSQL i model migracji",
+    "REASON": "Import próbny zgodny, FK działają, rollback opisany"
+  },
+  {
+    "OLD ID": "D017",
+    "OLD TASK": "Granice modularnego monolitu",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K017",
+    "NEW TASK": "Granice modularnego monolitu",
+    "REASON": "Moduły mają API i reguły zależności, brak billing w matching"
+  },
+  {
+    "OLD ID": "D018",
+    "OLD TASK": "Membership/RBAC i tenant isolation",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K018",
+    "NEW TASK": "Membership/RBAC i tenant isolation",
+    "REASON": "Dwie firmy nie odczytują cudzych zasobów, cofnięcie działa natychmiast"
+  },
+  {
+    "OLD ID": "D019",
+    "OLD TASK": "MFA, recovery i revoke",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K019",
+    "NEW TASK": "MFA, recovery i revoke",
+    "REASON": "Step-up operacji krytycznych, recovery i unieważnienie sesji"
+  },
+  {
+    "OLD ID": "D020",
+    "OLD TASK": "Outbox i idempotentny worker",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K020",
+    "NEW TASK": "Outbox i idempotentny worker",
+    "REASON": "Retry nie dubluje efektów, dead-letter ma obsługę"
+  },
+  {
+    "OLD ID": "D021",
+    "OLD TASK": "Regulaminy, DPA i publikacja firmy",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K021",
+    "NEW TASK": "Regulaminy, DPA i publikacja firmy",
+    "REASON": "Dokumenty odpowiadają ekranom, zakres licencji i praw jasny"
+  },
+  {
+    "OLD ID": "D022",
+    "OLD TASK": "Candidate Skills Profile MVP",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K022",
+    "NEW TASK": "Czteroczęściowy profil możliwości",
+    "REASON": "Potrafię/rozwijam/chcę/doświadczenie; brak obowiązku posiadania historii lub określonej liczby skills; descriptive levels."
+  },
+  {
+    "OLD ID": "D023",
+    "OLD TASK": "Taksonomia kompetencji v1",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K023",
+    "NEW TASK": "ESCO foundation i polskie aliasy z rights manifest",
+    "REASON": "Stabilne URI, wersje, licencje per dataset; brak tworzenia ontologii od zera; INFO/ZRK bez importu przed prawami."
+  },
+  {
+    "OLD ID": "D024",
+    "OLD TASK": "Evidence i shared snapshot",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K024",
+    "NEW TASK": "Snapshot i serwerowa employer projection",
+    "REASON": "Bez CV, nazwiska/photo/age/phone pierwszego etapu; bez poprzednich firm/tytułów zawsze; preview to ten sam DTO."
+  },
+  {
+    "OLD ID": "D025",
+    "OLD TASK": "Portal organizacji i zaproszenia",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K025",
+    "NEW TASK": "Portal organizacji i zaproszenia",
+    "REASON": "Role, invite TTL, ostatni owner i backup obsłużone"
+  },
+  {
+    "OLD ID": "D026",
+    "OLD TASK": "Weryfikacja firmy i first-offer review",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K026",
+    "NEW TASK": "Weryfikacja firmy i first-offer review",
+    "REASON": "Sprawa, dowody, decyzja i manualna ścieżka JDG"
+  },
+  {
+    "OLD ID": "D027",
+    "OLD TASK": "Kreator natywnej oferty",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K027",
+    "NEW TASK": "Kreator natywnej oferty MUST/NICE/WILL_TEACH",
+    "REASON": "Jawne salary, godziny, zmiany, weekendy, etapy, assessment, dwa zegary; employer approves AI draft."
+  },
+  {
+    "OLD ID": "D028",
+    "OLD TASK": "Typed salary i publication gate",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K028",
+    "NEW TASK": "Typed salary options i walidacja publikacji",
+    "REASON": "Podstawa kwoty osobno od umowy; gwarancja/zmienne/FTE/godziny; brak publikacji bez porównywalnej jawnej płacy."
+  },
+  {
+    "OLD ID": "D029",
+    "OLD TASK": "Stare negacje i scoring hard gates",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K029",
+    "NEW TASK": "Zweryfikować stare błędy scoringu i odłączyć legacy person score",
+    "REASON": "Aktualny reprodukowalny test poprawności w autoryzowanym środowisku; legacy wynik nie zasila canonical UI; bez nowego magicznego %."
+  },
+  {
+    "OLD ID": "D030",
+    "OLD TASK": "Matching relacji v2",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K030",
+    "NEW TASK": "Explainable matching bez person score",
+    "REASON": "Status perrequirement, unknown oddzielnie, brak blokady WILL_TEACH, hardconstraint jawny; explanation z danych nie z opiniiAI."
+  },
+  {
+    "OLD ID": "D031",
+    "OLD TASK": "Ranking niezależny od billing",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K031",
+    "NEW TASK": "Ranking independence contract i testy metamorfizmu",
+    "REASON": "Zmiana wyłącznie billing nie zmienia inputów, cache, kolejności, dostępności ani jakości match; brak paid exposure."
+  },
+  {
+    "OLD ID": "D032",
+    "OLD TASK": "Product shell obu ról",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K032",
+    "NEW TASK": "Product shell obu ról",
+    "REASON": "Split-view i mobile single-pane, focus i back zachowane"
+  },
+  {
+    "OLD ID": "D033",
+    "OLD TASK": "Interest i state machine",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K033",
+    "NEW TASK": "Interest i state machine",
+    "REASON": "Przejścia, terminalne stany, version conflict i duplikaty kontrolowane"
+  },
+  {
+    "OLD ID": "D034",
+    "OLD TASK": "Odpowiedź i accept/reject",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K034",
+    "NEW TASK": "Structured rejection i konkretny requirement",
+    "REASON": "Generyczny lepszy kandydat blokowany; requirementId i truthfulness; cancelled/filled nie udają luki umiejętności."
+  },
+  {
+    "OLD ID": "D035",
+    "OLD TASK": "Powiadomienia transakcyjne",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K035",
+    "NEW TASK": "Powiadomienia transakcyjne",
+    "REASON": "Inbox spójny, retry, preferencje, brak PII w push"
+  },
+  {
+    "OLD ID": "D036",
+    "OLD TASK": "Dzisiaj / Action Bar",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K036",
+    "NEW TASK": "Dzisiaj / Action Bar",
+    "REASON": "Priorytety z danych, jasny owner i due date"
+  },
+  {
+    "OLD ID": "D037",
+    "OLD TASK": "Scheduling manual + ICS",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K037",
+    "NEW TASK": "Ręczna dostępność, propozycja i potwierdzenie rozmowy",
+    "REASON": "Slot-only, UTC/IANA, cancel/reschedule, atomowa rezerwacja, ICS; brak pełnego kalendarza i auto no-show."
+  },
+  {
+    "OLD ID": "D038",
+    "OLD TASK": "Report flow i moderation cases",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K038",
+    "NEW TASK": "Report flow i moderation cases",
+    "REASON": "Zgłoszenie, hold, uzasadnienie, appeal i obsada"
+  },
+  {
+    "OLD ID": "D039",
+    "OLD TASK": "Deletion/export z pochodnymi",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K039",
+    "NEW TASK": "Deletion/export z pochodnymi",
+    "REASON": "Job trwały, tombstone działa po restore, eksport scoped"
+  },
+  {
+    "OLD ID": "D040",
+    "OLD TASK": "Response SLA i capacity",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K040",
+    "NEW TASK": "Dwa zegary, capacity i przypomnienia",
+    "REASON": "Autoack nie kończyresponseclock; nowy termin nie usuwa spóźnienia; zastępstwo i pauza nowych interest."
+  },
+  {
+    "OLD ID": "D041",
+    "OLD TASK": "Dashboard wiarygodności firmy",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K041",
+    "NEW TASK": "Jawne metryki rzetelności bez zbiorczego score",
+    "REASON": "n,okno,mianownik,unanswered obok mediany; nowa firma=mało danych; brak mnożników100/50/25."
+  },
+  {
+    "OLD ID": "D042",
+    "OLD TASK": "No-show claims i appeals",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K042",
+    "NEW TASK": "No-show claims i appeals",
+    "REASON": "Claim nie karze, dispute wyłącza skutki, korekta odwraca projekcje"
+  },
+  {
+    "OLD ID": "D043",
+    "OLD TASK": "Analytics marketplace i TPR",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K043",
+    "NEW TASK": "Marketplace metrics i NSM quality gates",
+    "REASON": "Dedup pary na tydzień, realny obustronny postęp, odmowy osobno, cohorthhealth i noPII analytics."
+  },
+  {
+    "OLD ID": "D044",
+    "OLD TASK": "Closed beta i diary study",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K044",
+    "NEW TASK": "Bezpieczna beta procesu przed nationwide public launch",
+    "REASON": "Beta testuje zakres bez zmiany nationwide publicavailability; jakościowe kryteria GO i capacity zamiast fikcyjnych wyników."
+  },
+  {
+    "OLD ID": "D045",
+    "OLD TASK": "Assessment definition/version",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K045",
+    "NEW TASK": "Assessment Definition draft/review/approved version",
+    "REASON": "Typ/liczba/czas/termin/rubryka przed Start; AI nie publikuje; brak pól internetAllowed/aiAllowed."
+  },
+  {
+    "OLD ID": "D046",
+    "OLD TASK": "Walidacja pierwszego assessmentu",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K046",
+    "NEW TASK": "Walidacja pierwszego typu assessmentu",
+    "REASON": "Ekspertowa mapa konstruktu, poprawność klucza, testy UI i plan fairness; mała próba nie udaje norm populacyjnych."
+  },
+  {
+    "OLD ID": "D047",
+    "OLD TASK": "Attempt, autosave i timer",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K047",
+    "NEW TASK": "Timer serwerowy, autosave, awarie i podstawowa dostępność",
+    "REASON": "Start jawny/idempotentny; deadline oddzielny; reconnect bez resetu; dostępna ścieżka pomocy, bez specjalnego modułu accommodations."
+  },
+  {
+    "OLD ID": "D048",
+    "OLD TASK": "Deterministic/manual evaluation",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K048",
+    "NEW TASK": "Objective/manual grading i lokalne zestawienie wyników",
+    "REASON": "Porównywalna rubryka/wersja, breakdown, unknown≠0, review/korekta; wynik nie uruchamia auto-hire/reject."
+  },
+  {
+    "OLD ID": "D049",
+    "OLD TASK": "Gemini adapter i task contracts",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K049",
+    "NEW TASK": "AI gateway jako generator propozycji i draftów",
+    "REASON": "Schema+semantic validation; brak narzędzi publikacji/odrzucania; bezpieczny manual fallback; provider terms age/privacy checked."
+  },
+  {
+    "OLD ID": "D050",
+    "OLD TASK": "AI-assisted grading shadow",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K050",
+    "NEW TASK": "AI-assisted grading shadow evaluation",
+    "REASON": "Najpierw porównanie do ocen ekspertów; realna możliwość korekty; brak automatycznego wpływu przed zatwierdzonym gate."
+  },
+  {
+    "OLD ID": "D051",
+    "OLD TASK": "Fairness i human oversight gate",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K051",
+    "NEW TASK": "Fairness i human oversight gate",
+    "REASON": "Niedozwolone sygnały wykluczone, alternatywa manualna, appeal"
+  },
+  {
+    "OLD ID": "D052",
+    "OLD TASK": "Polityka pracy próbnej i licencji",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K052",
+    "NEW TASK": "Anty-darmowa praca i jasny czas per assessment",
+    "REASON": "Zadania syntetyczne/ocenowe, zakaz komercyjnego wykorzystania, report flow; brak narzuconego limitera łącznego czasu."
+  },
+  {
+    "OLD ID": "D053",
+    "OLD TASK": "WTP i płatne pilotaże firm",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K053",
+    "NEW TASK": "Późniejsza walidacja WTP pracodawców",
+    "REASON": "Dopiero po wykazanej wartości i decyzji o przejściu z free-first; bez sprzedaży ranking/exposure i bez ceny uznanej z góry."
+  },
+  {
+    "OLD ID": "D054",
+    "OLD TASK": "Billing i entitlements firmy",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K054",
+    "NEW TASK": "Employer billing/entitlements narzędzi",
+    "REASON": "Płatność tylko za zatwierdzone narzędzia; brak candidate checkout; safety/prawa/feedback bez paywall."
+  },
+  {
+    "OLD ID": "D055",
+    "OLD TASK": "Dwa landingi i onboarding copy",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K055",
+    "NEW TASK": "Dwie ścieżki marketingowe z inkluzywnym copy",
+    "REASON": "Candidate osiem grup i B2B; Faro jest darmowe; bez gwarancji zatrudnienia i niepodpartych liczb."
+  },
+  {
+    "OLD ID": "D056",
+    "OLD TASK": "SEO natywnych ofert i klastry",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K056",
+    "NEW TASK": "SEO z rzeczywistą wartością i prywatnym profilem",
+    "REASON": "Brak pustych programmatic pages; prywatne dane noindex; aktualne oferty i weryfikacja structureddata przed publikacją."
+  },
+  {
+    "OLD ID": "D057",
+    "OLD TASK": "Kanały kandydatów w jednej komórce",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K057",
+    "NEW TASK": "Facebook job groups i segmented nationwide campaigns",
+    "REASON": "Reguły grup/admin approvals, żadnego scrapingDM; grupa×podaż×potrzeba; brak ograniczenia produktu do miasta."
+  },
+  {
+    "OLD ID": "D058",
+    "OLD TASK": "B2B funnel i partnerstwa",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K058",
+    "NEW TASK": "Employer acquisition i jakość wakatów",
+    "REASON": "Mierzyć completeactiveoffer→response→progress; nie RFPjobboards jako founderprimary; bez nieautoryzowanych wiadomości."
+  },
+  {
+    "OLD ID": "D059",
+    "OLD TASK": "Referral bez boost i danych znajomych",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K059",
+    "NEW TASK": "Referral bez boost i danych znajomych",
+    "REASON": "Link ofertowy, brak contact import, plan nie zmienia rankingu"
+  },
+  {
+    "OLD ID": "D060",
+    "OLD TASK": "Brand tokens i messaging v2",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K060",
+    "NEW TASK": "Zgodny język marki i semantyczne tokens",
+    "REASON": "Umbrella Twój nawigator, promise Wiesz co dalej; bez score pierścienia osoby; kontrast i różne stany unknown/error."
+  },
+  {
+    "OLD ID": "D061",
+    "OLD TASK": "PWA cache i asset update",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K061",
+    "NEW TASK": "PWA cache i asset update",
+    "REASON": "Public shell allowlist, logout cleanup, upgrade działa"
+  },
+  {
+    "OLD ID": "D062",
+    "OLD TASK": "WCAG krytycznych ścieżek",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K062",
+    "NEW TASK": "WCAG krytycznych ścieżek",
+    "REASON": "Keyboard, focus, zoom, reader, errors; bez krytycznych blokad"
+  },
+  {
+    "OLD ID": "D063",
+    "OLD TASK": "Performance i obserwowalność",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K063",
+    "NEW TASK": "Performance i obserwowalność",
+    "REASON": "Budżety i p95 na ustalonym obciążeniu, alert owner"
+  },
+  {
+    "OLD ID": "D064",
+    "OLD TASK": "Supply chain i release gates",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K064",
+    "NEW TASK": "Supply chain i release gates",
+    "REASON": "Minimalne uprawnienia, skany, SBOM, branch protection"
+  },
+  {
+    "OLD ID": "D065",
+    "OLD TASK": "Incident response i dyżury T&S",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K065",
+    "NEW TASK": "Incident response i dyżury T&S",
+    "REASON": "Tabletop naruszenia i scam, kontakty i zastępstwo"
+  },
+  {
+    "OLD ID": "D066",
+    "OLD TASK": "Source Rights Registry v2",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K066",
+    "NEW TASK": "Source Rights Registry v2",
+    "REASON": "Capability-based grant, expiry i revoke egzekwowane"
+  },
+  {
+    "OLD ID": "D067",
+    "OLD TASK": "Integracja źródła/ATS po licencji",
+    "DISPOSITION": "RETAIN — revalidate",
+    "NEW ID": "K067",
+    "NEW TASK": "Integracja źródła/ATS po licencji",
+    "REASON": "Jedno uprawnione źródło, kanon, obs, update i takedown"
+  },
+  {
+    "OLD ID": "D068",
+    "OLD TASK": "Google/Microsoft kalendarz",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K068",
+    "NEW TASK": "Integracje kalendarza po minimalnym schedulerze",
+    "REASON": "Udostępnienie dostępności, minimalne scopes; prywatne tytuły nie trafiają do firmy; providerreview."
+  },
+  {
+    "OLD ID": "D069",
+    "OLD TASK": "Windows Tauri feasibility",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K069",
+    "NEW TASK": "Ocena potrzeby Windows shell",
+    "REASON": "Dowód potrzeby i kosztu; wspólny webcore; brak trzeciego niezależnego produktu."
+  },
+  {
+    "OLD ID": "D070",
+    "OLD TASK": "Native mobile decision",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K070",
+    "NEW TASK": "Ocena potrzeby native mobile",
+    "REASON": "Tylko udowodniony brak PWA i analiza kosztu/dostępności; nie warunek startu."
+  },
+  {
+    "OLD ID": "D071",
+    "OLD TASK": "Growth goals i przenośne evidence",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K071",
+    "NEW TASK": "Standard Faro i portable verified skills wallet",
+    "REASON": "Zakres/wynik/data/wersja/grant; company result niecertyfikat; brak skill expiry; aplikacja możliwa bezwallet."
+  },
+  {
+    "OLD ID": "D072",
+    "OLD TASK": "Review jakości rynku i stop/go",
+    "DISPOSITION": "SUPERSEDED — modified",
+    "NEW ID": "K072",
+    "NEW TASK": "Regularny review rynku i jakości dowodów",
+    "REASON": "Pierwotne źródła i daty; nie aktualizuje founderlock automatycznie; ceny konkurentów nie WTPFaro."
+  }
+]

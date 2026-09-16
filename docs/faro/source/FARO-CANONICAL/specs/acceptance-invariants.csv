@@ -1,0 +1,17 @@
+﻿ID,RULE,FAILURE CONDITION,STATUS
+INV01,Firma nie otrzymujeCV,API/form/export/attachment flow omijaCV: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV02,Brak historii firm/stanowisk,Portfolio metadata lubLLMsummary ujawniaetykietę: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV03,Pierwszy etap ograniczony,EmployerDTO zawiera surname/photo/age/phone bezgrant: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV04,PropozycjaAI nie fakt,Matching używa niezatwierdzonegoProposal: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV05,Watch prywatny,Employerlist/analytics pokazujeidentyfikatorwatcher: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV06,Salarytyped,B2BexVAT porównane doUoPgross bezscenariusza: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV07,Billingnie ranking,Zmienionyplan zmienia wynik/kolejność/cache: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV08,Draftapproval,AIwysyła test bezapprovedversion: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV09,Timerjawny,Wejście naoverview uruchamiaczas: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV10,Dwa zegary,Autoack zamykaresponseclock: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV11,Rejectkonkretny,Lepszy kandydat bezrequirementId: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV12,Symetria,Withdrawal/słabywynik pogarszareputację: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV13,BrakEHV,Wyliczany iloraznetminuscommute przezworkpluscommutetime: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV14,Nationwide,Publicznyflow blokujeadres spoza kampanii: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV15,Freefirst,Wstartowymprodukcie istniejecheckout: FAIL,DESIGN TEST — NOT EXECUTED ON APP
+INV16,Retentionnieexpiry,Usuniętywynik automatycznie oznacza utratękompetencji: FAIL,DESIGN TEST — NOT EXECUTED ON APP
