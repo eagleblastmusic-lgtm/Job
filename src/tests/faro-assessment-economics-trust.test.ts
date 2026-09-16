@@ -23,15 +23,30 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
   const f = await assessmentSetup();
   try {
     const draft = await f.request<{ id: string; version: number; state: string }>(`/api/faro/offers/${f.offer.id}/assessments`, f.employer.cookie, 'POST', {
+      origin: 'AI', state: 'APPROVED', confirmed: true,
       title: 'Podstawy obsługi klienta', timeLimitMinutes: 5, expectedMinutes: 3, rubricVersion: 'rubric-1',
       tasks: [{ prompt: 'Wybierz właściwą odpowiedź', options: ['A', 'B'], answer: 1, points: 2 }]
     }, 201);
     assert.equal(draft.state, 'DRAFT');
+    const definition = new AssessmentService(f.app.db);
+    assert.equal(definition.definition(draft.id, draft.version).origin, 'AI');
+    const assignment = { assessmentId: draft.id, version: draft.version, deadline: new Date(Date.now() + 86_400_000).toISOString() };
+    const processBefore = f.app.db.db.prepare('SELECT stage,revision FROM faro_interests WHERE id=?').get(f.interest.id);
+    const assertAssignmentBlocked = async (state: string) => {
+      await f.request(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', assignment, 409);
+      assert.equal(definition.definition(draft.id, draft.version).state, state);
+      assert.deepEqual(f.app.db.db.prepare('SELECT stage,revision FROM faro_interests WHERE id=?').get(f.interest.id), processBefore);
+      const attempts = f.app.db.db.prepare('SELECT COUNT(*) count FROM faro_attempts WHERE process_id=?').get(f.interest.id) as { count: number };
+      assert.equal(attempts.count, 0);
+    };
+    await assertAssignmentBlocked('DRAFT');
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'APPROVE', confirmed: true }, 409);
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'REVIEW' });
+    await assertAssignmentBlocked('IN_REVIEW');
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'APPROVE', confirmed: false }, 400);
+    await assertAssignmentBlocked('IN_REVIEW');
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'APPROVE', confirmed: true });
-    const attempt = await f.request<{ id: string }>(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', { assessmentId: draft.id, version: draft.version, deadline: new Date(Date.now() + 86_400_000).toISOString() }, 201);
+    const attempt = await f.request<{ id: string }>(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', assignment, 201);
     const before = await f.request<{ state: string; taskCount: number; tasks: unknown[]; revision: number }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie);
     assert.equal(before.state, 'INVITED'); assert.equal(before.taskCount, 1); assert.equal(before.tasks.length, 0);
     const started = await f.request<{ state: string; startedAt: string; expiresAt: string; revision: number; tasks: Array<{ options: string[] }> }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie, 'POST', {});
@@ -47,7 +62,6 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     await f.request(`/api/faro/attempts/${attempt.id}/review`, f.employer.cookie, 'POST', { confirmed: true, note: 'Sprawdzono według rubric-1' });
     const final = await f.request<{ state: string; result: { review: string } }>(`/api/faro/attempts/${attempt.id}`, f.employer.cookie);
     assert.equal(final.state, 'FINALIZED'); assert.equal(final.result.review, 'FINALIZED');
-    const definition = new AssessmentService(f.app.db);
     const old = definition.row(attempt.id);
     f.app.db.db.prepare("UPDATE faro_attempts SET state='STARTED',expires_at=? WHERE id=?").run(new Date(Date.now() - 1000).toISOString(), attempt.id);
     await f.request(`/api/faro/attempts/${attempt.id}/answers`, f.candidate.cookie, 'PUT', { expectedVersion: old.revision, answers: { 'task-1': 0 } }, 409);
