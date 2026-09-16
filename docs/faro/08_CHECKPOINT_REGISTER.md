@@ -1,6 +1,6 @@
 # CHECKPOINT REGISTER
 
-All rows are initial execution contracts; live status is updated with evidence. CP00: audit + complete saved plan, status DONE after initial commit. No production code edited before CP00.
+All rows are initial execution contracts; live status is updated with evidence. CP00: audit + complete saved plan, status DONE after initial commit. No production code edited before CP00. Current delivery is through CP07, CP09 and CP10; CP08 and CP11 remain active next gates.
 
 ## CP01 — Foundation and retirement of rejected paths
 - ID: CP01
@@ -20,7 +20,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR for local removal; source fetch LEGAL REVIEW
 - RISK: Legacy consumers expect old routes
 - ROLLBACK: Revert checkpoint commit; no data deletion
-- STATUS: PLANNED
+- STATUS: DONE (commit a18b25d)
 
 ## CP02 — Organization scope and candidate projection
 - ID: CP02
@@ -40,7 +40,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR local; real-data/public LEGAL BLOCKER
 - RISK: Owner privileges must not imply process access
 - ROLLBACK: Disable canonical namespace; retain added tables
-- STATUS: PLANNED
+- STATUS: DONE (commit 20263a6)
 
 ## CP03 — Four-part skills profile and decomposition
 - ID: CP03
@@ -60,7 +60,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR manual/local; AI provider and taxonomy import LEGAL REVIEW
 - RISK: Free text can leak identity; do not expose raw descriptions
 - ROLLBACK: Disable proposal generation, preserve manual profile
-- STATUS: PLANNED
+- STATUS: DONE (commit 20263a6)
 
 ## CP04 — Native offers, salary and immutable versions
 - ID: CP04
@@ -80,7 +80,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR local; public marketplace LEGAL BLOCKER
 - RISK: Silent editing could erase applied conditions
 - ROLLBACK: Pause canonical intake and revert routes; preserve versions
-- STATUS: PLANNED
+- STATUS: DONE (commit de1d3ec)
 
 ## CP05 — Explainable matching and constraints
 - ID: CP05
@@ -100,7 +100,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR deterministic local; deployment GDPR review
 - RISK: Unknown incorrectly rendered as not capable
 - ROLLBACK: Revert matching presentation; preserve offer conditions
-- STATUS: PLANNED
+- STATUS: DONE (commit de1d3ec)
 
 ## CP06 — Recruitment, clocks, watch and outbox
 - ID: CP06
@@ -120,7 +120,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR local; real data LEGAL BLOCKER
 - RISK: Competing terminal decisions, retry duplications, contact grant race
 - ROLLBACK: Stop worker and intake; rollback code without dropping events
-- STATUS: PLANNED
+- STATUS: DONE (commit de1d3ec)
 
 ## CP07 — Trust and moderation foundations
 - ID: CP07
@@ -140,7 +140,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL REVIEW operational policy; local case structure clear
 - RISK: False signal or punishing candidates for platform failure
 - ROLLBACK: Disable signal creation; retain review history
-- STATUS: PLANNED
+- STATUS: DONE (current working commit)
 
 ## CP08 — Original authenticated Faro workspace
 - ID: CP08
@@ -160,7 +160,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR local; no public activation before gates
 - RISK: Login selector bleed or stale requests across session
 - ROLLBACK: Restore prior app script reference; leave canonical data intact
-- STATUS: PLANNED
+- STATUS: PLANNED (next implementation)
 
 ## CP09 — Private Job Economics and comparison
 - ID: CP09
@@ -180,7 +180,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL CLEAR manual local; automated tax/routing LEGAL REVIEW
 - RISK: Misleading UOP/B2B comparison and false precision
 - ROLLBACK: Disable calculator, keep direct offer conditions
-- STATUS: PLANNED
+- STATUS: DONE (current working commit)
 
 ## CP10 — Assessment foundations with real lifecycle
 - ID: CP10
@@ -200,7 +200,7 @@ All rows are initial execution contracts; live status is updated with evidence. 
 - LEGAL STATUS: LEGAL BLOCKER production scoring/ranking until review; foundations local
 - RISK: Timer/answers lost, keys exposed, rubric incomparable
 - ROLLBACK: Disable assignment/start; retain completed records for scoped export
-- STATUS: PLANNED
+- STATUS: DONE (current working commit)
 
 ## CP11 — Privacy, operations and release hardening
 - ID: CP11

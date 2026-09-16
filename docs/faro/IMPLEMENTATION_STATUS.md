@@ -34,6 +34,16 @@ RISKS: ESCO licensed mapping, MFA/recovery, full UI, process assignments and bac
 DEFERRED: external AI provider activation, real-data production (runtime returns RELEASE_GATES_OPEN in production).
 NEXT CHECKPOINT: CP04/CP05 native offers and deterministic matching; then CP06 transactional recruitment.
 
+## CP07–CP10 delivery
+
+DONE: private report and moderation case lifecycle with appeal, stale-offer/reconfirmation worker signals and proportional organization pause; manual Job Economics with gross/basis, estimated net range, commute cost/time and versioned provenance; assessment DRAFT → IN_REVIEW → APPROVED → ASSIGNED → STARTED → SUBMITTED → SCORED_PENDING_REVIEW → FINALIZED lifecycle with deterministic quiz scoring and server-authoritative timer.
+TESTED: build PASS; migration validation PASS (22); 3 targeted assessment/economics/trust tests PASS. Coverage includes approval gating, AI-origin drafts remaining drafts, no timer on overview, idempotent Start, reconnect/expiry, candidate result privacy, scoped review, no global ranking, private economics, review/appeal, stale signal dedupe and proportional pause.
+CHANGED FILES: migrations/0022_faro_assessment_trust_economics.sql; domain/faro/economics.ts; server/faro/{assessmentService,economicsService,trustService,api}.ts; src/tests/faro-assessment-economics-trust.test.ts.
+MIGRATIONS: 0022 additive.
+RISKS: assessment execution is intentionally quiz-only; file/code tasks, AI-assisted grading, wallet and tax/routing automation remain gated. Worker tick is an authenticated admin operation; production activation is still closed.
+DEFERRED: full employer/candidate workspace UI (CP08), PostgreSQL persistence/rehearsal and legal gates. No automatic company-fake verdict, no candidate trust score and no EHV/Life Score were added.
+NEXT CHECKPOINT: CP08 original Faro workspace consuming the real APIs, then CP11 hardening and release verification.
+
 ## CP04–CP06 native process delivery
 
 DONE: typed salary-required native offers with human review and immutable versions; material diff; deterministic requirement matching; transactional interest, original snapshot, actor/state/version/idempotency checks, structured rejection bound to original requirement, separate clocks, private watch, explicit phone grant/revoke, durable deduplicated outbox/inbox.

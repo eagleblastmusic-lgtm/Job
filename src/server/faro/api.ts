@@ -9,10 +9,14 @@ import { SKILL_CATALOG } from '../../domain/faro/skills.js';
 import { text } from './validation.js';
 import { OfferService } from './offerService.js';
 import { RecruitmentService } from './recruitmentService.js';
+import { AssessmentService } from './assessmentService.js';
+import { EconomicsService } from './economicsService.js';
+import { TrustService } from './trustService.js';
 
 export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig) {
   const profiles = new ProfileService(db);
   const offers = new OfferService(db), recruitment = new RecruitmentService(db);
+  const assessments = new AssessmentService(db), economics = new EconomicsService(db), trust = new TrustService(db);
   const rates = new Map<string, { count: number; expires: number }>();
   return async (req: IncomingMessage, res: ServerResponse, path: string) => {
     if (!path.startsWith('/api/faro/')) return false;
@@ -75,6 +79,37 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
       recruitment.deliverOutbox();
       return ok({ notifications: db.db.prepare('SELECT id,message,entity_type,entity_id,read_at,created_at FROM notifications WHERE user_id=? AND dedupe_key LIKE ? ORDER BY created_at DESC LIMIT 100').all(user.id, 'faro:%') });
     }
+    if (path === '/api/faro/worker/tick' && method === 'POST') {
+      if (user.role !== 'ADMIN') throw new HttpError(403, 'Wymagany moderator.', 'FORBIDDEN');
+      trust.tick();
+      return ok({ ok: true });
+    }
+    const report = path.match(/^\/api\/faro\/processes\/([^/]+)\/reports$/);
+    if (report && method === 'POST') return ok(trust.report(user.id, report[1]!, body), 201);
+    if (path === '/api/faro/cases' && method === 'GET') return ok({ cases: trust.list(user.id, user.role === 'ADMIN') });
+    const caseReview = path.match(/^\/api\/faro\/cases\/([^/]+)\/review$/);
+    if (caseReview && method === 'POST') return ok(trust.review(user.id, caseReview[1]!, body));
+    const caseAppeal = path.match(/^\/api\/faro\/cases\/([^/]+)\/appeal$/);
+    if (caseAppeal && method === 'POST') return ok(trust.appeal(user.id, caseAppeal[1]!, body));
+    const orgAssessments = path.match(/^\/api\/faro\/offers\/([^/]+)\/assessments$/);
+    if (orgAssessments && method === 'GET') return ok({ assessments: assessments.list(user.id, orgAssessments[1]!) });
+    if (orgAssessments && method === 'POST') return ok(assessments.create(user.id, orgAssessments[1]!, body), 201);
+    const assessmentVersion = path.match(/^\/api\/faro\/assessments\/([^/]+)\/versions\/([^/]+)$/);
+    if (assessmentVersion && method === 'POST') return ok(assessments.approve(user.id, assessmentVersion[1]!, { ...body, version: Number(assessmentVersion[2]) }));
+    const processAssessment = path.match(/^\/api\/faro\/processes\/([^/]+)\/assessment$/);
+    if (processAssessment && method === 'POST') return ok(assessments.assign(user.id, processAssessment[1]!, body), 201);
+    const attempt = path.match(/^\/api\/faro\/attempts\/([^/]+)$/);
+    if (attempt && method === 'GET') return ok(assessments.overview(user.id, attempt[1]!));
+    if (attempt && method === 'POST') return ok(assessments.start(user.id, attempt[1]!));
+    const attemptAnswers = path.match(/^\/api\/faro\/attempts\/([^/]+)\/answers$/);
+    if (attemptAnswers && method === 'PUT') return ok(assessments.save(user.id, attemptAnswers[1]!, body, false));
+    const attemptSubmit = path.match(/^\/api\/faro\/attempts\/([^/]+)\/submit$/);
+    if (attemptSubmit && method === 'POST') return ok(assessments.save(user.id, attemptSubmit[1]!, body, true));
+    const attemptReview = path.match(/^\/api\/faro\/attempts\/([^/]+)\/review$/);
+    if (attemptReview && method === 'POST') return ok(assessments.finalize(user.id, attemptReview[1]!, body));
+    const offerEconomics = path.match(/^\/api\/faro\/offers\/([^/]+)\/economics$/);
+    if (offerEconomics && method === 'GET') return ok(economics.get(user.id, offerEconomics[1]!));
+    if (offerEconomics && method === 'PUT') return ok(economics.save(user.id, offerEconomics[1]!, body));
     throw new HttpError(404, 'Nie znaleziono endpointu Faro.', 'NOT_FOUND');
   };
 }
