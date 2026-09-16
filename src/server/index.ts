@@ -1,6 +1,6 @@
-import { createExtendedJobApp } from './extendedApp.js';
+import { createFaroApp } from './faroApp.js';
 
-const app = createExtendedJobApp();
+const app = createFaroApp();
 app.server.listen(app.config.port, () => {
   console.log(`Job działa na ${app.config.appOrigin} (port ${app.config.port}).`);
 });
