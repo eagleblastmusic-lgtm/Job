@@ -23,3 +23,13 @@ MIGRATIONS: none.
 RISKS: workspace replacement and canonical APIs are next; intermediate commit is not a deployable product release. Legacy modules remain testable for migration evidence, not mounted.
 DEFERRED: baseline 2 importer failures caused by historical connector/fixture disagreement (generic connector no longer uses dedicated OLX/LinkedIn parsing); restoring these external fetch capabilities without rights would violate Canonical. They remain disclosed, not hidden or skipped.
 NEXT CHECKPOINT: CP02 + CP03 organization/projection/profile foundation.
+
+## CP02/CP03 foundation delivery
+
+DONE: persistent organizations, scoped memberships/invitations/revocation/manual verification; four-part profile storage, explicit first name, private activities and contact, pending question proposals, versioned confirmed claims, learning intents, one allowlisted nested employer projection and preview. Proposals currently use transparent local question rules, not a claim of live AI.
+TESTED: build PASS; migration validation PASS (20); 3 API/auth contract tests PASS including tenant denial, proposal confirmation/replay, malicious extra metadata, no private history/phone leak.
+CHANGED FILES: migrations/0020_faro_foundation.sql; src/domain/faro/skills.ts; src/server/faro/{api,base,validation,profileService}.ts; app.ts/faroApp.ts; src/tests/faro-{fixture,profile}.ts.
+MIGRATIONS: 0020 additive; existing data untouched.
+RISKS: ESCO licensed mapping, MFA/recovery, full UI, process assignments and backup owner transfer remain open; local authored labels explicitly not labelled ESCO.
+DEFERRED: external AI provider activation, real-data production (runtime returns RELEASE_GATES_OPEN in production).
+NEXT CHECKPOINT: CP04/CP05 native offers and deterministic matching; then CP06 transactional recruitment.

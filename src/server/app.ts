@@ -34,7 +34,7 @@ interface AppRuntime {
 interface RateEntry { count: number; resetAt: number }
 type RateMap = Map<string, RateEntry>;
 
-function securityHeaders(res: ServerResponse, config: AppConfig): void {
+export function securityHeaders(res: ServerResponse, config: AppConfig): void {
   res.setHeader('x-content-type-options', 'nosniff');
   res.setHeader('x-frame-options', 'DENY');
   res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
