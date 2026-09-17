@@ -2,7 +2,7 @@
 
 Source 2026-09-16.1; audited main ae4af4e. Initial plan 1.0 preserved in 8b2524a; current plan 1.1. Implementation is in progress on codex/faro-canonical. Backend deliveries through ea50b36 are partial checkpoints, not a completed Canonical product.
 
-Current product gap: CP08 has not replaced the legacy authenticated client, which still calls retired endpoints. This branch is not ready for user-facing release. CP11 data export/deletion coverage, persistence/recovery and release verification also remain open. The login layout stays locked; the approved registration CTA was changed in a18b25d.
+Current product gap: CP08 now replaces the legacy authenticated client with the Canonical workspace. Full lifecycle and CP11 data export/deletion coverage, persistence/recovery and release verification remain open. This branch is not ready for public release. The login layout stays locked; the approved registration CTA was changed in a18b25d.
 
 ## CP00
 
@@ -72,3 +72,19 @@ ROLLBACK: revert this test/documentation commit; no data or runtime rollback req
 STATUS: DONE for this bounded evidence/status correction only; CP10 remains PARTIAL.
 DEFERRED: CP08 workspace, remaining CP09/CP10 integration and CP11 release hardening.
 NEXT CHECKPOINT: CP08; user requested this continuation only through the nearest commit.
+
+## CP08-A — Real workspace and two-sided process
+
+GOAL / SCOPE: replace retired post-login client with an original Night/Gold workspace using persisted Canonical APIs. User has resumed the full plan beyond the earlier nearest-commit boundary.
+CLASSIFICATION: DELTA_REQUIRED for authenticated client and assessment discovery; existing auth/offer/profile/process services reused.
+DEPENDENCIES: CP02–CP07 service foundations; CP09/CP10 APIs.
+IMPLEMENTATION: role switch, desktop split/mobile single pane, profile four layers, local proposal confirmation, private watch, exact projection dialog, interest, process clocks/reason/history/diff/contact controls, organization/invites, offer editor/publication, quiz overview/start/save/review, manual economics/comparison, inbox and moderation forms. Static PWA cache is now an exact public-asset allowlist. Async navigation aborts pending fetches and rejects stale renders; logout clears private client state. No mock inventory, CV client or billing upsell is mounted.
+CHANGED FILES: src/client/faro{,Types,Ui,Views}.ts; public/{index.html,faro.css,sw.js}; src/server/faro/api.ts; e2e/faro.spec.ts; docs/faro progress files.
+MIGRATIONS: none. API: scoped GET attempts and process-assessment discovery reuse the assessment authorization service.
+TESTED: build/lint/typecheck PASS; 9 targeted Canonical node tests PASS; Playwright desktop and mobile scenarios 2 PASS, covering real candidate/employer data and persisted progression, private watch distinct from interest, economics, comparison, no calls to retired APIs, no browser errors, axe violations zero on offer workspace, 320px horizontal reflow, mobile back. Screenshots inspected. Exact auth markup and original styles compared with a18b25d: unchanged.
+ACCEPTANCE: delivered browser path is verified; the broader CP08 contract remains open for remaining workflows and their browser verification.
+LEGAL STATUS: local/test only; runtime production gate remains closed.
+RISKS / DEFERRED: broader assessment/editor/moderation tests, profile-preview concurrency, structured clarification, appointment lifecycle and CP11 data rights still require work. Existing historical importer failures remain disclosed.
+ROLLBACK: revert this checkpoint code; additive APIs have no schema change. Existing canonical data remains.
+STATUS: DONE for CP08-A; CP08 remains PARTIAL.
+NEXT CHECKPOINT: complete recruitment/privacy boundaries and assessment lifecycle, then data rights and operational release checks. Continue without waiting for another user instruction.

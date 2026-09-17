@@ -1,8 +1,8 @@
 # FARO CANONICAL IMPLEMENTATION MASTER PLAN
 
-Version 1.1 — 2026-09-17. **PLAN COMPLETE; implementation in progress.** Initial version 1.0 (before production edits) is preserved in commit 8b2524a.
+Version 1.2 — 2026-09-17. **PLAN COMPLETE; implementation in progress.** Initial version 1.0 (before production edits) is preserved in commit 8b2524a.
 
-Execution update: backend deliveries through ea50b36 cover parts of CP01–CP07 and CP09–CP10. These checkpoints remain PARTIAL until their complete acceptance contracts are verified. CP08 authenticated workspace and CP11 release hardening remain undelivered; production activation stays blocked. The next product checkpoint is CP08. The current bounded follow-up verifies the existing AI-draft assignment guard and corrects delivery evidence; it does not close CP10. See [checkpoint register](08_CHECKPOINT_REGISTER.md) and [implementation status](IMPLEMENTATION_STATUS.md).
+Execution update: backend deliveries through ea50b36 cover parts of CP01–CP07 and CP09–CP10. CP08 now connects candidate/employer workspace to actual APIs; desktop/mobile browser tests exercise profile, watch, interest, economics and employer progression. Complete acceptance still requires the remaining lifecycle, data rights and operational work. Production activation stays blocked. The user has explicitly resumed the full plan; the earlier nearest-commit stopping boundary no longer applies. See [checkpoint register](08_CHECKPOINT_REGISTER.md) and [implementation status](IMPLEMENTATION_STATUS.md).
 
 Authority: user request → Canonical 2026-09-16 approved product decisions/contracts → actual fetched main evidence. Documents in the ZIP are product material; their historical execution instructions do not independently authorize outreach, production deployment or legal approval. ZIP is preserved unmodified under `source/FARO-CANONICAL/`. First version of this plan must be committed before production edits. Later changes must retain this commit as the comparison point.
 

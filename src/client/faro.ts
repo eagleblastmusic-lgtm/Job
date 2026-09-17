@@ -1,0 +1,232 @@
+import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection } from './faroTypes.js';
+import { esc, label, salary, money, date, chip, empty, input, select, area, check, form, button, projection } from './faroUi.js';
+import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView } from './faroViews.js';
+
+const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+const root = $('#appView');
+let user: User | null = null, skills: Skill[] = [], organizations: Organization[] = [];
+let role: 'candidate' | 'employer' = 'candidate', orgId = '', filter = '', modelFilter = '';
+let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setInterval> | undefined;
+let offers: Offer[] = [], currentOffer: Offer | null = null, currentProcess: Process | null = null, currentAttempt: Attempt | null = null;
+const compared = new Set<string>();
+let watchIds = new Set<string>();
+const value = (f: FormData, name: string) => String(f.get(name) ?? '').trim();
+const number = (f: FormData, name: string) => Number(value(f, name));
+const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit') });
+const claim = (f: FormData) => ({ skillId: value(f, 'skillId'), level: value(f, 'level'), source: value(f, 'source'), practice: practice(f), confirmed: f.has('confirmed') });
+const toDate = (text: string) => { const d = new Date(text); if (!Number.isFinite(d.getTime())) throw new Error('Podaj prawidłowy termin.'); return d.toISOString(); };
+
+async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal): Promise<T> {
+  const r = await fetch(path.startsWith('/api/') ? path : `/api/faro${path}`, { method, signal, credentials: 'same-origin', headers: body === undefined ? {} : { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store' });
+  const data = await r.json() as T & { error?: { message?: string } };
+  if (r.status === 401) { loggedOut(); throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
+  if (!r.ok) throw new Error(data.error?.message ?? `Błąd ${r.status}`);
+  return data;
+}
+function notify(text: string, error = false) {
+  const status = $('#f-status');
+  if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
+}
+function loggedOut() {
+  epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
+  user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear();
+  currentOffer = null; currentProcess = null; currentAttempt = null; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
+  root.replaceChildren(); root.className = 'hidden'; document.body.classList.remove('faro-session');
+  $('#authView').classList.remove('hidden'); $('#logoutButton').classList.add('hidden');
+  document.querySelectorAll<HTMLFormElement>('#loginForm,#registerForm').forEach(f => f.reset());
+}
+function shell() {
+  root.className = 'faro'; document.body.classList.add('faro-session'); $('#authView').classList.add('hidden');
+  root.innerHTML = `<a class="f-skip" href="#f-content">Przejdź do treści</a><header class="f-header"><a class="f-brand" href="#offers" aria-label="Faro — możliwości"><span aria-hidden="true">↗</span> FARO<span class="f-brand-note">Twój następny krok.</span></a><div class="f-session"><label class="f-role-label">Przestrzeń<select id="f-role"><option value="candidate" ${role === 'candidate' ? 'selected' : ''}>Kandydat</option><option value="employer" ${role === 'employer' ? 'selected' : ''}>Pracodawca</option></select></label>${button('logout', 'Wyloguj')}</div></header>
+  <div class="f-shell"><nav class="f-nav" aria-label="Workspace Faro">${(role === 'candidate' ? [['offers','Możliwości'],['watches','Obserwowane'],['processes','Moje procesy'],['profile','Profil'],['compare','Porównanie'],['attempts','Assessmenty']] : [['employer','Oferty'],['organization','Organizacja']]).concat([['notifications','Dzisiaj'],['cases','Zgłoszenia'],['privacy','Prywatność']]).map(([path,title]) => `<a href="#${path}" ${location.hash.split('/')[0] === `#${path}` ? 'aria-current="page"' : ''}>${title}</a>`).join('')}<p class="f-nav-note">Cała Polska.<br>Kompetencje przede wszystkim.<br><strong>Bezpłatnie.</strong></p></nav><div class="f-main"><p id="f-status" role="status" aria-live="polite"></p><div id="f-content" tabindex="-1" aria-busy="true"><p class="f-loading">Wczytuję Twoją przestrzeń…</p></div></div></div>`;
+}
+function navigate(path: string) { if (location.hash === `#${path}`) void render(); else location.hash = path; }
+async function bootstrap() {
+  try {
+    const me = await api<{ user: User }>('/api/me'); user = me.user;
+    await render();
+  } catch (e) { if ((e as Error).name !== 'AbortError') { loggedOut(); $('#authMessage').textContent = (e as Error).message; } }
+}
+function split(list: string, detail: string, selected: boolean, back: string) {
+  return `<div class="f-split ${selected ? 'f-selected' : ''}"><aside class="f-list" aria-label="Lista">${list}</aside><section class="f-detail" aria-label="Szczegóły">${selected ? `<a class="f-back" href="#${esc(back)}">← Wróć do listy</a>` : ''}${detail}</section></div>`;
+}
+function card(o: Offer, base: string, selected: string) {
+  return `<a class="f-offer-card ${selected === o.id ? 'f-active' : ''}" href="#${base}/${o.id}" ${selected === o.id ? 'aria-current="true"' : ''}><span class="f-company-mark" aria-hidden="true">${esc(o.company.slice(0,1))}</span><div><p class="f-muted">${esc(o.company)}</p><h2>${esc(o.data.role)}</h2><p class="f-card-money">${esc(salary(o.data.salary[0]!))}</p><div class="f-chips">${chip(label(o.data.workModel))}${chip(o.data.location)}${role === 'employer' ? chip(label(o.status)) : ''}</div></div><span aria-hidden="true">↗</span></a>`;
+}
+async function render() {
+  if (!user) return;
+  const mine = ++epoch; controller.abort(); controller = new AbortController(); clearInterval(timer); shell();
+  currentOffer = null; currentProcess = null; currentAttempt = null;
+  const [page = 'offers', id = ''] = location.hash.slice(1).split('/');
+  try {
+    const [catalog, orgs] = await Promise.all([api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
+    if (mine !== epoch) return;
+    skills = catalog.skills; organizations = orgs.organizations;
+    if (!organizations.some(o => o.id === orgId)) orgId = organizations[0]?.id ?? '';
+    let html = '';
+    if (['offers','watches','employer'].includes(page)) {
+      const employer = page === 'employer';
+      if (employer && !orgId) html = empty('Załóż swoją organizację', 'Najpierw utwórz organizację, potem przygotuj transparentną ofertę.') + '<a class="f-button f-primary" href="#organization">Przejdź do organizacji</a>';
+      else {
+        const [list, watches] = await Promise.all([api<{offers:Offer[]}>(page === 'watches' ? '/watches' : `/offers${employer ? `?organizationId=${encodeURIComponent(orgId)}` : ''}`), api<{offers:Offer[]}>('/watches')]);
+        offers = list.offers; watchIds = new Set(watches.offers.map(o => o.id));
+        const chosen = id ? await api<Offer>(`/offers/${encodeURIComponent(id)}`) : null;
+        if (mine !== epoch) return;
+        currentOffer = chosen;
+        const filtered = offers.filter(o => `${o.data.role} ${o.company} ${o.data.location}`.toLocaleLowerCase('pl').includes(filter.toLocaleLowerCase('pl')) && (!modelFilter || o.data.workModel === modelFilter));
+        html = `<div class="f-page-heading"><p class="f-kicker">${employer ? 'PRZESTRZEŃ PRACODAWCY' : 'MOŻLIWOŚCI · CAŁA POLSKA'}</p><h1>${employer ? 'Dobra rekrutacja zaczyna się od jasnych warunków.' : 'Zobacz, dokąd prowadzą Twoje umiejętności.'}</h1><p>${employer ? 'Oferty, ludzie i kolejne kroki w jednym miejscu.' : 'Jawne wynagrodzenie. Konkretne kompetencje. Miejsce na naukę.'}</p>${employer ? `<a class="f-button f-primary" href="#offer-create">Utwórz ofertę</a>` : ''}</div>
+        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label><button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id)) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
+      }
+    } else if (page === 'profile') html = profileView(await api<Profile>('/profile'), skills);
+    else if (page === 'offer-create' || page === 'offer-edit') {
+      if (!orgId) throw new Error('Najpierw utwórz organizację.');
+      const o = id ? await api<Offer>(`/offers/${id}`) : undefined; currentOffer = o ?? null;
+      html = offerForm(skills, user.id, o);
+    } else if (page === 'organization') {
+      html = `<h1>Twoja organizacja</h1><p>Publikacja jest dostępna po weryfikacji organizacji. Wybór przestrzeni nie nadaje uprawnień do danych innych firm.</p>${organizations.length ? `<label>Aktywna organizacja<select id="f-org">${organizations.map(o => `<option value="${esc(o.id)}" ${orgId === o.id ? 'selected' : ''}>${esc(o.name)} · ${esc(label(o.verification))} · ${esc(label(o.role))}</option>`).join('')}</select></label>` : ''}<div class="f-grid"><section class="f-card"><h2>Utwórz organizację</h2>${form('organization',input('name','Nazwa organizacji','','text','required maxlength="150"'),'Utwórz')}</section><section class="f-card"><h2>Dołącz z zaproszenia</h2>${form('accept-invite',input('token','Kod zaproszenia'),'Dołącz')}</section>${orgId ? `<section class="f-card"><h2>Zaproś współpracownika</h2>${form('invite', input('email','E-mail','','email') + select('role','Rola',['RECRUITER','HIRING_MANAGER','ADMIN']),'Utwórz kod zaproszenia',orgId)}</section>` : ''}${user.role === 'ADMIN' ? `<section class="f-card"><h2>Weryfikacja organizacji</h2>${form('verify-org',input('organizationId','Identyfikator organizacji',orgId) + area('note','Uzasadnienie weryfikacji','','required minlength="10"'),'Potwierdź weryfikację')}</section>` : ''}</div><p class="f-muted">Identyfikator wybranej organizacji: ${esc(orgId)}</p>`;
+    } else if (page === 'processes' || page === 'recruitments') {
+      if (page === 'recruitments') { currentOffer = await api<Offer>(`/offers/${id}`); }
+      const list = await api<{processes:Process[]}>(`/processes${page === 'recruitments' ? `?offerId=${encodeURIComponent(id)}` : ''}`);
+      const selectedId = page === 'processes' ? id : location.hash.slice(1).split('/')[2] ?? '';
+      const p = selectedId ? await api<Process>(`/processes/${selectedId}`) : null; currentProcess = p;
+      const base = page === 'recruitments' ? `recruitments/${id}` : 'processes';
+      html = `<h1>${page === 'recruitments' ? 'Zgłoszenia do rekrutacji' : 'Moje procesy'}</h1>` + split(list.processes.map(p => `<a class="f-offer-card" href="#${base}/${p.id}"><div><h3>${esc(page === 'recruitments' ? p.projection.firstName : p.role)}</h3><p>${esc(p.company)}</p>${chip(label(p.status))}<p>${esc(label(p.stage))}</p></div></a>`).join('') || empty('Brak zgłoszeń', 'Zgłoszenie zainteresowania rozpoczyna proces.'), p ? processDetail(p,skills) : empty('Każdy krok ma swoje miejsce', 'Wybierz proces, aby zobaczyć terminy, historię i dostępne działania.'), Boolean(p),base);
+      if (mine !== epoch) return;
+      $('#f-content').innerHTML = html;
+      if (p) {
+        const attempts = await api<{attempts:Attempt[]}>(`/processes/${p.id}/assessment`);
+        if (mine !== epoch) return;
+        $('#f-attempt-list').innerHTML = attemptLinks(attempts.attempts);
+      }
+      finish(mine); return;
+    } else if (page === 'economics') {
+      currentOffer = await api<Offer>(`/offers/${id}`);
+      html = economicsView(currentOffer, await api<Economics|null>(`/offers/${id}/economics`));
+    } else if (page === 'compare') {
+      const data = await Promise.all([...compared].map(async id => ({ offer: await api<Offer>(`/offers/${id}`), economics: await api<Economics|null>(`/offers/${id}/economics`) })));
+      const rows: Array<[string, (o:Offer,e:Economics|null)=>string]> = [
+        ['Brutto / faktura',(o)=>salary(o.data.salary[0]!)], ['Szacowane netto',(_,e)=>e?.result.estimatedNetRange ? `${money(e.result.estimatedNetRange.min)} – ${money(e.result.estimatedNetRange.max)}` : 'Nie oszacowano'],
+        ['Po kosztach dojazdu',(_,e)=>e?.result.netAfterCommute ? `${money(e.result.netAfterCommute.min)} – ${money(e.result.netAfterCommute.max)}` : 'Nie oszacowano'], ['Dojazd — koszt',(_,e)=>money(e?.result.commuteCost ?? null)], ['Dojazd — minuty dziennie',(_,e)=>e?.result.commuteTimeMinutes?.toString() ?? 'Nie oszacowano'],
+        ['Dni zdalne',o=>String(o.data.remoteDays)],['Zmiany',o=>o.data.shifts],['Weekendy',o=>o.data.weekends === null ? 'Nie określono' : o.data.weekends ? 'Tak':'Nie'],['Etapy',o=>o.data.stages.join(' → ')],['Assessment',o=>`${o.data.assessmentMinutes} min`],['Pierwsza odpowiedź',o=>`${o.data.responseHours} h kalendarzowych`]
+      ];
+      html = `<h1>Porównaj warunki, wybierz swój kierunek.</h1><p>Nie sumujemy pieniędzy i czasu w ocenę życia. Sprawdź podstawę i okres wynagrodzenia; nie każdy wariant jest bezpośrednio porównywalny.</p>${data.length ? `<div class="f-table-wrap" tabindex="0" aria-label="Porównanie ofert"><table><thead><tr><th scope="col">Warunek</th>${data.map(({offer:o})=>`<th scope="col">${esc(o.data.role)}<br>${esc(o.company)}${button('compare-remove','Usuń',o.id)}</th>`).join('')}</tr></thead><tbody>${rows.map(([title,render])=>`<tr><th scope="row">${title}</th>${data.map(({offer:o,economics:e})=>`<td>${esc(render(o,e))}${e && e.offerVersion !== o.version ? '<small>Scenariusz dotyczy wcześniejszej wersji.</small>' : ''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : empty('Wybierz oferty do porównania','Dodawaj je ze szczegółów oferty. Wybór pozostaje w tej sesji.')}`;
+    } else if (page === 'attempts') {
+      if (id) { const a = await api<Attempt>(`/attempts/${id}`); currentAttempt = a; html = attemptView(a); }
+      else html = `<h1>Twoje assessmenty</h1>${attemptLinks((await api<{attempts:Attempt[]}>('/attempts')).attempts)}`;
+    } else if (page === 'assessment-create' || page === 'assessment-assign') {
+      const process = page === 'assessment-assign' ? await api<Process>(`/processes/${id}`) : null;
+      const offerId = process?.offerId ?? id;
+      const definitions = (await api<{assessments:Array<{id:string;version:number;state:string;content:string}>}>(`/offers/${offerId}/assessments`)).assessments;
+      html = `<h1>${process ? 'Przypisz assessment' : 'Assessmenty rekrutacji'}</h1><p>Każda wersja wymaga review. Kandydat pozna liczbę zadań, limit i deadline przed rozpoczęciem.</p>${definitions.map(d=>`<section class="f-card"><h2>${esc((JSON.parse(d.content) as {title:string}).title)}</h2>${chip(label(d.state))}<p>Wersja ${d.version}</p>${process && d.state === 'APPROVED' ? form('assessment-assign', `<input type="hidden" name="assessmentId" value="${esc(d.id)}"><input type="hidden" name="version" value="${d.version}">` + input('deadline','Termin wykonania','','datetime-local'), 'Przypisz',process.id) : !process && d.state !== 'APPROVED' ? form('assessment-approve', `<input type="hidden" name="version" value="${d.version}"><input type="hidden" name="action" value="${d.state === 'DRAFT' ? 'REVIEW' : 'APPROVE'}">` + check('confirmed','Sprawdziłem treść, klucz odpowiedzi, limit czasu i prawa do zadania.'),d.state === 'DRAFT' ? 'Przekaż do review' : 'Zatwierdź',d.id) : ''}</section>`).join('') || '<p>Nie ma jeszcze assessmentów.</p>'}${!process ? `<section class="f-card"><h2>Nowy quiz — szkic</h2>${form('assessment-create', input('title','Nazwa') + input('timeLimitMinutes','Limit czasu (minuty)',15,'number','required min="1" max="480"') + input('expectedMinutes','Przewidywany czas (minuty)',10,'number','required min="1" max="480"') + input('rubricVersion','Oznaczenie kryteriów oceny','1') + area('prompt','Treść zadania') + area('options','Odpowiedzi — jedna w wierszu') + input('answer','Numer poprawnej odpowiedzi (od 1)',1,'number','required min="1" max="8"') + input('points','Punkty',1,'number','required min="1" max="100"'),'Zapisz szkic',offerId)}</section>` : ''}`;
+    } else if (page === 'notifications') {
+      const data = await api<{notifications:Array<{message:string;created_at:string;entity_type:string;entity_id:string}>}>('/notifications');
+      html = `<h1>Dzisiaj w Twoim Faro</h1>${data.notifications.map(n=>`<article class="f-card"><p>${esc(n.message)}</p><small>${esc(date(n.created_at))}</small><br><a href="#${n.entity_type === 'offer' ? 'offers':'processes'}/${esc(n.entity_id)}">Otwórz szczegóły</a></article>`).join('') || empty('Jesteś na bieżąco','Aktualizacje pojawią się tutaj, gdy zmieni się oferta lub Twój proces.')}`;
+    } else if (page === 'cases') {
+      const data = await api<{cases:Array<{id:string;kind:string;state:string;statement:string;decision:string|null}>}>('/cases');
+      html = `<h1>Zgłoszenia i przegląd</h1><p>Sygnał kierujemy do przeglądu przez człowieka. Nie jest wyrokiem o osobie lub firmie.</p>${data.cases.map(c=>`<article class="f-card"><h2>${esc(label(c.kind))}</h2>${chip(c.state)}<p>${esc(c.statement)}</p><p>${esc(c.decision)}</p>${form('appeal',area('statement','Uzasadnienie odwołania','','required minlength="10"'),'Zapisz odwołanie',c.id)}${user?.role === 'ADMIN' ? form('case-review',select('state','Etap przeglądu',['EVIDENCE_REVIEW','ACTION','NO_ACTION','RESOLVED']) + area('decision','Uzasadnienie decyzji','','required minlength="10"') + input('reviewAt','Termin ponownego przeglądu','','datetime-local') + check('restrict','Wstrzymaj przyjmowanie nowych zgłoszeń przez organizację',false),'Zapisz przegląd',c.id) : ''}</article>`).join('') || '<p>Brak zgłoszeń.</p>'}`;
+    } else if (page === 'privacy') {
+      html = `<h1>Twoje dane i wybory</h1><section class="f-card"><h2>Udostępnienie pod Twoją kontrolą</h2><p>Obserwowane oferty i kalkulacje pozostają prywatne. Telefon udostępniasz osobno w konkretnym procesie i możesz cofnąć zgodę.</p><p>Faro jest bezpłatne dla obu stron. Plan rozliczeń nie wpływa na kolejność ofert ani matching.</p><a href="/privacy.html">Informacja o prywatności</a><p>Eksport i usuwanie danych Canonical są przygotowywane w kolejnym etapie. Uruchomienie publiczne pozostaje zablokowane do ich ukończenia.</p></section>`;
+    } else html = empty('Nie znaleziono widoku','Wybierz pozycję w nawigacji.');
+    if (mine !== epoch) return;
+    $('#f-content').innerHTML = html; finish(mine);
+    if (currentAttempt?.state === 'STARTED' && currentAttempt.expiresAt) {
+      const end = Date.parse(currentAttempt.expiresAt), server = Date.parse(currentAttempt.serverNow), started = performance.now();
+      const tick = () => { const element = $('#f-timer'); if (!element) return; const seconds = Math.max(0,Math.ceil((end-server-(performance.now()-started))/1000)); element.textContent = seconds ? `Pozostało ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}` : 'Czas upłynął. Serwer zweryfikuje zapis.'; };
+      tick(); timer = setInterval(tick,1000);
+    }
+  } catch (e) {
+    if (mine !== epoch || (e as Error).name === 'AbortError') return;
+    $('#f-content').innerHTML = empty('Nie udało się wczytać danych',(e as Error).message) + button('retry','Spróbuj ponownie'); finish(mine);
+  }
+}
+function finish(mine: number) { if (mine !== epoch) return; $('#f-content').setAttribute('aria-busy','false'); $('#f-content').focus({preventScroll:true}); }
+function attemptLinks(items: Attempt[]) { return items.map(a=>`<a class="f-offer-card" href="#attempts/${a.id}"><div><h3>${esc(a.title)}</h3>${chip(label(a.state))}<p>Termin: ${esc(date(a.deadline))}</p></div></a>`).join('') || '<p>Brak zaproszeń do assessmentów.</p>'; }
+
+root.addEventListener('change', event => {
+  const el = event.target as HTMLSelectElement;
+  if (el.id === 'f-role') { role = el.value === 'employer' ? 'employer' : 'candidate'; filter=''; modelFilter=''; navigate(role === 'employer' ? 'employer':'offers'); }
+  if (el.id === 'f-org') { orgId=el.value; void render(); }
+});
+root.addEventListener('click', event => {
+  if ((event.target as Element).closest('.f-skip')) { event.preventDefault(); $('#f-content').focus(); return; }
+  const el = (event.target as Element).closest<HTMLButtonElement>('button[data-action]');
+  if (!el || el.disabled) return;
+  const action = el.dataset.action!, id = el.dataset.id!, mine = epoch; el.disabled = true;
+  void (async () => {
+    try {
+      if (action === 'logout') { await api('/api/auth/logout','POST',{}); loggedOut(); location.hash=''; return; }
+      if (action === 'retry') { await render(); return; }
+      if (action === 'compare-add') { if (compared.size >= 4 && !compared.has(id)) throw new Error('Porównuj do 4 ofert jednocześnie.'); compared.add(id); notify('Oferta dodana. Otwórz Porównanie.'); return; }
+      if (action === 'compare-remove') compared.delete(id);
+      if (action === 'watch' || action === 'unwatch') await api(`/offers/${id}/watch`,action === 'watch' ? 'POST':'DELETE',{});
+      if (action === 'revoke-claim') await api(`/claims/${id}`,'DELETE',{});
+      if (action === 'reject-proposal') await api(`/proposals/${id}`,'POST',{status:'REJECTED'});
+      if (action === 'preview' || action === 'interest-preview') {
+        const p = await api<Projection>('/profile/preview'); if (mine !== epoch) return;
+        const content = `<h2>Tak wygląda Twój profil dla pracodawcy</h2>${projection(p)}${action === 'interest-preview' ? form('interest',check('projectionConfirmed','Potwierdzam udostępnienie powyższych danych w tej rekrutacji.'),'Zgłoś zainteresowanie',id) : ''}`;
+        const dialog = document.createElement('dialog'); dialog.className='faro f-dialog'; dialog.innerHTML = `<div>${button('close-dialog','Zamknij')}${content}</div>`; root.append(dialog); dialog.showModal(); dialog.addEventListener('close',()=>dialog.remove(),{once:true}); return;
+      }
+      if (action === 'close-dialog') { el.closest('dialog')?.close(); return; }
+      if (action === 'grant-phone' || action === 'revoke-phone') await api(`/processes/${id}/phone-grant`,action === 'grant-phone' ? 'POST':'DELETE',{});
+      if (action === 'read-phone') { const data = await api<{phone:string}>(`/processes/${id}/phone`); if (mine === epoch) notify(`Udostępniony numer: ${data.phone}`); return; }
+      if (action === 'attempt-start') await api(`/attempts/${id}`,'POST',{});
+      if (mine === epoch) await render();
+    } catch (e) { if (mine === epoch && (e as Error).name !== 'AbortError') notify((e as Error).message,true); }
+    finally { el.disabled=false; }
+  })();
+});
+root.addEventListener('submit', event => {
+  const el = event.target as HTMLFormElement; if (!el.dataset.form) return; event.preventDefault();
+  const f = new FormData(el), action = el.dataset.form, id = el.dataset.id ?? '', mine = epoch;
+  const fields = el.querySelector('fieldset'); if (fields?.disabled) return; if (fields) fields.disabled=true;
+  void (async () => {
+    try {
+      let destination = '';
+      if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model'); }
+      else if (action === 'profile') await api('/profile','PUT',{firstName:value(f,'firstName'),phone:value(f,'phone'),expectedVersion:number(f,'version'),availability:{kind:value(f,'availability'),value:value(f,'availabilityValue')}});
+      else if (action === 'claim') await api('/claims','POST',claim(f));
+      else if (action === 'learning') await api('/learning','POST',{skillId:value(f,'skillId'),mode:value(f,'mode'),practice:practice(f)});
+      else if (action === 'activity') await api('/activities','POST',{description:value(f,'description'),source:value(f,'source')});
+      else if (action === 'proposal') await api(`/proposals/${id}`,'POST',{...claim(f),status:'ACCEPTED'});
+      else if (action === 'organization') { const o = await api<{id:string}>('/organizations','POST',{name:value(f,'name')}); orgId=o.id; }
+      else if (action === 'accept-invite') await api('/invites/accept','POST',{token:value(f,'token')});
+      else if (action === 'invite') { const data = await api<{token:string}>(`/organizations/${id}/invites`,'POST',{email:value(f,'email'),role:value(f,'role')}); if (mine === epoch) el.querySelector('.f-form-message')!.textContent=`Kod ważny 72 godziny: ${data.token}`; return; }
+      else if (action === 'verify-org') await api(`/organizations/${encodeURIComponent(value(f,'organizationId'))}/verify`,'POST',{note:value(f,'note')});
+      else if (action === 'offer') {
+        const prior=currentOffer, contract=value(f,'contract');
+        const data: OfferData = { role:value(f,'role'), responsibilities:value(f,'responsibilities').split('\n').filter(Boolean), location:value(f,'location'), workModel:value(f,'workModel'), remoteDays:number(f,'remoteDays'), salary:[{ contract, basis:({UOP:'GROSS_EMPLOYMENT',CIVIL:'GROSS_CIVIL',B2B:'B2B_NET_INVOICE_EXCL_VAT'} as Record<string,string>)[contract]!, min:Math.round(number(f,'salaryMin')*100),max:Math.round(number(f,'salaryMax')*100),currency:'PLN',period:value(f,'period'),variable:value(f,'variable'),hoursPerPeriod:number(f,'hoursPerPeriod'),ftePercent:number(f,'ftePercent')}], requirements:skills.filter(s=>value(f,`kind:${s.id}`)!=='Pomijam').map(s=>({id:prior?.data.requirements.find(r=>r.skillId===s.id)?.id ?? crypto.randomUUID(),skillId:s.id,kind:value(f,`kind:${s.id}`),level:value(f,`level:${s.id}`),rationale:value(f,`why:${s.id}`)})), hours:value(f,'hours'),shifts:value(f,'shifts'),nights:value(f,'nights')==='Nie określono'?null:value(f,'nights')==='Tak',weekends:value(f,'weekends')==='Nie określono'?null:value(f,'weekends')==='Tak',learningSupport:value(f,'learningSupport'),responseHours:number(f,'responseHours'),decisionHours:number(f,'decisionHours'),stages:value(f,'stages').split('\n').filter(Boolean),assessmentMinutes:number(f,'assessmentMinutes'),interviewCount:number(f,'interviewCount'),closesAt:toDate(value(f,'closesAt')),recruiterId:value(f,'recruiterId') };
+        const o=await api<Offer>(id?`/offers/${id}`:`/organizations/${orgId}/offers`,id?'PUT':'POST',id?{data,expectedVersion:prior?.revision}:data); destination=`employer/${o.id}`;
+      } else if (action === 'lifecycle') await api(`/offers/${id}/lifecycle`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed'),expectedVersion:currentOffer?.revision});
+      else if (action === 'interest') { const p=await api<{id:string}>(`/offers/${id}/interest`,'POST',{offerVersion:currentOffer?.version,projectionConfirmed:f.has('projectionConfirmed'),idempotencyKey:crypto.randomUUID()}); destination=`processes/${p.id}`; }
+      else if (action === 'process-command') { const command=value(f,'command'); await api(`/processes/${id}/commands`,'POST',{command,expectedVersion:currentProcess?.revision,idempotencyKey:crypto.randomUUID(),reason:{code:value(f,'reason'),requirementId:value(f,'requirementId')},nextAction:value(f,'nextAction'),dueAt:value(f,'dueAt')?toDate(value(f,'dueAt')):null,answer:value(f,'answer'),explanation:value(f,'explanation')}); }
+      else if (action === 'report') await api(`/processes/${id}/reports`,'POST',{kind:value(f,'kind'),statement:value(f,'statement')});
+      else if (action === 'appeal') await api(`/cases/${id}/appeal`,'POST',{statement:value(f,'statement')});
+      else if (action === 'case-review') await api(`/cases/${id}/review`,'POST',{state:value(f,'state'),decision:value(f,'decision'),reviewAt:toDate(value(f,'reviewAt')),restrict:f.has('restrict')});
+      else if (action === 'economics') await api(`/offers/${id}/economics`,'PUT',{salaryOptionIndex:number(f,'salaryOptionIndex'),netMin:value(f,'netMin')?Math.round(number(f,'netMin')*100):null,netMax:value(f,'netMax')?Math.round(number(f,'netMax')*100):null,commuteCost:value(f,'commuteCost')?Math.round(number(f,'commuteCost')*100):null,commuteMinutes:value(f,'commuteMinutes')?number(f,'commuteMinutes'):null,transport:value(f,'transport'),source:value(f,'source'),observedAt:toDate(value(f,'observedAt')),assumptions:value(f,'assumptions')});
+      else if (action === 'assessment-create') await api(`/offers/${id}/assessments`,'POST',{title:value(f,'title'),timeLimitMinutes:number(f,'timeLimitMinutes'),expectedMinutes:number(f,'expectedMinutes'),rubricVersion:value(f,'rubricVersion'),tasks:[{prompt:value(f,'prompt'),options:value(f,'options').split('\n').filter(Boolean),answer:number(f,'answer')-1,points:number(f,'points')}]});
+      else if (action === 'assessment-approve') await api(`/assessments/${id}/versions/${number(f,'version')}`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed')});
+      else if (action === 'assessment-assign') { await api(`/processes/${id}/assessment`,'POST',{assessmentId:value(f,'assessmentId'),version:number(f,'version'),deadline:toDate(value(f,'deadline'))}); destination=`processes/${id}`; }
+      else if (action === 'attempt-answers') {
+        const answers:Record<string,number>={}; for(const task of currentAttempt?.tasks ?? []) if(f.has(task.id)) answers[task.id]=number(f,task.id);
+        const submit=value(f,'operation')==='Prześlij do oceny'; await api(`/attempts/${id}/${submit?'submit':'answers'}`,submit?'POST':'PUT',{answers,expectedVersion:currentAttempt?.revision});
+      } else if (action === 'attempt-review') await api(`/attempts/${id}/review`,'POST',{note:value(f,'note'),confirmed:f.has('confirmed')});
+      if (mine !== epoch) return;
+      if(destination) navigate(destination); else { await render(); notify('Zapisano.'); }
+    } catch(e) { if(mine === epoch && (e as Error).name !== 'AbortError') { const message=el.querySelector('.f-form-message'); if(message) message.textContent=(e as Error).message; else notify((e as Error).message,true); } }
+    finally { if(fields) fields.disabled=false; }
+  })();
+});
+document.querySelectorAll<HTMLElement>('[data-auth-tab]').forEach(tab=>tab.addEventListener('click',()=>{
+  const register=tab.dataset.authTab==='register'; $('#registerForm').classList.toggle('hidden',!register); $('#loginForm').classList.toggle('hidden',register);
+  document.querySelectorAll('[data-auth-tab]').forEach(t=>t.classList.toggle('active',t===tab)); $('#authMessage').textContent='';
+}));
+for(const id of ['loginForm','registerForm']) $<HTMLFormElement>(`#${id}`).addEventListener('submit',event=>{
+  event.preventDefault(); const el=event.currentTarget as HTMLFormElement, f=new FormData(el), submit=el.querySelector<HTMLButtonElement>('button[type=submit]')!;
+  if(submit.disabled)return; submit.disabled=true; $('#authMessage').textContent='Trwa logowanie…';
+  void (async()=>{try{await api(`/api/auth/${id==='loginForm'?'login':'register'}`,'POST',{email:value(f,'email'),password:value(f,'password'),name:value(f,'name'),acceptTerms:f.has('acceptTerms'),acceptPrivacy:f.has('acceptPrivacy'),analyticsConsent:f.has('analyticsConsent')}); el.reset(); $('#authMessage').textContent=''; await bootstrap();}catch(e){$('#authMessage').textContent=(e as Error).message;}finally{submit.disabled=false;}})();
+});
+window.addEventListener('hashchange',()=>{if(user)void render();});
+window.addEventListener('offline',()=>notify('Jesteś offline. Zmiany wymagają połączenia z serwerem.',true));
+window.addEventListener('pagehide',()=>{controller.abort();clearInterval(timer);});
+if('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(()=>{});
+root.replaceChildren(); void bootstrap();

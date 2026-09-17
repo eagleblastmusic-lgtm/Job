@@ -160,7 +160,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL CLEAR local; no public activation before gates
 - RISK: Login selector bleed or stale requests across session
 - ROLLBACK: Restore prior app script reference; leave canonical data intact
-- STATUS: PLANNED (next implementation)
+- STATUS: PARTIAL (real workspace and candidate/employer process delivered; desktop/mobile profile/watch/interest/economics/advance and axe verified. Assessment/editor/privacy/interview completion follows).
 
 ## CP09 — Private Job Economics and comparison
 - ID: CP09
