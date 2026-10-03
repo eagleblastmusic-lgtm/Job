@@ -1,4 +1,4 @@
-import type { Skill, Projection, Salary } from './faroTypes.js';
+import type { Skill, Projection, Salary, Economics } from './faroTypes.js';
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export const labels: Record<string, string> = {
   NO_SHOW_CASE:'Nieobecność do wyjaśnienia',INTERVIEW_DISCREPANCY:'Rozbieżność po rozmowie',CANDIDATE:'Kandydat',EMPLOYER:'Pracodawca',
@@ -30,6 +30,7 @@ export const label = (value: string) => labels[value] ?? value;
 export const money = (value: number | null) => value === null ? 'Nie oszacowano' : new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(value / 100);
 export const date = (value: string | null) => value ? new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Warsaw' }).format(new Date(value)) : 'Nie ustalono';
 export const salary = (s: Salary) => `${money(s.min)} – ${money(s.max)} ${s.contract === 'B2B' ? 'na fakturze bez VAT' : 'brutto'} / ${label(s.period)}`;
+export const scenarioSalary=(e:Economics)=>`${money(e.result.grossOrInvoiceMin)} – ${money(e.result.grossOrInvoiceMax)} ${e.result.basis==='B2B_NET_INVOICE_EXCL_VAT'?'na fakturze bez VAT':'brutto'} / ${label(e.result.period)}`;
 export const chip = (value: string, tone = '') => `<span class="f-chip ${esc(tone)}">${esc(value)}</span>`;
 export const empty = (title: string, description: string) => `<div class="f-empty"><span aria-hidden="true">↗</span><h2>${esc(title)}</h2><p>${esc(description)}</p></div>`;
 export const options = (items: string[], selected = '') => items.map(item => `<option value="${esc(item)}" ${item === selected ? 'selected' : ''}>${esc(label(item))}</option>`).join('');

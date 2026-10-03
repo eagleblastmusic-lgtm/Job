@@ -262,3 +262,19 @@ RISK / DEFERRED: salary thresholds, commute-distance/time and exact hours need c
 ROLLBACK: disable own active preference or revert list/client/API together; preserve private settings/history.
 STATUS: DONE for CP05-A scoped condition filters; overall CP05 PARTIAL.
 NEXT CHECKPOINT: offer salary variant preservation and economics comparison units; operational release foundations.
+
+# CP04-C / CP09-B — Salary variant integrity and comparison units (2026-10-04)
+ID / TITLE: CP04-C and CP09-B, preserve alternatives and compare the selected scenario.
+GOAL / PURPOSE / CURRENT GAP: editing a multi-salary offer silently dropped alternatives; comparison used first salary even when private economics used another basis/period; unit metadata was implicit.
+SCOPE / IMPLEMENTATION / FILES: client offer editor, economics view/compare and types/UI helpers, domain economics.ts and economicsService.ts; economics/API and browser tests. Editing first variant preserves all remaining variants and shows them read-only. Comparison uses immutable gross/invoice bounds, basis and period stored in the private scenario; monetary results show period. New calculations use manual-scenario-v2 with PLN minor units, same-period net/commute cost and round-trip daily minutes. Asserted contradictory periods/time basis are rejected without overwriting saved data.
+DEPENDENCIES: CP04 versioned salary options, CP09 manual private scenarios and CP08 workspace.
+DB CHANGE / MIGRATIONS: none; existing result JSON preserves old v1 records unchanged.
+API CHANGE: economics accepts optional netPeriod/commuteCostPeriod/commuteTimeBasis assertions; mismatches return 400 ECONOMICS_UNIT_MISMATCH. Server-defined unit convention is recorded on new manual results. No automatic payroll conversion introduced.
+FRONTEND CHANGE: extra salary alternatives retained/displayed during edit; selected-scenario gross/period aligns with netto/commute rows and result provenance.
+TESTS / TESTED: build/lint/typecheck PASS; 5 assessment/economics/trust scenarios PASS including unit mismatch and stored metadata assertions. New browser flow PASS desktop/mobile: edit UOP monthly variant without dropping B2B hourly variant, select second for economics, compare hourly invoice and commute cost consistently.
+ACCEPTANCE: second variant unchanged after real UI edit, selected B2B hourly scenario never paired with first UOP monthly bounds, same-period amounts labelled, mismatched units rejected, source/date/assumptions/version retained, no EHV/Life Score or invented tax constants.
+LEGAL STATUS: local manual foundation; tax rule/expert/provider and production gates remain open.
+RISK / DEFERRED: additional offer alternatives currently read-only in editor; automatic tax/transport and cross-period normalization remain gated. Old manual v1 records retain their original convention/version and are not rewritten as v2.
+ROLLBACK: revert client/domain/API together; preserve versioned offer/scenario JSON. Do not remove existing alternatives during rollback.
+STATUS: DONE for scoped CP04-C/CP09-B integrity; full CP04/CP09 remain PARTIAL.
+NEXT CHECKPOINT: Canonical backup/restore and erasure reconciliation, relevant CI release evidence.

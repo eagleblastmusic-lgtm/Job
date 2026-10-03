@@ -216,3 +216,5 @@ CP10-C now provides employer-scoped immutable definition editing, latest-version
 CP06-G adds private watch alert toggles and deduplicated upcoming-close notices based on published deadlines. Explicit candidate matching constraints remain the next engineering slice; rollout/notification policies retain their external gates.
 
 CP05-A delivers explicit private work-condition filters with unknown-state explanations and no automatic relaxation. Salary/commute constraints remain pending comparable basis/unit contracts. Current candidate workspace and employer projection evidence is recorded in IMPLEMENTATION_STATUS.md.
+
+CP04-C/CP09-B preserve extra salary alternatives during editing and align comparison with the selected private scenario. Manual-v2 results record money/time periods; historical v1 records retain provenance. Automatic tax/tariff integration remains externally gated. Remaining operations/CI/recovery work continues next.

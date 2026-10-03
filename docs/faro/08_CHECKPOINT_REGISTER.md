@@ -180,7 +180,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL CLEAR manual local; automated tax/routing LEGAL REVIEW
 - RISK: Misleading UOP/B2B comparison and false precision
 - ROLLBACK: Disable calculator, keep direct offer conditions
-- STATUS: PARTIAL (private manual economics API in ea50b36; comparison/input UI and complete unit/basis validation remain; automatic tax/routing gated).
+- STATUS: PARTIAL (private manual scenarios and comparison UI delivered; CP09-B aligns selected basis/period and records explicit units. Automatic tax/routing and validated source integrations remain gated).
 
 ## CP10 — Assessment foundations with real lifecycle
 - ID: CP10

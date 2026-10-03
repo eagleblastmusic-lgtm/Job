@@ -57,3 +57,7 @@ PUT `/offers/:id/watch` accepts only boolean `alerts` for the current authentica
 # Private condition constraints
 
 PUT `/profile/constraints` accepts `{expectedVersion,constraints:{active,workModels,contracts,noNights,noWeekends}}`; booleans and enums are validated, unlisted fields are discarded and current profile revision is required. Empty model/contract sets impose no boundary. Candidate offer list respects active constraints server-side without automatic relaxation: selected unknown conditions do not enter the known-matching list. Own detail explains SATISFIED/KNOWN_NOT_MET/UNKNOWN; watches and process history remain accessible. Organization list is unaffected and initial employer projection excludes preferences.
+
+# Economics units and selected variant
+
+New manual calculations are `manual-scenario-v2`, recording units `{money:PLN_MINOR,netPeriod:<salary period>,commuteCostPeriod:<salary period>,commuteTime:ROUND_TRIP_MINUTES_PER_WORK_DAY}` and salary option index. All input amounts are integer grosze; private net and commute cost use the selected salary period. Optional assertions netPeriod/commuteCostPeriod/commuteTimeBasis reject conflicting units with ECONOMICS_UNIT_MISMATCH. Historical v1 JSON is preserved. Comparison uses stored scenario salary bounds/basis/period rather than the first current offer variant and flags changed offer versions. No automatic tax or cross-basis conversion is performed.

@@ -290,3 +290,37 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     expect(final.result.earned).toBe(1);expect(final.result.review).toBe('FINALIZED');
   }finally{await f.close();}
 });
+
+test('Faro preserves additional salary variants during edit and compares the selected economics basis',async({page})=>{
+  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  try {
+    const employer=await f.user('SalaryEmployer'),candidate=await f.user('SalaryCandidate');
+    const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Warianty wynagrodzenia'},201);
+    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    const input=offerInput(employer.id),second={...input.salary[0]!,contract:'B2B',basis:'B2B_NET_INVOICE_EXCL_VAT',min:7500,max:9000,period:'HOUR',hoursPerPeriod:1};
+    const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',{...input,salary:[input.salary[0],second]},201);
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    await login(page,f.base,employer.email);await page.locator('#f-role').selectOption('employer');
+    await page.goto(`${f.base}/#offer-edit/${offer.id}`);
+    await expect(page.getByRole('heading',{name:'Pozostałe warianty wynagrodzenia'})).toBeVisible();
+    await page.locator('[data-form=offer] [name=salaryMin]').fill('5600');
+    await page.locator('[data-form=offer]').getByRole('button',{name:'Zapisz szkic',exact:true}).click();
+    await expect(page.getByRole('link',{name:'Edytuj warunki'})).toBeVisible();
+    const edited=await f.request<{revision:number;data:{salary:Array<Record<string,unknown>>}}>(`/api/faro/offers/${offer.id}`,employer.cookie);
+    expect(edited.data.salary).toHaveLength(2);expect(edited.data.salary[0]!.min).toBe(560000);expect(edited.data.salary[1]).toEqual(second);
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:edited.revision});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:edited.revision+1,confirmed:true});
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);
+    await page.goto(`${f.base}/#economics/${offer.id}`);
+    await page.locator('[name=salaryOptionIndex]').selectOption('1');
+    await page.locator('[name=netMin]').fill('50');await page.locator('[name=netMax]').fill('60');
+    await page.locator('[name=commuteCost]').fill('5');await page.locator('[name=assumptions]').fill('Syntetyczny koszt przypisany do jednej godziny, bez automatycznych podatków.');
+    await page.getByRole('button',{name:'Zapisz prywatny szacunek'}).click();
+    await expect(page.getByRole('heading',{name:'Wynik scenariusza'})).toBeVisible();
+    await page.goto(`${f.base}/#offers/${offer.id}`);await page.getByRole('button',{name:'Dodaj do porównania'}).click();
+    await page.getByRole('link',{name:'Porównanie',exact:true}).click();
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Brutto / faktura',exact:true})})).toContainText(/75,00.*90,00.*fakturze.*godzinę/);
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Dojazd — koszt',exact:true})})).toContainText(/5,00.*godzinę/);
+  }finally{await f.close();}
+});

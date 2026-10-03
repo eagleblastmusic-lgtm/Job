@@ -111,7 +111,13 @@ test('economics is private, versioned and honest about unsupported automatic tax
     const result = await f.request<{ result: { estimatedNetRange: { min: number; max: number }; netAfterCommute: { min: number; max: number }; automaticTax: { supported: boolean }; calculationVersion: string }; offerVersion: number }>(`/api/faro/offers/${f.offer.id}/economics`, f.candidate.cookie, 'PUT', {
       salaryOptionIndex: 0, netMin: 420000, netMax: 470000, commuteCost: 30000, commuteMinutes: 45, transport: 'CAR', source: 'candidate-scenario', observedAt: new Date().toISOString(), assumptions: 'Ręcznie podany miesięczny koszt paliwa w groszach'
     });
-    assert.equal(result.result.estimatedNetRange.min, 420000); assert.equal(result.result.netAfterCommute.max, 440000); assert.equal(result.result.automaticTax.supported, false); assert.equal(result.result.calculationVersion, 'manual-scenario-v1');
+    assert.equal(result.result.estimatedNetRange.min, 420000); assert.equal(result.result.netAfterCommute.max, 440000); assert.equal(result.result.automaticTax.supported, false); assert.equal(result.result.calculationVersion, 'manual-scenario-v2');
+    const stored=f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id) as {result:string};
+    assert.deepEqual((JSON.parse(stored.result) as {units:unknown}).units,{money:'PLN_MINOR',netPeriod:'MONTH',commuteCostPeriod:'MONTH',commuteTime:'ROUND_TRIP_MINUTES_PER_WORK_DAY'});
+    const input={salaryOptionIndex:0,netMin:420000,netMax:470000,commuteCost:30000,commuteMinutes:45,transport:'CAR',source:'candidate-scenario',observedAt:new Date().toISOString(),assumptions:'Jawne założenia miesięcznego scenariusza'};
+    await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteCostPeriod:'YEAR'},400);
+    await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteTimeBasis:'ONE_WAY'},400);
+    assert.deepEqual(f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id),stored);
     const employerView = await f.request<Record<string, unknown>>(`/api/faro/offers/${f.offer.id}/economics`, f.employer.cookie, 'GET', undefined, 200);
     assert.equal(employerView, null);
     const text = JSON.stringify(result);

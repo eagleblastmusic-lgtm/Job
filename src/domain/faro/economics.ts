@@ -11,7 +11,9 @@ export function calculateEconomics(salary: SalaryOption, input: EconomicsInput, 
     commuteCost: input.commuteCost, commuteTimeMinutes: input.commuteMinutes,
     netAfterCommute: input.netMin === null || input.netMax === null || input.commuteCost === null ? null : { min: input.netMin - input.commuteCost, max: input.netMax - input.commuteCost },
     assumptions: input.assumptions, source: input.source, sourceDate: input.observedAt, calculatedAt: now,
-    calculationVersion: 'manual-scenario-v1', automaticTax: { supported: false, reason: 'TAX_RULES_REVIEW_REQUIRED' }, transport: input.transport };
+    calculationVersion: 'manual-scenario-v2', salaryOptionIndex:input.salaryOptionIndex,
+    units:{money:'PLN_MINOR',netPeriod:salary.period,commuteCostPeriod:salary.period,commuteTime:'ROUND_TRIP_MINUTES_PER_WORK_DAY'},
+    automaticTax: { supported: false, reason: 'TAX_RULES_REVIEW_REQUIRED' }, transport: input.transport };
 }
 export interface NetRulesProvider {
   version: string; source: string; effectiveFrom: string;

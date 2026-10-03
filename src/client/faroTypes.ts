@@ -56,7 +56,8 @@ export interface Interview {
 export interface Economics {
   offerVersion: number; scenario: Record<string, string | number | null>;
   result: { estimatedNetRange: { min: number; max: number } | null; netAfterCommute: { min: number; max: number } | null;
-    commuteCost: number | null; commuteTimeMinutes: number | null; source: string; sourceDate: string; assumptions: string; calculationVersion: string; period: string };
+    commuteCost: number | null; commuteTimeMinutes: number | null; source: string; sourceDate: string; assumptions: string; calculationVersion: string; period: string;
+    basis:string;grossOrInvoiceMin:number;grossOrInvoiceMax:number;units?:{money:string;netPeriod:string;commuteCostPeriod:string;commuteTime:string} };
 }
 export interface AssessmentDefinition {
   title:string; timeLimitMinutes:number; expectedMinutes:number; rubricVersion:string;
