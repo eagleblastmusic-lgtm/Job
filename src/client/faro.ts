@@ -18,8 +18,8 @@ const toDate = (text: string) => { const d = new Date(text); if (!Number.isFinit
 
 async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal): Promise<T> {
   const r = await fetch(path.startsWith('/api/') ? path : `/api/faro${path}`, { method, signal, credentials: 'same-origin', headers: body === undefined ? {} : { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store' });
-  const data = await r.json() as T & { error?: { message?: string } };
-  if (r.status === 401) { loggedOut(); throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
+  const data = await r.json() as T & { error?: { message?: string; code?: string } };
+  if (r.status === 401 && data.error?.code !== 'REAUTH_FAILED') { loggedOut(); throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
   if (!r.ok) throw new Error(data.error?.message ?? `Błąd ${r.status}`);
   return data;
 }
@@ -84,6 +84,10 @@ async function render() {
       html = offerForm(skills, user.id, o);
     } else if (page === 'organization') {
       html = `<h1>Twoja organizacja</h1><p>Publikacja jest dostępna po weryfikacji organizacji. Wybór przestrzeni nie nadaje uprawnień do danych innych firm.</p>${organizations.length ? `<label>Aktywna organizacja<select id="f-org">${organizations.map(o => `<option value="${esc(o.id)}" ${orgId === o.id ? 'selected' : ''}>${esc(o.name)} · ${esc(label(o.verification))} · ${esc(label(o.role))}</option>`).join('')}</select></label>` : ''}<div class="f-grid"><section class="f-card"><h2>Utwórz organizację</h2>${form('organization',input('name','Nazwa organizacji','','text','required maxlength="150"'),'Utwórz')}</section><section class="f-card"><h2>Dołącz z zaproszenia</h2>${form('accept-invite',input('token','Kod zaproszenia'),'Dołącz')}</section>${orgId ? `<section class="f-card"><h2>Zaproś współpracownika</h2>${form('invite', input('email','E-mail','','email') + select('role','Rola',['RECRUITER','HIRING_MANAGER','ADMIN']),'Utwórz kod zaproszenia',orgId)}</section>` : ''}${user.role === 'ADMIN' ? `<section class="f-card"><h2>Weryfikacja organizacji</h2>${form('verify-org',input('organizationId','Identyfikator organizacji',orgId) + area('note','Uzasadnienie weryfikacji','','required minlength="10"'),'Potwierdź weryfikację')}</section>` : ''}</div><p class="f-muted">Identyfikator wybranej organizacji: ${esc(orgId)}</p>`;
+      if (orgId && ['OWNER','ADMIN'].includes(organizations.find(o=>o.id===orgId)?.role ?? '')) {
+        const {members} = await api<{members:Array<{user_id:string;email:string;role:string;active:number}>}>(`/organizations/${orgId}/members`);
+        html += `<section class="f-card"><h2>Członkowie organizacji</h2>${members.filter(m=>m.active).map(m=>`<div class="f-row"><p>${esc(m.email)} · ${esc(label(m.role))}</p>${m.role !== 'OWNER' ? button('revoke-member','Odbierz dostęp',m.user_id) : ''}</div>`).join('')}${organizations.find(o=>o.id===orgId)?.role === 'OWNER' ? form('transfer-owner',`<label>Nowy właściciel<select name="successorId">${members.filter(m=>m.active && m.user_id!==user?.id).map(m=>`<option value="${esc(m.user_id)}">${esc(m.email)}</option>`).join('')}</select></label>` + input('password','Potwierdź aktualnym hasłem','','password','required autocomplete="current-password"') + check('confirmed','Przekazuję własność wybranemu członkowi.'),'Przekaż własność',orgId) : ''}</section>`;
+      }
     } else if (page === 'processes' || page === 'recruitments') {
       if (page === 'recruitments') { currentOffer = await api<Offer>(`/offers/${id}`); }
       const list = await api<{processes:Process[]}>(`/processes${page === 'recruitments' ? `?offerId=${encodeURIComponent(id)}` : ''}`);
@@ -125,7 +129,8 @@ async function render() {
       const data = await api<{cases:Array<{id:string;kind:string;state:string;statement:string;decision:string|null}>}>('/cases');
       html = `<h1>Zgłoszenia i przegląd</h1><p>Sygnał kierujemy do przeglądu przez człowieka. Nie jest wyrokiem o osobie lub firmie.</p>${data.cases.map(c=>`<article class="f-card"><h2>${esc(label(c.kind))}</h2>${chip(c.state)}<p>${esc(c.statement)}</p><p>${esc(c.decision)}</p>${form('appeal',area('statement','Uzasadnienie odwołania','','required minlength="10"'),'Zapisz odwołanie',c.id)}${user?.role === 'ADMIN' ? form('case-review',select('state','Etap przeglądu',['EVIDENCE_REVIEW','ACTION','NO_ACTION','RESOLVED']) + area('decision','Uzasadnienie decyzji','','required minlength="10"') + input('reviewAt','Termin ponownego przeglądu','','datetime-local') + check('restrict','Wstrzymaj przyjmowanie nowych zgłoszeń przez organizację',false),'Zapisz przegląd',c.id) : ''}</article>`).join('') || '<p>Brak zgłoszeń.</p>'}`;
     } else if (page === 'privacy') {
-      html = `<h1>Twoje dane i wybory</h1><section class="f-card"><h2>Udostępnienie pod Twoją kontrolą</h2><p>Obserwowane oferty i kalkulacje pozostają prywatne. Telefon udostępniasz osobno w konkretnym procesie i możesz cofnąć zgodę.</p><p>Faro jest bezpłatne dla obu stron. Plan rozliczeń nie wpływa na kolejność ofert ani matching.</p><a href="/privacy.html">Informacja o prywatności</a><p>Eksport i usuwanie danych Canonical są przygotowywane w kolejnym etapie. Uruchomienie publiczne pozostaje zablokowane do ich ukończenia.</p></section>`;
+      const consent=await api<{consents:Array<{type:string;granted:boolean}>}>('/api/consents');
+      html = `<h1>Twoje dane i wybory</h1><section class="f-card"><h2>Udostępnienie pod Twoją kontrolą</h2><p>Obserwowane oferty i kalkulacje pozostają prywatne. Telefon udostępniasz osobno w konkretnym procesie i możesz cofnąć zgodę.</p><p>Faro jest bezpłatne dla obu stron. Plan rozliczeń nie wpływa na kolejność ofert ani matching.</p><a href="/privacy.html">Informacja o prywatności</a><div class="f-actions">${button('export','Pobierz moje dane')}</div></section><section class="f-card"><h2>Opcjonalna analityka</h2>${form('analytics',`<label class="f-check"><input type="checkbox" name="granted" ${consent.consents.some(c=>c.type==='ANALYTICS' && c.granted)?'checked':''}>Zgadzam się na opcjonalną analitykę produktu.</label>`,'Zapisz wybór')}</section><section class="f-card"><h2>Usuń konto</h2><p>Usuniemy Twoje konto, profil, zgłoszenia, odpowiedzi, obserwowane oferty i kalkulacje. Operacja jest nieodwracalna. Jeśli zarządzasz zespołem, najpierw przekaż własność organizacji. Oferty organizacji, której jesteś jedynym członkiem, zostaną zamknięte.</p>${form('delete-account',input('confirmation','Wpisz USUŃ KONTO','','text','required autocomplete="off"') + input('password','Aktualne hasło','','password','required autocomplete="current-password"') + check('confirmed','Rozumiem skutki usunięcia konta.'),'Usuń moje konto')}</section>`;
     } else html = empty('Nie znaleziono widoku','Wybierz pozycję w nawigacji.');
     if (mine !== epoch) return;
     $('#f-content').innerHTML = html; finish(mine);
@@ -160,6 +165,12 @@ root.addEventListener('click', event => {
       if (action === 'compare-remove') compared.delete(id);
       if (action === 'watch' || action === 'unwatch') await api(`/offers/${id}/watch`,action === 'watch' ? 'POST':'DELETE',{});
       if (action === 'revoke-claim') await api(`/claims/${id}`,'DELETE',{});
+      if (action === 'revoke-member') await api(`/organizations/${orgId}/members/${id}`,'DELETE',{});
+      if (action === 'export') {
+        const data=await api('/api/export'); if(mine!==epoch)return;
+        const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+        const link=document.createElement('a'); link.href=url; link.download='faro-moje-dane.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notify('Przygotowano eksport Twoich danych.'); return;
+      }
       if (action === 'reject-proposal') await api(`/proposals/${id}`,'POST',{status:'REJECTED'});
       if (action === 'preview' || action === 'interest-preview') {
         const p = await api<Projection>('/profile/preview'); if (mine !== epoch) return;
@@ -192,6 +203,9 @@ root.addEventListener('submit', event => {
       else if (action === 'accept-invite') await api('/invites/accept','POST',{token:value(f,'token')});
       else if (action === 'invite') { const data = await api<{token:string}>(`/organizations/${id}/invites`,'POST',{email:value(f,'email'),role:value(f,'role')}); if (mine === epoch) el.querySelector('.f-form-message')!.textContent=`Kod ważny 72 godziny: ${data.token}`; return; }
       else if (action === 'verify-org') await api(`/organizations/${encodeURIComponent(value(f,'organizationId'))}/verify`,'POST',{note:value(f,'note')});
+      else if (action === 'transfer-owner') await api(`/organizations/${id}/owner`,'POST',{successorId:value(f,'successorId'),password:value(f,'password')});
+      else if (action === 'analytics') await api('/api/consents/analytics','PUT',{granted:f.has('granted')});
+      else if (action === 'delete-account') { await api('/api/account','DELETE',{confirmation:value(f,'confirmation'),password:value(f,'password')}); loggedOut(); location.hash=''; $('#authMessage').textContent='Konto i dane zostały usunięte.'; return; }
       else if (action === 'offer') {
         const prior=currentOffer, contract=value(f,'contract');
         const data: OfferData = { role:value(f,'role'), responsibilities:value(f,'responsibilities').split('\n').filter(Boolean), location:value(f,'location'), workModel:value(f,'workModel'), remoteDays:number(f,'remoteDays'), salary:[{ contract, basis:({UOP:'GROSS_EMPLOYMENT',CIVIL:'GROSS_CIVIL',B2B:'B2B_NET_INVOICE_EXCL_VAT'} as Record<string,string>)[contract]!, min:Math.round(number(f,'salaryMin')*100),max:Math.round(number(f,'salaryMax')*100),currency:'PLN',period:value(f,'period'),variable:value(f,'variable'),hoursPerPeriod:number(f,'hoursPerPeriod'),ftePercent:number(f,'ftePercent')}], requirements:skills.filter(s=>value(f,`kind:${s.id}`)!=='Pomijam').map(s=>({id:prior?.data.requirements.find(r=>r.skillId===s.id)?.id ?? crypto.randomUUID(),skillId:s.id,kind:value(f,`kind:${s.id}`),level:value(f,`level:${s.id}`),rationale:value(f,`why:${s.id}`)})), hours:value(f,'hours'),shifts:value(f,'shifts'),nights:value(f,'nights')==='Nie określono'?null:value(f,'nights')==='Tak',weekends:value(f,'weekends')==='Nie określono'?null:value(f,'weekends')==='Tak',learningSupport:value(f,'learningSupport'),responseHours:number(f,'responseHours'),decisionHours:number(f,'decisionHours'),stages:value(f,'stages').split('\n').filter(Boolean),assessmentMinutes:number(f,'assessmentMinutes'),interviewCount:number(f,'interviewCount'),closesAt:toDate(value(f,'closesAt')),recruiterId:value(f,'recruiterId') };

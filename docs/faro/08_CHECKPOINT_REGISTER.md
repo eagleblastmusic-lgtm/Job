@@ -220,7 +220,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL REVIEW retention/launch; irreversible operations require explicit scope
 - RISK: Data loss, incomplete privacy erasure, false production readiness
 - ROLLBACK: Verified backup and read-only downtime; never destructive migration shortcut
-- STATUS: PLANNED
+- STATUS: PARTIAL (CP11-A own export/deletion, member controls and owner transfer delivered; persistence, restore reconciliation and full release verification remain).
 
 ## CP12 — External gates and post-MVP register
 - ID: CP12

@@ -405,6 +405,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
       store.audit(user.id, 'ACCOUNT_DELETION_REAUTH_FAILED', 'user', user.id);
       throw new HttpError(401, 'Podaj poprawne aktualne hasło, aby usunąć konto.', 'REAUTH_FAILED');
     }
+    store.assertAccountDeletable(user.id);
     for (const storageKey of store.listUploadPaths(user.id)) await deleteStoredFile(config.dataDir, storageKey);
     store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id);
     await rm(resolve(config.dataDir, 'uploads', user.id), { recursive: true, force: true });

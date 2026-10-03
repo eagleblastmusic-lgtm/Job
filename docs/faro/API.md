@@ -1,0 +1,19 @@
+# Canonical API
+
+All `/api/faro/*` routes require a session and mutation origin validation. Domain writes are rate limited; request JSON is bounded. Production use is blocked by unresolved release gates. IDs in request bodies never replace authenticated ownership or organization assignment.
+
+| Resource | Routes and commands |
+|---|---|
+| Profile | GET/PUT `/profile`; GET `/profile/preview`; POST `/claims`, `/learning`, `/activities`; DELETE `/claims/:id`; POST `/proposals/:id` |
+| Organizations | GET/POST `/organizations`; POST `/:id/verify`, `/:id/invites`, `/:id/owner`; GET `/:id/members`; DELETE `/:id/members/:user`; POST `/invites/accept` |
+| Offers | GET `/offers`; GET/PUT `/offers/:id`; POST `/organizations/:id/offers`; POST `/offers/:id/lifecycle` |
+| Recruitment | POST `/offers/:id/interest`; GET `/processes`, `/processes/:id`; POST `/processes/:id/commands` |
+| Watch/contact | GET `/watches`; POST/DELETE `/offers/:id/watch`; POST/DELETE `/processes/:id/phone-grant`; GET `/processes/:id/phone` |
+| Assessment | GET/POST `/offers/:id/assessments`; POST `/assessments/:id/versions/:version`; GET/POST `/processes/:id/assessment`; GET `/attempts`; GET/POST `/attempts/:id`; PUT `/:id/answers`; POST `/:id/submit`, `/:id/review` |
+| Economics | GET/PUT `/offers/:id/economics` (own scenario only) |
+| Moderation/inbox | GET `/notifications`, `/cases`; POST `/processes/:id/reports`, `/cases/:id/review`, `/cases/:id/appeal`; admin POST `/worker/tick` |
+| Existing identity/data rights | `/api/auth/*`, `/api/me`, `/api/consents`, `/api/consents/analytics`, GET `/api/export`, DELETE `/api/account` |
+
+Offer and process mutations require `expectedVersion` where supported; process commands additionally require `idempotencyKey`. 409 means refresh/review changed data, not silently resubmit a decision. Ownership transfer requires current password and an active successor. Account deletion also requires the exact confirmation phrase. Errors return `{error:{code,message}}`; an incorrect reauthentication password does not destroy the session.
+
+Assessment definition editing, appointment endpoints and additional lifecycle commands remain future deltas; do not infer callable endpoints from schema states.

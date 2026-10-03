@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
+import { readFile } from 'node:fs/promises';
 import { faroFixture, offerInput } from '../src/tests/faro-fixture.js';
 
 async function login(page: Page, base: string, email: string) {
@@ -84,4 +85,31 @@ test('Faro real candidate and employer process, private watch, economics and res
     expect(p.stage).toBe('ACCEPTED_TO_NEXT_STAGE'); expect(p.contactGrant).toBeNull();
     expect(errors).toEqual([]); expect(retired).toEqual([]);
   } finally { try { if (!page.isClosed()) { await page.screenshot({path:info.outputPath('final-state.png'),fullPage:true}); await page.goto('about:blank'); } } finally { await f.close(); } }
+});
+
+test('privacy workspace exports own data and requires reauthentication before erasure',async({page})=>{
+  const f=await faroFixture(); f.app.config.appOrigin=f.base;
+  try{
+    const candidate=await f.user('PrivacyBrowser');
+    await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',availability:{kind:'IMMEDIATE'},expectedVersion:0});
+    await login(page,f.base,candidate.email);
+    await page.getByRole('link',{name:'Prywatność',exact:true}).click();
+    const downloaded=page.waitForEvent('download');
+    await page.getByRole('button',{name:'Pobierz moje dane'}).click();
+    const file=await downloaded;
+    const payload=JSON.parse(await readFile((await file.path())!,'utf8')) as {faro:{faro_profiles:Array<{first_name:string}>}};
+    expect(payload.faro.faro_profiles[0]!.first_name).toBe('Anna');
+    const deletion=page.locator('[data-form=delete-account]');
+    await deletion.locator('[name=confirmation]').fill('USUŃ KONTO');
+    await deletion.locator('[name=password]').fill('BledneHaslo123');
+    await deletion.locator('[name=confirmed]').check();
+    await deletion.getByRole('button',{name:'Usuń moje konto'}).click();
+    await expect(deletion.locator('.f-form-message')).toContainText('poprawne aktualne hasło');
+    await expect(page.locator('.f-brand')).toBeVisible();
+    await deletion.locator('[name=password]').fill('Bezpieczne123');
+    await deletion.getByRole('button',{name:'Usuń moje konto'}).click();
+    await expect(page.locator('#loginForm')).toBeVisible();
+    await expect(page.locator('#authMessage')).toHaveText('Konto i dane zostały usunięte.');
+    await f.request('/api/me',candidate.cookie,'GET',undefined,401);
+  }finally{if(!page.isClosed())await page.goto('about:blank'); await f.close();}
 });

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { PrivacyService } from './faro/privacyService.js';
 import type { JobDatabase } from './db.js';
 import type {
   ApplicationStatus, CareerExperience, CareerFact, CareerFactStatus, CareerProfile,
@@ -312,10 +313,19 @@ export class AppStore {
     }
     data.job_requirements = this.db.prepare(`SELECT r.* FROM job_requirements r JOIN jobs j ON j.id=r.job_id WHERE j.user_id=?`).all(userId);
     data.outcomes = this.db.prepare(`SELECT o.* FROM outcomes o JOIN applications a ON a.id=o.application_id WHERE a.user_id=?`).all(userId);
+    data.faro = new PrivacyService(this.database).exportOwn(userId);
     return data;
   }
 
-  deleteUser(userId: string): void { this.db.prepare('DELETE FROM users WHERE id=?').run(userId); }
+  assertAccountDeletable(userId: string): void { new PrivacyService(this.database).assertDeletable(userId); }
+
+  deleteUser(userId: string): void {
+    const privacy = new PrivacyService(this.database);
+    privacy.transaction(() => {
+      privacy.eraseDerivatives(userId);
+      this.db.prepare('DELETE FROM users WHERE id=?').run(userId);
+    });
+  }
 
   diagnostics(): Record<string, unknown> {
     const scalar = (sql: string): number => Number((this.db.prepare(sql).get() as { count: number }).count);

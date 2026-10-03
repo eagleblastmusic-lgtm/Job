@@ -12,6 +12,8 @@ import { RecruitmentService } from './recruitmentService.js';
 import { AssessmentService } from './assessmentService.js';
 import { EconomicsService } from './economicsService.js';
 import { TrustService } from './trustService.js';
+import { PrivacyService } from './privacyService.js';
+import { verifyPassword, MAX_PASSWORD_LENGTH } from '../auth.js';
 
 export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig) {
   const profiles = new ProfileService(db);
@@ -52,6 +54,17 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (path === '/api/faro/invites/accept' && method === 'POST') return ok(profiles.acceptInvite(user.id, user.email, text(body.token, 100)));
     const member = path.match(/^\/api\/faro\/organizations\/([^/]+)\/members\/([^/]+)$/);
     if (member && method === 'DELETE') { profiles.revokeMember(user.id, member[1]!, member[2]!); return ok({ ok: true }); }
+    const members = path.match(/^\/api\/faro\/organizations\/([^/]+)\/members$/);
+    if (members && method === 'GET') {
+      profiles.member(user.id,members[1]!,['OWNER','ADMIN']);
+      return ok({ members: db.db.prepare('SELECT m.user_id,m.role,m.active,u.email FROM faro_members m JOIN users u ON u.id=m.user_id WHERE m.organization_id=?').all(members[1]!) });
+    }
+    const ownership = path.match(/^\/api\/faro\/organizations\/([^/]+)\/owner$/);
+    if (ownership && method === 'POST') {
+      const password = text(body.password, MAX_PASSWORD_LENGTH);
+      if (!verifyPassword(password,user.passwordHash)) throw new HttpError(401,'Potwierdź operację aktualnym hasłem.','REAUTH_FAILED');
+      return ok(new PrivacyService(db).transferOwner(user.id,ownership[1]!,text(body.successorId,100)));
+    }
     const url = new URL(req.url ?? path, config.appOrigin);
     if (path === '/api/faro/offers' && method === 'GET') return ok({ offers: offers.list(user.id, url.searchParams.get('organizationId') ?? undefined) });
     const orgOffers = path.match(/^\/api\/faro\/organizations\/([^/]+)\/offers$/);

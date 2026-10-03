@@ -1,6 +1,6 @@
 # IMPLEMENTATION STATUS
 
-Source 2026-09-16.1; audited main ae4af4e. Initial plan 1.0 preserved in 8b2524a; current plan 1.1. Implementation is in progress on codex/faro-canonical. Backend deliveries through ea50b36 are partial checkpoints, not a completed Canonical product.
+Source 2026-09-16.1; audited main ae4af4e. Initial plan 1.0 preserved in 8b2524a; current plan 1.2. Implementation is in progress on codex/faro-canonical. Backend deliveries and workspace b7d93b8 are partial checkpoints, not a completed Canonical product.
 
 Current product gap: CP08 now replaces the legacy authenticated client with the Canonical workspace. Full lifecycle and CP11 data export/deletion coverage, persistence/recovery and release verification remain open. This branch is not ready for public release. The login layout stays locked; the approved registration CTA was changed in a18b25d.
 
@@ -88,3 +88,19 @@ RISKS / DEFERRED: broader assessment/editor/moderation tests, profile-preview co
 ROLLBACK: revert this checkpoint code; additive APIs have no schema change. Existing canonical data remains.
 STATUS: DONE for CP08-A; CP08 remains PARTIAL.
 NEXT CHECKPOINT: complete recruitment/privacy boundaries and assessment lifecycle, then data rights and operational release checks. Continue without waiting for another user instruction.
+
+## CP11-A — Own data export, account erasure and ownership continuity (2026-10-03)
+
+GOAL / SCOPE: complete the existing account export/deletion path for Canonical records; provide actual workspace controls and safe organization continuity.
+CLASSIFICATION: DELTA_REQUIRED. Existing session/password/rate-limit/file-removal mechanisms are reused. External retention/legal-hold and persistent restore reconciliation remain SPEC_BLOCKED until approved policy/operational evidence.
+DEPENDENCIES: existing account handlers, CP02 organizations, CP06 process/outbox and CP08 workspace.
+IMPLEMENTATION: export own Canonical profile/history, events, attempts, grants, watches, economics and cases without other candidates or answer keys. Deletion cascades personal records, removes shared process notifications, redacts linked case free text and records an erasure hash. Solo-owned organization closes offers, cancels active processes and revokes grants/attempts; shared organization requires explicit owner transfer with password. Deleted responsible recruiter pauses remaining intake without deleting candidate histories. Workspace exposes download, consent, deletion, member revocation and ownership transfer.
+CHANGED FILES: src/server/{app,store}.ts; src/server/faro/{api,privacyService}.ts; src/client/faro.ts; src/tests/faro-privacy.test.ts; e2e/faro.spec.ts; runtime documents under docs/faro.
+MIGRATIONS: 0023_faro_data_rights.sql, additive local erasure ledger. No existing user database was deleted during implementation; tests delete only their generated fixtures.
+TESTED: 6 data-rights/auth scenarios PASS; build/lint/typecheck PASS; 23 migrations validated; 4 desktop/mobile browser scenarios PASS including download contents, failed reauthentication without logout, successful deletion and revoked session. Final owner-recruiter pause correction is covered by the targeted API scenario.
+ACCEPTANCE: own export, candidate erasure, solo organization closure and shared owner transfer verified through real HTTP and SQLite; workspace download/delete verified in both viewports.
+LEGAL STATUS: local synthetic implementation; production/privacy legal gates remain open. Erasure ledger is not yet an external durable tombstone service.
+RISKS / DEFERRED: backup restoration must reconcile current deletion ledger; purpose-specific retention/legal holds and production persistence remain release gates. No claim of complete GDPR compliance.
+ROLLBACK: revert code; retain additive ledger; do not reverse completed account erasures from backups.
+STATUS: DONE for CP11-A; CP11 remains PARTIAL.
+NEXT CHECKPOINT: preview/confirmation consistency, structured process responses, interview lifecycle and full assessment workflow. Continue full plan.
