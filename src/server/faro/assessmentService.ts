@@ -51,20 +51,39 @@ export class AssessmentService extends FaroStore {
     this.audit(userId, `ASSESSMENT_${action}`, id); return { id, version, state: action === 'REVIEW' ? 'IN_REVIEW' : 'APPROVED' };
   }
   assign(userId: string, processId: string, body: Record<string, unknown>) {
+    this.recruitment.authorize(userId,processId);
+    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,processId,operation:'ASSESSMENT_ASSIGN'},()=>{
     const process = this.recruitment.row(processId);
     const offer = new OfferService(this.database, this.clock).assigned(userId, process.offer_id);
     this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
     const definitionId = text(body.assessmentId, 100), version = integer(body.version, 1), definition = this.definition(definitionId, version);
     if (definition.offer_id !== process.offer_id) throw new HttpError(404, 'Nie znaleziono assessmentu.');
     if (definition.state !== 'APPROVED') throw new HttpError(409, 'Przypisanie wymaga zatwierdzonej wersji.', 'ASSESSMENT_NOT_APPROVED');
+    if(integer(body.expectedVersion,1)!==process.revision)throw new HttpError(409,'Odśwież proces.','VERSION_CONFLICT');
     if (process.status !== 'ACTIVE' || process.stage !== 'ACCEPTED_TO_NEXT_STAGE') throw new HttpError(409, 'Najpierw przyjmij do kolejnego etapu.');
+    if(this.db.prepare('SELECT id FROM faro_attempts WHERE process_id=? AND assessment_id=? AND assessment_version=?').get(processId,definitionId,version))throw new HttpError(409,'Ta wersja ma już próbę w tym procesie.','ASSESSMENT_ALREADY_ASSIGNED');
     const deadline = date(body.deadline); if (deadline <= this.now()) throw new HttpError(400, 'Deadline musi być w przyszłości.');
     const id = randomUUID();
-    this.transaction(() => {
       this.db.prepare("INSERT INTO faro_attempts(id,process_id,assessment_id,assessment_version,state,deadline) VALUES(?,?,?,?,'INVITED',?)").run(id, processId, definitionId, version, deadline);
       this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_REQUESTED',stage_due_at=?,revision=revision+1 WHERE id=?").run(deadline, processId);
       this.recruitment.event(process, userId, 'ASSESSMENT_ASSIGNED', { attemptId: id, deadline });
-    }); return { id };
+    return { id };
+    });
+  }
+  expire(id?:string) {
+    this.transaction(()=>{
+      const due=this.db.prepare("SELECT id FROM faro_attempts WHERE state IN ('INVITED','STARTED') AND (deadline<=? OR (state='STARTED' AND expires_at<=?))"+(id?' AND id=?':'')).all(...(id?[this.now(),this.now(),id]:[this.now(),this.now()])) as Array<{id:string}>;
+      for(const item of due) {
+        const attempt=this.row(item.id),process=this.recruitment.row(attempt.process_id);
+        this.db.prepare("UPDATE faro_attempts SET state='EXPIRED',revision=revision+1 WHERE id=?").run(item.id);
+        if(!TERMINAL.includes(process.status)&&process.stage==='ASSESSMENT_REQUESTED') {
+          const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
+          const dueAt=new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString();
+          this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?").run(dueAt,'Termin assessmentu upłynął. Ustal kolejny krok; brak automatycznej odmowy.',process.id);
+        }
+        this.recruitment.event(process,null,'ATTEMPT_EXPIRED',{attemptId:item.id});
+      }
+    });
   }
   row(id: string) {
     const row = this.db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(id) as unknown as AttemptRow | undefined;
@@ -89,9 +108,11 @@ export class AssessmentService extends FaroStore {
     return process;
   }
   start(userId: string, id: string) {
+    this.candidate(userId,this.row(id));
+    this.expire(id);
     return this.transaction(() => {
       const row = this.row(id); this.candidate(userId, row);
-      if (row.started_at) return this.overview(userId, id);
+      if (row.state==='STARTED') return this.overview(userId, id);
       if (row.state !== 'INVITED' || row.deadline <= this.now()) throw new HttpError(409, 'Zaproszenie nie jest już aktywne.', 'ATTEMPT_EXPIRED');
       const definition = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
       const expires = new Date(Math.min(Date.parse(row.deadline), this.clock().getTime() + definition.timeLimitMinutes * 60000)).toISOString();
@@ -100,10 +121,13 @@ export class AssessmentService extends FaroStore {
     });
   }
   save(userId: string, id: string, body: Record<string, unknown>, submit: boolean) {
+    this.candidate(userId,this.row(id));
+    this.expire(id);
+    return this.transaction(()=>{
     const row = this.row(id), process = this.candidate(userId, row);
+    if(row.state==='EXPIRED')throw new HttpError(409,'Czas próby upłynął.','ATTEMPT_EXPIRED');
     if (row.state !== 'STARTED') throw new HttpError(409, 'Próba nie jest aktywna.');
     if (!row.expires_at || row.expires_at <= this.now()) {
-      this.db.prepare("UPDATE faro_attempts SET state='EXPIRED',revision=revision+1 WHERE id=?").run(id);
       throw new HttpError(409, 'Czas próby upłynął.', 'ATTEMPT_EXPIRED');
     }
     if (integer(body.expectedVersion, 1) !== row.revision) throw new HttpError(409, 'Odpowiedzi zmieniły się.', 'VERSION_CONFLICT');
@@ -115,13 +139,14 @@ export class AssessmentService extends FaroStore {
     }
     const breakdown = definition.tasks.map(task => ({ taskId: task.id, earned: answers[task.id] === undefined ? null : answers[task.id] === task.answer ? task.points : 0, possible: task.points }));
     const result = { breakdown, earned: breakdown.reduce((sum, task) => sum + (task.earned ?? 0), 0), possible: breakdown.reduce((sum, task) => sum + task.possible, 0), unanswered: breakdown.filter(task => task.earned === null).length, assessmentVersion: row.assessment_version, rubricVersion: definition.rubricVersion, review: 'PENDING' };
-    this.transaction(() => {
       this.db.prepare('UPDATE faro_attempts SET answers=?,revision=revision+1,state=?,result=? WHERE id=?').run(JSON.stringify(answers), submit ? 'SCORED_PENDING_REVIEW' : 'STARTED', submit ? JSON.stringify(result) : null, id);
       if (submit) {
-        this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_COMPLETED',stage_due_at=NULL,revision=revision+1 WHERE id=?").run(row.process_id);
+        const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
+        this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_COMPLETED',stage_due_at=?,revision=revision+1 WHERE id=?").run(new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString(),row.process_id);
         this.recruitment.event(process, userId, 'ATTEMPT_SUBMITTED', { attemptId: id });
       }
-    }); return this.overview(userId, id);
+    return this.overview(userId, id);
+    });
   }
   finalize(userId: string, id: string, body: Record<string, unknown>) {
     const row = this.row(id), process = this.recruitment.row(row.process_id);

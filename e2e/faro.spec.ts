@@ -213,3 +213,57 @@ test('privacy workspace exports own data and requires reauthentication before er
     await f.request('/api/me',candidate.cookie,'GET',undefined,401);
   }finally{if(!page.isClosed())await page.goto('about:blank'); await f.close();}
 });
+
+test('Faro assessment assignment and reviewed result through real workspace',async({page})=>{
+  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  try {
+    const employer=await f.user('QuizEmployer'),candidate=await f.user('QuizCandidate');
+    const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Pracownia quizu'},201);
+    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const preview=await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation',candidate.cookie);
+    const process=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'quiz-interest'},201);
+    await f.request(`/api/faro/processes/${process.id}/commands`,employer.cookie,'POST',{command:'ADVANCE',nextAction:'Krótki quiz praktyczny',dueAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'quiz-advance'});
+    await login(page,f.base,employer.email);
+    await page.locator('#f-role').selectOption('employer');
+    await page.goto(`${f.base}/#assessment-create/${offer.id}`);
+    const create=page.locator('[data-form=assessment-create]');
+    await create.locator('[name=title]').fill('Quiz obsługi klienta');
+    await create.locator('[name=prompt]').fill('Co robisz najpierw?');
+    await create.locator('[name=options]').fill('Słucham klienta\nPrzerywam klientowi');
+    await create.getByRole('button',{name:'Zapisz szkic'}).click();
+    await page.locator('[data-form=assessment-approve] [name=confirmed]').check();
+    await page.getByRole('button',{name:'Przekaż do review'}).click();
+    await expect(page.getByRole('button',{name:'Zatwierdź',exact:true})).toBeVisible();
+    await page.locator('[data-form=assessment-approve] [name=confirmed]').check();
+    await page.getByRole('button',{name:'Zatwierdź',exact:true}).click();
+    await expect(page.getByText('Zatwierdzony',{exact:true})).toBeVisible();
+    await page.goto(`${f.base}/#assessment-assign/${process.id}`);
+    await page.locator('[data-form=assessment-assign] [name=deadline]').fill('2099-01-01T12:00');
+    await page.getByRole('button',{name:'Przypisz',exact:true}).click();
+    await expect(page.locator('.f-detail').getByText('Zaproszenie do assessmentu',{exact:true})).toBeVisible();
+    const attempts=await f.request<{attempts:Array<{id:string}>}>(`/api/faro/processes/${process.id}/assessment`,candidate.cookie);
+    expect(attempts.attempts).toHaveLength(1);const id=attempts.attempts[0]!.id;
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);
+    await page.goto(`${f.base}/#attempts/${id}`);
+    await expect(page.getByText('Liczba zadań',{exact:true})).toBeVisible();
+    await expect(page.getByText('Co robisz najpierw?',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Rozpocznij assessment'}).click();
+    await page.getByLabel('Słucham klienta',{exact:true}).check();
+    await page.locator('[name=operation]').selectOption('Prześlij do oceny');
+    await page.getByRole('button',{name:'Zapisz',exact:true}).click();
+    await expect(page.getByText('Wynik czeka na review',{exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Wynik w tej rekrutacji'})).toHaveCount(0);
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,employer.email);
+    await page.locator('#f-role').selectOption('employer');await page.goto(`${f.base}/#attempts/${id}`);
+    await page.locator('[data-form=attempt-review] [name=note]').fill('Sprawdzono odpowiedź zgodnie z rubryką.');
+    await page.locator('[data-form=attempt-review] [name=confirmed]').check();
+    await page.getByRole('button',{name:'Udostępnij wynik kandydatowi'}).click();
+    await expect(page.getByText('Wynik zatwierdzony',{exact:true})).toBeVisible();
+    const final=await f.request<{result:{earned:number;review:string}}>(`/api/faro/attempts/${id}`,candidate.cookie);
+    expect(final.result.earned).toBe(1);expect(final.result.review).toBe('FINALIZED');
+  }finally{await f.close();}
+});

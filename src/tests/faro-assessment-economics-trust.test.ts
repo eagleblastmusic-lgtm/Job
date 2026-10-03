@@ -31,7 +31,7 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(draft.state, 'DRAFT');
     const definition = new AssessmentService(f.app.db);
     assert.equal(definition.definition(draft.id, draft.version).origin, 'AI');
-    const assignment = { assessmentId: draft.id, version: draft.version, deadline: new Date(Date.now() + 86_400_000).toISOString() };
+    const assignment = { expectedVersion:2,idempotencyKey:'assessment-assignment',assessmentId: draft.id, version: draft.version, deadline: new Date(Date.now() + 86_400_000).toISOString() };
     const processBefore = f.app.db.db.prepare('SELECT stage,revision FROM faro_interests WHERE id=?').get(f.interest.id);
     const assertAssignmentBlocked = async (state: string) => {
       await f.request(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', assignment, 409);
@@ -47,7 +47,11 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'APPROVE', confirmed: false }, 400);
     await assertAssignmentBlocked('IN_REVIEW');
     await f.request(`/api/faro/assessments/${draft.id}/versions/${draft.version}`, f.employer.cookie, 'POST', { action: 'APPROVE', confirmed: true });
+    await f.request(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', {...assignment,expectedVersion:1,idempotencyKey:'stale-assignment'},409);
     const attempt = await f.request<{ id: string }>(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', assignment, 201);
+    assert.deepEqual(await f.request(`/api/faro/processes/${f.interest.id}/assessment`, f.employer.cookie, 'POST', assignment, 201),attempt);
+    assert.equal(definition.recruitment.row(f.interest.id).revision,3);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ASSESSMENT_ASSIGNED'").get(f.interest.id)!.n,1);
     const before = await f.request<{ state: string; taskCount: number; tasks: unknown[]; revision: number }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie);
     assert.equal(before.state, 'INVITED'); assert.equal(before.taskCount, 1); assert.equal(before.tasks.length, 0);
     const started = await f.request<{ state: string; startedAt: string; expiresAt: string; revision: number; tasks: Array<{ options: string[] }> }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie, 'POST', {});
@@ -58,6 +62,7 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(saved.state, 'STARTED');
     const submitted = await f.request<{ state: string; result: unknown }>(`/api/faro/attempts/${attempt.id}/submit`, f.candidate.cookie, 'POST', { expectedVersion: saved.revision, answers: { 'task-1': 1 } });
     assert.equal(submitted.state, 'SCORED_PENDING_REVIEW'); assert.equal(submitted.result, null);
+    assert.ok(definition.recruitment.row(f.interest.id).stage_due_at);
     const employerPending = await f.request<{ result: { earned: number; possible: number; unanswered: number; review: string } }>(`/api/faro/attempts/${attempt.id}`, f.employer.cookie);
     assert.equal(employerPending.result.earned, 2); assert.equal(employerPending.result.possible, 2); assert.equal(employerPending.result.unanswered, 0); assert.equal(employerPending.result.review, 'PENDING');
     await f.request(`/api/faro/attempts/${attempt.id}/review`, f.employer.cookie, 'POST', { confirmed: true, note: 'Sprawdzono według rubric-1' });
@@ -69,6 +74,35 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(definition.row(attempt.id).state, 'EXPIRED');
     assert.equal('ranking' in final.result, false);
   } finally { await f.close(); }
+});
+
+test('idle assessment expiry is server driven and neutral; started expiry retains saved answers and original first clock',async()=>{
+  const f=await assessmentSetup();try {
+    const service=new AssessmentService(f.app.db);
+    const draft=service.create(f.employer.id,f.offer.id,{title:'Próba wygaśnięcia',timeLimitMinutes:1,expectedMinutes:1,rubricVersion:'expiry-1',tasks:[{prompt:'Pytanie',options:['A','B'],answer:1,points:2}]});
+    service.approve(f.employer.id,draft.id,{version:1,action:'REVIEW'});
+    service.approve(f.employer.id,draft.id,{version:1,action:'APPROVE',confirmed:true});
+    const deadline=new Date(Date.now()+86400000).toISOString(),first=service.recruitment.row(f.interest.id).first_response_at;
+    const attempt=service.assign(f.employer.id,f.interest.id,{assessmentId:draft.id,version:1,deadline,expectedVersion:2,idempotencyKey:'expiry-assign'});
+    const start=service.start(f.candidate.id,attempt.id);
+    service.save(f.candidate.id,attempt.id,{expectedVersion:start.revision,answers:{'task-1':1}},false);
+    const future=new Date(Date.parse(start.expiresAt!)+1000),late=new AssessmentService(f.app.db,()=>future);
+    new TrustService(f.app.db,()=>future).tick();
+    const expired=late.row(attempt.id),p=late.recruitment.row(f.interest.id);
+    assert.equal(expired.state,'EXPIRED');assert.equal(expired.answers,'{"task-1":1}');assert.equal(expired.result,null);
+    assert.equal(p.status,'ACTIVE');assert.equal(p.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(p.first_response_at,first);assert.ok(p.stage_due_at!>future.toISOString());
+    assert.throws(()=>late.start(f.candidate.id,attempt.id),/nie jest już aktywne/);
+    assert.throws(()=>late.save(f.candidate.id,attempt.id,{expectedVersion:expired.revision,answers:{'task-1':0}},true),/upłynął/);
+    assert.equal(late.row(attempt.id).answers,expired.answers);
+    new TrustService(f.app.db,()=>future).tick();
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ATTEMPT_EXPIRED'").get(f.interest.id)!.n,1);
+    const next=service.create(f.employer.id,f.offer.id,{title:'Druga próba',timeLimitMinutes:1,expectedMinutes:1,rubricVersion:'expiry-2',tasks:[{prompt:'Pytanie',options:['A','B'],answer:0,points:1}]});
+    service.approve(f.employer.id,next.id,{version:1,action:'REVIEW'});service.approve(f.employer.id,next.id,{version:1,action:'APPROVE',confirmed:true});
+    const invited=service.assign(f.employer.id,f.interest.id,{assessmentId:next.id,version:1,deadline,expectedVersion:p.revision,idempotencyKey:'unstarted-assign'});
+    new TrustService(f.app.db,()=>new Date(Date.parse(deadline)+1000)).tick();
+    assert.equal(service.row(invited.id).state,'EXPIRED');assert.equal(service.row(invited.id).started_at,null);
+    assert.equal(service.recruitment.row(f.interest.id).status,'ACTIVE');
+  }finally{await f.close();}
 });
 
 test('economics is private, versioned and honest about unsupported automatic tax rules', async () => {

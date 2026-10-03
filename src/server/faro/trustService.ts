@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { InterviewService } from './interviewService.js';
+import { AssessmentService } from './assessmentService.js';
 import { HttpError } from '../http.js';
 import { text, choice, date, integer } from './validation.js';
 interface CaseRow {id:string;organization_id:string;process_id:string|null;reporter_id:string|null;kind:string;state:string;revision:number;explanation_due_at:string|null;public_reason:string|null;statement:string;decision:string|null;review_at:string|null;created_at:string;}
@@ -116,6 +117,7 @@ export class TrustService extends FaroStore {
     });
   }
   tick() {
+    new AssessmentService(this.database,this.clock).expire();
     new InterviewService(this.database,this.clock).tick();
     const service = new RecruitmentService(this.database, this.clock), now = this.now();
     this.transaction(() => {

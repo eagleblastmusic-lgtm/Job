@@ -26,7 +26,7 @@ async function setup() {
   const definition=assessments.create(employer.id,offer.id,{title:'Prywatna próba',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'r1',tasks:[{prompt:'Pytanie',options:['A','B'],answer:1,points:2}]});
   assessments.approve(employer.id,definition.id,{version:1,action:'REVIEW'});
   assessments.approve(employer.id,definition.id,{version:1,action:'APPROVE',confirmed:true});
-  const attempt=assessments.assign(employer.id,process.id,{assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString()});
+  const attempt=assessments.assign(employer.id,process.id,{expectedVersion:2,idempotencyKey:'privacy-assignment',assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString()});
   return {...f,employer,candidate,other,org,offer,process,attempt,profiles,recruitment};
 }
 test('data export contains own canonical records without other profiles or assessment answer keys; erasure removes derivatives',async()=>{

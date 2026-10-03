@@ -23,7 +23,7 @@ export const labels: Record<string, string> = {
   PENDING: 'Oczekuje na weryfikację', VERIFIED: 'Zweryfikowana', RESTRICTED: 'Ograniczona',
   OWNER: 'Właściciel', ADMIN: 'Administrator', RECRUITER: 'Rekruter', HIRING_MANAGER: 'Osoba oceniająca',
   INTEREST_CREATED: 'Zgłoszono zainteresowanie', ADVANCE: 'Zaproszono do kolejnego etapu', CLARIFY: 'Zadano pytanie', ANSWER: 'Udzielono odpowiedzi', REJECT: 'Przekazano odmowę', WITHDRAW: 'Wycofano zainteresowanie', OFFER: 'Przekazano propozycję zatrudnienia', ACCEPT_OFFER: 'Przyjęto propozycję', CANCEL: 'Anulowano proces',
-  ASSESSMENT_ASSIGNED: 'Przypisano assessment', ATTEMPT_SUBMITTED: 'Przesłano odpowiedzi', ASSESSMENT_FINALIZED: 'Zatwierdzono wynik',
+  ASSESSMENT_ASSIGNED: 'Przypisano assessment', ATTEMPT_SUBMITTED: 'Przesłano odpowiedzi', ATTEMPT_EXPIRED: 'Upłynął termin assessmentu', ASSESSMENT_FINALIZED: 'Zatwierdzono wynik',
   role: 'Rola', salary: 'Wynagrodzenie', requirements: 'Wymagania', location: 'Lokalizacja', workModel: 'Model pracy', stages: 'Etapy', closesAt: 'Zamknięcie', responsibilities: 'Zadania', responseHours: 'Czas odpowiedzi', decisionHours: 'Czas decyzji', shifts: 'Zmiany', weekends: 'Weekendy', hours: 'Godziny'
 };
 export const label = (value: string) => labels[value] ?? value;

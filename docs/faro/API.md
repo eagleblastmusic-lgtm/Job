@@ -41,3 +41,7 @@ Immutable versions record explicit publication proof and first publication date.
 # Worker operations
 
 ADMIN-only GET `/worker/status` returns running/stopped state, interval, run count, last run/success, opaque failure code and aggregate outbox status counts. POST `/worker/tick` executes the same cycle and returns 503 WORKER_TICK_FAILED on failure. Development scheduling runs without any client polling; it is stopped before app database closure and always disabled in production while release gates remain open.
+
+# Assessment obligation integrity
+
+Assignment POST `/processes/:id/assessment` requires `expectedVersion` of the process and `idempotencyKey`. Exact replay returns the same attempt; a stale process revision or previously attempted definition version is a conflict. All assignment effects are transactional. The worker expires INVITED/STARTED attempts from persisted deadline/expiry, retains saved answers and emits a single audited neutral event. It resumes the employer next-step deadline using the original offer decisionHours; expiry alone does not score or reject. Submission also retains an employer review deadline. Candidate Start/save/submit enforce expiry even between worker cycles.

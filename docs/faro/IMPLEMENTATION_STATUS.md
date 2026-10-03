@@ -198,3 +198,19 @@ RISK / DEFERRED: no distributed lease, external channel delivery, dead-letter re
 ROLLBACK: disable FARO_WORKER_ENABLED or revert code; preserve outbox and immutable history.
 STATUS: DONE for CP06-F local scheduler; CP06 overall PARTIAL.
 NEXT CHECKPOINT: assessment assignment concurrency/idempotency and server expiry.
+
+# CP10-B — Transactional assignment, server expiry and review deadline (2026-10-04)
+ID / TITLE: CP10-B, assessment obligation integrity.
+GOAL / PURPOSE / CURRENT GAP: assignment lacked concurrency/idempotency and idle attempts never expired; submitted results removed employer deadline.
+SCOPE / IMPLEMENTATION / FILES: assessmentService.ts, trustService.ts, client faro.ts/faroUi.ts, assessment/privacy tests and e2e/faro.spec.ts. Assignment uses expected process revision and durable command key; definition/process checks, attempt, event and notification are one transaction. Save checks current answers inside transaction. Scheduled expiry preserves answers, creates one event/outbox and returns ACTIVE process to employer next step without automatic rejection/scoring. Clock B uses original offer decisionHours after expiry or submission. Start replay never restarts an expired attempt.
+DEPENDENCIES: CP06-F worker, CP06 immutable original conditions, CP10 approved quiz foundation, CP08 workspace.
+DB CHANGE / MIGRATIONS: none; additive existing schema supports states.
+API CHANGE: POST /processes/:id/assessment now requires expectedVersion and idempotencyKey; stale assignment 409, exact replay returns same attempt, duplicate version gets a domain conflict.
+FRONTEND CHANGE: assignment carries process revision/key; timeline labels expiry.
+TESTS / TESTED: build/lint/typecheck PASS; all 25 Canonical scenarios PASS; new real quiz create/review/assign/start/submit/human-result workflow PASS on desktop and mobile (2 scenarios). Initial browser run omitted the required review confirmation; test corrected, both reruns PASS. Existing 8 browser workflows were not repeated for this bounded delta.
+ACCEPTANCE: one assignment on replay, stale revision changes nothing, unstarted/started expiry without GET, saved answers retained, late writes denied, first-response clock unchanged, employer gets next deadline, no candidate-global ranking or automated employment decision.
+LEGAL STATUS: local synthetic foundation; production assessment/scoring gate remains blocked.
+RISK / DEFERRED: quiz only; definition editing, technical incident/retry policy, immutable result corrections and complex/manual scoring remain. Expiry does not infer skill absence or misconduct. No new global timeout policy is invented.
+ROLLBACK: revert code/API+client together; retain attempt/event history. Disable local worker if needed.
+STATUS: DONE for CP10-B; overall CP10 remains PARTIAL.
+NEXT CHECKPOINT: immutable edited definitions and renewed approval.
