@@ -213,3 +213,34 @@ test('matching is requirement-specific and billing-independent; pending suggesti
     assert.equal('score' in explained[0]!, false);
   } finally { await f.close(); }
 });
+
+test('watch alerts remain private, mute removes pending optional alerts, closing reminder is deduplicated and process updates stay independent',async()=>{
+  const f=await setup();try {
+    const r=new RecruitmentService(f.app.db),url=`/api/faro/offers/${f.offer.id}/watch`;
+    r.watch(f.candidate.id,f.offer.id,true);
+    assert.equal(r.watches(f.candidate.id)[0]!.watchAlerts,true);
+    await f.request(url,f.employer.cookie,'PUT',{alerts:false,candidateId:f.candidate.id},404);
+    r.enqueue(f.candidate.id,'offer',f.offer.id,'Opcjonalna zmiana oferty','watch-pending');
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:false});
+    assert.equal(r.watches(f.candidate.id).length,1);assert.equal(r.watches(f.candidate.id)[0]!.watchAlerts,false);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key='watch-pending'").get()!.n,0);
+    assert.equal(r.watches(f.employer.id).length,0);
+    const future=new Date(Date.parse(f.offer.data.closesAt)-12*3600000);
+    new TrustService(f.app.db,()=>future).tick();
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND dedupe_key LIKE '%:closing-soon'").get(f.candidate.id)!.n,0);
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:true});
+    new TrustService(f.app.db,()=>future).tick();new TrustService(f.app.db,()=>future).tick();
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND dedupe_key LIKE '%:closing-soon'").get(f.candidate.id)!.n,1);
+    // Resume synthetic offer intake before testing independent applicant notifications.
+    f.app.db.db.prepare("UPDATE faro_offers SET status='PUBLISHED',confirmed_until=? WHERE id=?").run(new Date(Date.now()+86400000).toISOString(),f.offer.id);
+    r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:new ProfileService(f.app.db).previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'watch-applicant'});
+    r.enqueue(f.candidate.id,'offer',f.offer.id,'Warunki istotne dla zgłoszenia','applicant-pending');
+    r.enqueue(f.candidate.id,'offer',f.offer.id,'Opcjonalne zamknięcie','offer:fixture:closing-soon');
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:false});
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key='applicant-pending'").get()!.n,1);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key='offer:fixture:closing-soon'").get()!.n,0);
+    r.deliverOutbox();assert.ok(f.app.db.db.prepare("SELECT id FROM notifications WHERE user_id=? AND dedupe_key='faro:applicant-pending'").get(f.candidate.id));
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:'false'},400);
+    await f.request(url,f.candidate.cookie,'DELETE');assert.equal(r.watches(f.candidate.id).length,0);
+  }finally{await f.close();}
+});

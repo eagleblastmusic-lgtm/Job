@@ -49,3 +49,7 @@ Assignment POST `/processes/:id/assessment` requires `expectedVersion` of the pr
 # Assessment definition configuration
 
 GET `/assessments/:id/versions/:version` returns the scoped employer definition including answer key; candidates/outsiders receive 404. PUT requires `{expectedVersion,idempotencyKey,data}` and creates the next immutable DRAFT from the latest version. Existing AI origin is retained and client approval fields are ignored. Edit replay returns the same version; stale edit gets VERSION_CONFLICT. Earlier versions remain available to existing attempts, but new assignment/approval must target the latest version and complete fresh human review. The editor supports 1–50 objective quiz tasks and the review screen exposes the complete rubric/key/limits.
+
+# Private watch alert preferences
+
+PUT `/offers/:id/watch` accepts only boolean `alerts` for the current authenticated user's saved watch (404 if absent). GET `/watches` includes that user's `watchAlerts`; organization roles do not gain watcher access. Muting/unwatching removes pending optional offer alerts but preserves updates attached to an interest. The local worker sends a deduplicated upcoming-close alert to enabled watches within 24 hours of the last published deadline. Delivered notices remain in own history; no email/SMS delivery is added.

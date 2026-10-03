@@ -22,6 +22,7 @@ export interface OfferData {
   responseHours: number; decisionHours: number; stages: string[]; assessmentMinutes: number; interviewCount: number; closesAt: string; recruiterId: string;
 }
 export interface Offer {
+  watchAlerts?:boolean;
   ownInterest?:{id:string;status:string}|null;
   id: string; company: string; organizationId: string; status: string; version: number; revision: number; data: OfferData;
   acceptingInterest?: boolean;

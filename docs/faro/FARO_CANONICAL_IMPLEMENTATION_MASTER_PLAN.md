@@ -212,3 +212,5 @@ CP06-F now implements scheduled development delivery and ADMIN aggregate diagnos
 CP10-B adds transactional revision/idempotency-protected assignment, server expiry of idle attempts and employer review deadlines; real quiz workspace lifecycle is verified on desktop/mobile. Immutable edited definitions and approval renewal remain the next assessment slice. See IMPLEMENTATION_STATUS.md for evidence and external gates.
 
 CP10-C now provides employer-scoped immutable definition editing, latest-version assignment guards and a full task/key/rubric review surface. New versions require renewed approval; existing attempts keep their original versions. Objective quiz foundations are real and verified, while complex assessment and external validity/production gates remain deferred.
+
+CP06-G adds private watch alert toggles and deduplicated upcoming-close notices based on published deadlines. Explicit candidate matching constraints remain the next engineering slice; rollout/notification policies retain their external gates.

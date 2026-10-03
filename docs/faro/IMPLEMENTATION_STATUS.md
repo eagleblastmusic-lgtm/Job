@@ -230,3 +230,19 @@ RISK / DEFERRED: objective quiz only, no arbitrary file upload or automated comp
 ROLLBACK: revert client/API together; retain additive version/attempt history and latest-version assignment guard.
 STATUS: DONE for CP10-C; overall CP10 PARTIAL.
 NEXT CHECKPOINT: remaining candidate constraints/watch preferences and operations/release foundations.
+
+# CP06-G — Private watch alert preference and closing reminder (2026-10-04)
+ID / TITLE: CP06-G, private watch controls.
+GOAL / PURPOSE / CURRENT GAP: alerts flag existed without API/UI; no reminder before offer closure.
+SCOPE / IMPLEMENTATION / FILES: recruitmentService.ts, trustService.ts, API, client faro.ts/faroTypes.ts/faroViews.ts; recruitment and browser tests. Watch list returns own watchAlerts only. Candidate can mute/enable alerts while keeping watch. Mute/unwatch removes pending optional offer alerts; applicant condition/process updates remain independent. Worker queues one upcoming-close reminder per published deadline within 24 hours, deduplicated across cycles; no pending draft deadline is used.
+DEPENDENCIES: CP06-F scheduler/outbox and CP04-B publication proofs.
+DB CHANGE / MIGRATIONS: none; existing private alerts field and outbox keys.
+API CHANGE: PUT /offers/:id/watch with boolean alerts, own record only; absent own watch is 404 even if a candidateId is asserted. GET /watches exposes own flag, no employer watcher endpoint/count.
+FRONTEND CHANGE: explicit mute/enable actions next to private watch; existing observation remains saved.
+TESTS / TESTED: build/lint/typecheck PASS; 12 recruitment/worker scenarios PASS. Expanded real candidate/employer workflow PASS on desktop/mobile including alert toggles, axe check and 320px reflow. Unchanged other contracts retain previous evidence.
+ACCEPTANCE: private owner scope, no employer watchers, mute keeps saved offer, pending optional alert removed, candidate process updates retained, closing reminder delivered once, alerts true restores eligibility, malformed preference rejected.
+LEGAL STATUS: local in-app notifications; external messaging/consent and production gates remain open.
+RISK / DEFERRED: 24-hour reminder window follows existing local reminder convention and remains TEST FIRST; no email/SMS or per-category channel selector. Already delivered notices remain own history; pending optional notices are cancelled.
+ROLLBACK: revert preference UI/API/worker together; retain existing watches/alerts flags and delivered history.
+STATUS: DONE for CP06-G; overall CP06 remains PARTIAL.
+NEXT CHECKPOINT: explicit private candidate constraints in matching.

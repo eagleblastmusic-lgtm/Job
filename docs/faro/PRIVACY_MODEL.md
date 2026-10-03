@@ -19,3 +19,5 @@ Candidate process responses use enums, catalog skill identifiers, bounded practi
 # Moderation conflict and evidence
 
 Private case explanations and appeal text are visible to their author and an independent authorized moderator. The other party receives case state and a structured public reason. Global ADMIN does not override this projection for cases in which that user is a party or organization member. Own export excludes the other party's explanation/appeal and raw moderator notes. Export includes relevant candidate case metadata; erasure redacts linked free-form evidence before relation deletion. Production retention/legal-hold and access review remain external gates.
+
+Watch alert flags and upcoming-close delivery are private to the candidate. No employer count/list is exposed. The optional watch preference does not suppress updates associated with an existing interest. Muting removes pending optional watch alerts; already delivered own notification history remains exportable.

@@ -133,6 +133,8 @@ export class TrustService extends FaroStore {
         this.db.prepare("UPDATE faro_offers SET status='CLOSED',revision=revision+1 WHERE id=?").run(offer.id);
         service.offers.notifyChange(offer.id, service.offers.get(offer.id).version, 'CLOSE');
       }
+      const upcoming=this.db.prepare("SELECT o.id,w.candidate_id,v.version,json_extract(v.content,'$.closesAt') deadline FROM faro_offers o JOIN faro_offer_versions v ON v.offer_id=o.id AND v.version=(SELECT MAX(version) FROM faro_offer_versions WHERE offer_id=o.id AND publication_proof<>'NONE') JOIN faro_watches w ON w.offer_id=o.id AND w.alerts=1 WHERE o.status IN ('PUBLISHED','PAUSED') AND json_extract(v.content,'$.closesAt')>? AND json_extract(v.content,'$.closesAt')<=?").all(now,new Date(this.clock().getTime()+86400000).toISOString()) as Array<{id:string;candidate_id:string;version:number;deadline:string}>;
+      for(const offer of upcoming)service.enqueue(offer.candidate_id,'offer',offer.id,'Zbliża się zamknięcie obserwowanej oferty. Sprawdź jej aktualne warunki.',`offer:${offer.id}:${offer.deadline}:closing-soon`);
       const due = this.db.prepare("SELECT id,candidate_id,offer_id,stage,response_due_at,stage_due_at,first_response_at FROM faro_interests WHERE status IN ('INTERESTED','ACTIVE','OFFERED')").all() as unknown as Array<{ id: string; candidate_id: string; offer_id: string; stage:string; response_due_at: string; stage_due_at: string | null; first_response_at: string | null }>;
       for (const p of due) {
         if(['INTERVIEW_PROPOSED','INTERVIEW_CONFIRMED'].includes(p.stage))continue;

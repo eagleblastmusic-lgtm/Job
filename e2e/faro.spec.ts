@@ -42,6 +42,10 @@ test('Faro real candidate and employer process, private watch, economics and res
     await expect(page.getByText('Wymagane · deklarujesz wymagany poziom', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Obserwuj prywatnie' }).click();
     await expect(page.getByRole('button', { name: 'Przestań obserwować' })).toBeVisible();
+    await page.getByRole('button',{name:'Wycisz alerty obserwowanej oferty'}).click();
+    await expect(page.getByRole('button',{name:'Włącz alerty obserwowanej oferty'})).toBeVisible();
+    await page.getByRole('button',{name:'Włącz alerty obserwowanej oferty'}).click();
+    await expect(page.getByRole('button',{name:'Wycisz alerty obserwowanej oferty'})).toBeVisible();
     const noInterest = await f.request<{processes:unknown[]}>('/api/faro/processes', candidate.cookie);
     expect(noInterest.processes).toHaveLength(0);
     await page.getByRole('button', { name: 'Zgłoś zainteresowanie', exact: true }).click();

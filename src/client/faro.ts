@@ -10,6 +10,7 @@ let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setI
 let offers: Offer[] = [], currentOffer: Offer | null = null, currentProcess: Process | null = null, currentAttempt: Attempt | null = null;
 const compared = new Set<string>();
 let watchIds = new Set<string>();
+let watchAlerts = new Map<string,boolean>();
 let interviews:Interview[]=[];
 const value = (f: FormData, name: string) => String(f.get(name) ?? '').trim();
 const number = (f: FormData, name: string) => Number(value(f, name));
@@ -37,7 +38,7 @@ function notify(text: string, error = false) {
 }
 function loggedOut() {
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
-  user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear();
+  user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear(); watchAlerts.clear();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[]; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
   root.replaceChildren(); root.className = 'hidden'; document.body.classList.remove('faro-session');
   $('#authView').classList.remove('hidden'); $('#logoutButton').classList.add('hidden');
@@ -77,13 +78,13 @@ async function render() {
       if (employer && !orgId) html = empty('Załóż swoją organizację', 'Najpierw utwórz organizację, potem przygotuj transparentną ofertę.') + '<a class="f-button f-primary" href="#organization">Przejdź do organizacji</a>';
       else {
         const [list, watches] = await Promise.all([api<{offers:Offer[]}>(page === 'watches' ? '/watches' : `/offers${employer ? `?organizationId=${encodeURIComponent(orgId)}` : ''}`), api<{offers:Offer[]}>('/watches')]);
-        offers = list.offers; watchIds = new Set(watches.offers.map(o => o.id));
+        offers = list.offers; watchIds = new Set(watches.offers.map(o => o.id)); watchAlerts=new Map(watches.offers.map(o=>[o.id,o.watchAlerts!==false]));
         const chosen = id ? await api<Offer>(`/offers/${encodeURIComponent(id)}`) : null;
         if (mine !== epoch) return;
         currentOffer = chosen;
         const filtered = offers.filter(o => `${o.data.role} ${o.company} ${o.data.location}`.toLocaleLowerCase('pl').includes(filter.toLocaleLowerCase('pl')) && (!modelFilter || o.data.workModel === modelFilter));
         html = `<div class="f-page-heading"><p class="f-kicker">${employer ? 'PRZESTRZEŃ PRACODAWCY' : 'MOŻLIWOŚCI · CAŁA POLSKA'}</p><h1>${employer ? 'Dobra rekrutacja zaczyna się od jasnych warunków.' : 'Zobacz, dokąd prowadzą Twoje umiejętności.'}</h1><p>${employer ? 'Oferty, ludzie i kolejne kroki w jednym miejscu.' : 'Jawne wynagrodzenie. Konkretne kompetencje. Miejsce na naukę.'}</p>${employer ? `<a class="f-button f-primary" href="#offer-create">Utwórz ofertę</a>` : ''}</div>
-        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label><button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id)) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
+        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label><button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id),watchAlerts.get(chosen.id)!==false) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
       }
     } else if (page === 'profile') html = profileView(await api<Profile>('/profile'), skills);
     else if (page === 'offer-create' || page === 'offer-edit') {
@@ -193,6 +194,7 @@ root.addEventListener('click', event => {
       if (action === 'retry') { await render(); return; }
       if (action === 'compare-add') { if (compared.size >= 4 && !compared.has(id)) throw new Error('Porównuj do 4 ofert jednocześnie.'); compared.add(id); notify('Oferta dodana. Otwórz Porównanie.'); return; }
       if (action === 'compare-remove') compared.delete(id);
+      if(action==='watch-mute'||action==='watch-enable')await api(`/offers/${id}/watch`,'PUT',{alerts:action==='watch-enable'});
       if (action === 'watch' || action === 'unwatch') await api(`/offers/${id}/watch`,action === 'watch' ? 'POST':'DELETE',{});
       if (action === 'revoke-claim') await api(`/claims/${id}`,'DELETE',{});
       if (action === 'revoke-member') await api(`/organizations/${orgId}/members/${id}`,'DELETE',{});

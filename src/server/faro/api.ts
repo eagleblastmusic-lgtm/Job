@@ -80,6 +80,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     const interest = path.match(/^\/api\/faro\/offers\/([^/]+)\/interest$/);
     if (interest && method === 'POST') return ok(recruitment.interest(user.id, interest[1]!, body), 201);
     const watch = path.match(/^\/api\/faro\/offers\/([^/]+)\/watch$/);
+    if(watch&&method==='PUT')return ok(recruitment.watchSettings(user.id,watch[1]!,body));
     if (watch && ['POST','DELETE'].includes(method)) return ok(recruitment.watch(user.id, watch[1]!, method === 'POST'));
     if (path === '/api/faro/watches' && method === 'GET') return ok({ offers: recruitment.watches(user.id) });
     if (path === '/api/faro/processes' && method === 'GET') return ok({ processes: recruitment.list(user.id, url.searchParams.get('offerId') ?? undefined) });
