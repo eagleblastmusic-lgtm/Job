@@ -130,3 +130,16 @@ ROLLBACK: revert code, preserve additive interview data; stop scheduling before 
 TESTED: build/lint/typecheck PASS; 24 migrations PASS; all 15 Faro scenarios PASS; all 4 desktop/mobile browser scenarios PASS including real proposal/confirmation/ICS/reschedule. Final review additionally enforces the interview count from the original offer version, covered in the interview domain scenario.
 STATUS: DONE for CP06-C manual interview foundation. Overall CP06 remains PARTIAL (structured clarification and repeat-interest history still open).
 NEXT CHECKPOINT: structured privacy-safe clarification and bilateral moderation explanations, then assessment lifecycle and operations.
+# CP06-D — Structured clarification and process actions (2026-10-03)
+
+GOAL / SCOPE: close candidate free-text identity leakage and distinguish a meaningful question from empty acknowledgment.
+DEPENDENCIES: original offer requirement snapshot, profile validators, process state machine and workspace.
+IMPLEMENTATION / FILES: RecruitmentService validates typed question/response, derives safe question text and preserves profile/snapshot boundaries; API filters historical raw answer text; ProfileService shares strict availability validation; workspace renders structured response controls and history; available commands come from the server state machine. Changed client views/types/controller/labels and recruitment/browser tests.
+DB CHANGE / MIGRATIONS: none; structured question/response lives in existing immutable process events. Historical private data is not destructively overwritten.
+ACCEPTANCE: empty acknowledgment and unknown requirement do not close Clock A; extra surname/photo/phone/company/verification fields cannot cross the API; explicit answer resumes employer Clock B; declaration cannot create a verified profile fact. Invalid calendar dates reject; availability response is separate from profile data.
+LEGAL STATUS: privacy boundary foundation; production gates unchanged.
+RISK / DEFERRED: in-flight pre-upgrade free-text questions require recruiter replacement; open-ended candidate messaging is outside this current structured contract. Repeated-interest history and scheduled delivery remain for CP06.
+ROLLBACK: coordinated client/server revert; preserve event history and keep privacy filtering if rolling back UI.
+TESTED: build/lint/typecheck; all 16 Faro scenarios PASS; all 6 desktop/mobile browser scenarios PASS. The browser cleanup timeout was diagnosed from trace as fixture connection shutdown and repaired in the disposable test helper. Final legacy-question replacement is additionally covered by the targeted recruitment test.
+STATUS: DONE for CP06-D; overall plan remains in progress.
+NEXT CHECKPOINT: repeated-interest history, bilateral case explanations and assessment lifecycle.

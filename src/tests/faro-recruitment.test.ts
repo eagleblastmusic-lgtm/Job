@@ -83,6 +83,44 @@ test('interest rejects absent or stale preview without side effects and freezes 
   } finally { await f.close(); }
 });
 
+test('clarification cannot close the first clock with an empty acknowledgment or leak free text; typed answer resumes employer clock without changing profile facts',async()=>{
+  const f=await setup();try {
+    const service=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db);
+    const p=service.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'clarification-interest'});
+    const url=`/api/faro/processes/${p.id}/commands`,dueAt=new Date(Date.now()+86400000).toISOString();
+    await f.request(url,f.employer.cookie,'POST',{command:'CLARIFY',nextAction:'Dziękujemy za zgłoszenie',dueAt,expectedVersion:1,idempotencyKey:'empty-ack'},400);
+    assert.equal(service.row(p.id).first_response_at,null);
+    await f.request(url,f.employer.cookie,'POST',{command:'CLARIFY',question:{topic:'REQUIREMENT',requirementId:'unknown'},dueAt,expectedVersion:1,idempotencyKey:'wrong-requirement'},400);
+    await f.request(url,f.employer.cookie,'POST',{command:'CLARIFY',question:{topic:'REQUIREMENT',requirementId:'req-customer'},dueAt,expectedVersion:1,idempotencyKey:'skill-question'});
+    const first=service.row(p.id).first_response_at;assert.ok(first);
+    await f.request(url,f.candidate.cookie,'POST',{command:'ANSWER',answer:'Nazwisko Sekret, +48500100200, poprzednia firma',expectedVersion:2,idempotencyKey:'raw-answer',confirmed:true},400);
+    const answer={command:'ANSWER',response:{kind:'DECLARE_SKILL',level:'INDEPENDENT',source:'WORK',practice:{quantity:12,unit:'MONTHS'},surname:'Sekret',photo:'private.png',verification:'FARO_ASSESSMENT'},answer:'Poprzednia firma i stanowisko',confirmed:true,expectedVersion:2,idempotencyKey:'typed-answer'};
+    await f.request(url,f.candidate.cookie,'POST',answer);
+    const view=service.view(f.employer.id,p.id),serialized=JSON.stringify(view);
+    assert.doesNotMatch(serialized,/Sekret|private\.png|Poprzednia firma|48500100200|FARO_ASSESSMENT/);
+    assert.equal(view.firstResponseAt,first);assert.ok(view.stageDueAt);assert.equal(view.stage,'AWAITING_EMPLOYER');
+    assert.equal(profiles.profile(f.candidate.id).claims.length,0);assert.equal(view.projection.skillClaims.length,0);
+    const event=JSON.parse(view.events.find(e=>e.kind==='ANSWER')!.data) as {response:{verification:string}};
+    assert.equal(event.response.verification,'DECLARED');
+    // A pre-upgrade free-form answer stays private even when it already exists in history.
+    f.app.db.db.prepare("UPDATE faro_events SET data=? WHERE process_id=? AND kind='ANSWER'").run(JSON.stringify({action:'Sekret +48500100200 poprzednia firma'}),p.id);
+    f.app.db.db.prepare('UPDATE faro_interests SET next_action=? WHERE id=?').run('Sekret +48500100200',p.id);
+    assert.doesNotMatch(JSON.stringify(service.view(f.employer.id,p.id)),/Sekret|48500100200|poprzednia firma/);
+    await f.request(url,f.employer.cookie,'POST',{command:'CLARIFY',question:{topic:'AVAILABILITY'},dueAt,expectedVersion:3,idempotencyKey:'availability-question'});
+    await f.request(url,f.candidate.cookie,'POST',{command:'ANSWER',confirmed:true,response:{availability:{kind:'ON_DATE',value:'2027-02-31'}},expectedVersion:4,idempotencyKey:'invalid-date'},400);
+    await f.request(url,f.candidate.cookie,'POST',{command:'ANSWER',confirmed:true,response:{availability:{kind:'AFTER_PERIOD',value:7,surname:'Sekret'}},expectedVersion:4,idempotencyKey:'availability-answer'});
+    const available=service.view(f.employer.id,p.id);assert.doesNotMatch(JSON.stringify(available),/Sekret/);
+    const last=JSON.parse(available.events.at(-1)!.data) as {response:{availability:{kind:string;value:string}}};
+    assert.equal(last.response.availability.kind,'AFTER_PERIOD');assert.equal(last.response.availability.value,'7');
+    assert.equal(profiles.profile(f.candidate.id).availability.kind,'IMMEDIATE');
+    f.app.db.db.prepare("UPDATE faro_events SET data='{}' WHERE process_id=? AND kind='CLARIFY'").run(p.id);
+    f.app.db.db.prepare("UPDATE faro_interests SET stage='CLARIFICATION_REQUESTED' WHERE id=?").run(p.id);
+    assert.ok(service.view(f.employer.id,p.id).availableCommands.includes('CLARIFY'));
+    await f.request(url,f.employer.cookie,'POST',{command:'CLARIFY',question:{topic:'REQUIREMENT',requirementId:'req-customer'},dueAt,expectedVersion:5,idempotencyKey:'replace-legacy-question'});
+    assert.equal(service.row(p.id).first_response_at,first);
+  }finally{await f.close();}
+});
+
 test('offer salary validation and stale/paused intake preserve access to existing processes', async () => {
   const f = await setup();
   try {

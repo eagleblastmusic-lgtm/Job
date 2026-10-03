@@ -110,6 +110,38 @@ test('Faro real candidate and employer process, private watch, economics and res
   } finally { try { if (!page.isClosed()) { await page.screenshot({path:info.outputPath('final-state.png'),fullPage:true}); await page.goto('about:blank'); } } finally { await f.close(); } }
 });
 
+test('clarification workspace shares only structured declarations and keeps profile snapshot unchanged',async({page})=>{
+  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  try {
+    const employer=await f.user('ClarifyEmployer'),candidate=await f.user('ClarifyCandidate');
+    const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Rozmowa o kompetencjach'},201);
+    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const preview=await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation',candidate.cookie);
+    const p=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'browser-clarify-interest'},201);
+    await login(page,f.base,employer.email);await page.goto(`${f.base}/#processes/${p.id}`);
+    const command=page.locator('[data-form=process-command]');
+    await command.locator('[name=command]').selectOption('CLARIFY');
+    await command.locator('[name=questionTopic]').selectOption('REQUIREMENT');
+    await command.locator('[name=questionRequirementId]').selectOption('req-customer');
+    await command.locator('[name=dueAt]').fill('2099-01-01T12:00');await command.locator('[name=confirmed]').check();
+    await command.getByRole('button',{name:'Zapisz działanie'}).click();
+    await expect(page.locator('.f-detail').getByText('Pytanie do kandydata',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);await page.goto(`${f.base}/#processes/${p.id}`);
+    await expect(command.locator('[name=answer]')).toHaveCount(0);
+    await command.locator('[name=command]').selectOption('ANSWER');await command.locator('[name=responseKind]').selectOption('DECLARE_SKILL');
+    await command.locator('[name=level]').selectOption('INDEPENDENT');await command.locator('[name=source]').selectOption('WORK');
+    await command.locator('[name=quantity]').fill('12');await command.locator('[name=unit]').selectOption('MONTHS');await command.locator('[name=confirmed]').check();
+    await command.getByRole('button',{name:'Zapisz działanie'}).click();
+    await expect(page.locator('.f-timeline')).toContainText('Deklaruję kompetencję');
+    const view=await f.request<{projection:{skillClaims:unknown[]};stage:string}>(`/api/faro/processes/${p.id}`,employer.cookie);
+    expect(view.projection.skillClaims).toHaveLength(0);expect(view.stage).toBe('AWAITING_EMPLOYER');
+  } finally {await page.goto('about:blank');await f.close();}
+});
+
 test('privacy workspace exports own data and requires reauthentication before erasure',async({page})=>{
   const f=await faroFixture(); f.app.config.appOrigin=f.base;
   try{

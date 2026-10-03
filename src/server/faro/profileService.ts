@@ -16,14 +16,18 @@ export class ProfileService extends FaroStore {
     if (!/^[\p{L}][\p{L}\p{M}'’-]*$/u.test(name)) throw new HttpError(400, 'Wpisz tylko imię, bez nazwiska.', 'FIRST_NAME_ONLY');
     const current = this.profile(userId);
     if (integer(body.expectedVersion) !== current.version) throw new HttpError(409, 'Profil zmienił się. Odśwież dane.', 'VERSION_CONFLICT');
-    const raw = object(body.availability);
-    const kind = choice(raw.kind, ['UNKNOWN', 'IMMEDIATE', 'AFTER_PERIOD', 'ON_DATE'] as const);
-    const value = kind === 'ON_DATE' ? text(raw.value, 10) : kind === 'AFTER_PERIOD' ? String(integer(raw.value, 1, 365)) : null;
-    if (kind === 'ON_DATE' && (!/^\d{4}-\d\d-\d\d$/.test(value!) || !Number.isFinite(Date.parse(value!)))) throw new HttpError(400, 'Nieprawidłowa data dostępności.');
+    const availability=this.availability(body.availability);
     const phone = body.phone ? text(body.phone, 20) : null;
     if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) throw new HttpError(400, 'Nieprawidłowy telefon.');
-    this.db.prepare('INSERT INTO faro_profiles(user_id,first_name,availability,phone,version,updated_at) VALUES(?,?,?,?,1,?) ON CONFLICT(user_id) DO UPDATE SET first_name=excluded.first_name,availability=excluded.availability,phone=excluded.phone,version=faro_profiles.version+1,updated_at=excluded.updated_at').run(userId, name, JSON.stringify({ kind, value, updatedAt: this.now() }), phone, this.now());
+    this.db.prepare('INSERT INTO faro_profiles(user_id,first_name,availability,phone,version,updated_at) VALUES(?,?,?,?,1,?) ON CONFLICT(user_id) DO UPDATE SET first_name=excluded.first_name,availability=excluded.availability,phone=excluded.phone,version=faro_profiles.version+1,updated_at=excluded.updated_at').run(userId, name, JSON.stringify(availability), phone, this.now());
     return this.profile(userId);
+  }
+  availability(input:unknown):Availability {
+    const raw = object(input);
+    const kind = choice(raw.kind, ['UNKNOWN', 'IMMEDIATE', 'AFTER_PERIOD', 'ON_DATE'] as const);
+    const value = kind === 'ON_DATE' ? text(raw.value, 10) : kind === 'AFTER_PERIOD' ? String(integer(raw.value, 1, 365)) : null;
+    if (kind === 'ON_DATE' && (!/^\d{4}-\d\d-\d\d$/.test(value!) || !Number.isFinite(Date.parse(value!)) || new Date(value!).toISOString().slice(0,10)!==value)) throw new HttpError(400, 'Nieprawidłowa data dostępności.');
+    return {kind,value,updatedAt:this.now()};
   }
   practice(value: unknown): Practice {
     const p = object(value);

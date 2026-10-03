@@ -13,3 +13,6 @@ The erasure log is a local restore hook, not a durable external deletion journal
 PWA caching is limited to explicit public shell assets; authenticated API responses use no-store. Navigation aborts stale fetches, logout removes private DOM/state, and server authorization is re-evaluated on every request. File/CV upload routes are retired; assessment file execution is not enabled.
 
 LEGAL REVIEW: approved purposes, retention/holds, controller/processor responsibilities, GDPR profiling and DPIA. Local synthetic verification is not legal certification or permission to publish.
+# Clarification boundary
+
+Candidate process responses use enums, catalog skill identifiers, bounded practice and validated availability. Raw identity/CV/employer-history text has no response field in the current contract. Historical raw ANSWER action and nextAction are suppressed in process API presentation. Own export may still contain the candidate's historical raw answer; it is not organization export. Response declarations remain separate from confirmed profile history and from verified evidence.

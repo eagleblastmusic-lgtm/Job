@@ -21,7 +21,13 @@ export async function faroFixture() {
     const data = await response.json() as { user: { id: string } };
     return { id: data.user.id, cookie: response.headers.get('set-cookie')!.split(';')[0]!, email: `${name.toLowerCase()}@example.pl` };
   }
-  return { app, base, request, user, close: async () => { await app.close(); await rm(dir, { recursive: true, force: true }); } };
+  return { app, base, request, user, close: async () => {
+    const closing=app.close();
+    // Browser preconnect sockets must not keep the disposable fixture alive after assertions.
+    app.server.closeAllConnections();
+    await closing;
+    await rm(dir, { recursive: true, force: true });
+  } };
 }
 
 export function offerInput(recruiterId: string) {

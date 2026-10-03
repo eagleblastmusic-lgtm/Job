@@ -28,6 +28,8 @@ export interface Offer {
 }
 export interface Organization { id: string; name: string; verification: string; role: string; }
 export interface Process {
+  availableCommands:string[];
+  clarification:{topic:'REQUIREMENT'|'AVAILABILITY';requirementId:string|null;skillId:string|null;previousStage:string}|null;
   id: string; offerId: string; role: string; company: string; status: string; stage: string; revision: number;
   viewer: 'CANDIDATE' | 'EMPLOYER'; projection: Projection; requirements: Requirement[];
   responseDueAt: string; firstResponseAt: string | null; stageDueAt: string | null; nextAction: string | null;

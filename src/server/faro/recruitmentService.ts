@@ -7,6 +7,7 @@ import { text, integer, choice, date, object } from './validation.js';
 import { transition, COMMANDS, REJECTION_REASONS, TERMINAL, type InterestStatus, type Stage } from '../../domain/faro/recruitment.js';
 import { materialDiff } from '../../domain/faro/offers.js';
 import type { employerProjection } from '../../domain/faro/skills.js';
+import { LEVELS, SOURCES, skillById } from '../../domain/faro/skills.js';
 export interface ProcessRow {
   id: string; candidate_id: string; offer_id: string; offer_version: number; snapshot: string;
   status: InterestStatus; stage: Stage; revision: number; response_due_at: string; first_response_at: string | null;
@@ -66,10 +67,19 @@ export class RecruitmentService extends FaroStore {
   view(userId: string, id: string) {
     const row = this.authorize(userId, id), candidate = row.candidate_id === userId;
     const offer = this.offers.get(row.offer_id);
-    const events = this.db.prepare('SELECT kind,data,occurred_at FROM faro_events WHERE process_id=? ORDER BY occurred_at,rowid').all(id);
+    const events = (this.db.prepare('SELECT kind,data,occurred_at FROM faro_events WHERE process_id=? ORDER BY occurred_at,rowid').all(id) as Array<{kind:string;data:string;occurred_at:string}>).map(event=>{
+      if(event.kind!=='ANSWER')return event;
+      const data=JSON.parse(event.data) as Record<string,unknown>;
+      // Historical free-form candidate answers never cross the employer API boundary.
+      delete data.action;
+      return {...event,data:JSON.stringify(data)};
+    });
+    const last=this.db.prepare('SELECT kind FROM faro_events WHERE process_id=? ORDER BY rowid DESC LIMIT 1').get(id) as {kind:string}|undefined;
     const grant = this.db.prepare('SELECT granted_at,revoked_at FROM faro_contact_grants WHERE process_id=?').get(id) ?? null;
     return { id, offerId: row.offer_id, offerVersion: row.offer_version, role: offer.data.role, company: offer.company, status: row.status, stage: row.stage, revision: row.revision,
-      responseDueAt: row.response_due_at, firstResponseAt: row.first_response_at, stageDueAt: row.stage_due_at, nextAction: row.next_action,
+      responseDueAt: row.response_due_at, firstResponseAt: row.first_response_at, stageDueAt: row.stage_due_at, nextAction: last?.kind==='ANSWER'?'Kandydat odpowiedział. Firma sprawdzi deklarację i przekaże kolejny krok.':row.next_action,
+      clarification:this.clarification(row.id),
+      availableCommands:COMMANDS.filter(command=>transition(row.status,row.stage,candidate?'CANDIDATE':'EMPLOYER',command)||(!candidate&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(row.id))),
       reason: row.reason ? JSON.parse(row.reason) as Record<string, unknown> : null, createdAt: row.created_at,
       projection: JSON.parse(row.snapshot) as ReturnType<typeof employerProjection>, events, contactGrant: grant, viewer: candidate ? 'CANDIDATE' : 'EMPLOYER',
       requirements: this.offers.version(row.offer_id, row.offer_version).requirements,
@@ -86,9 +96,11 @@ export class RecruitmentService extends FaroStore {
       const row = this.authorize(userId, id), actor = row.candidate_id === userId ? 'CANDIDATE' : 'EMPLOYER';
       if (actor === 'EMPLOYER') this.member(userId, this.offers.get(row.offer_id).organizationId, ['OWNER','ADMIN','RECRUITER']);
       if (integer(body.expectedVersion, 1) !== row.revision) throw new HttpError(409, 'Proces został zmieniony. Odśwież dane.', 'VERSION_CONFLICT');
-      const command = choice(body.command, COMMANDS), next = transition(row.status, row.stage, actor, command);
+      const command = choice(body.command, COMMANDS), next = transition(row.status, row.stage, actor, command)
+        ?? (actor==='EMPLOYER'&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(id)?{status:row.status,stage:row.stage,substantive:false}:null);
       if (!next) throw new HttpError(409, 'Ta akcja nie jest dostępna w tym etapie.', 'INVALID_TRANSITION');
       let reason: Record<string, unknown> | null = null, action: string | null = null, due: string | null = null;
+      let question:ReturnType<RecruitmentService['clarification']>=null,response:Record<string,unknown>|null=null;
       if (command === 'REJECT') {
         const raw = object(body.reason), code = choice(raw.code, REJECTION_REASONS);
         const requires = ['REQUIREMENT_NOT_DEMONSTRATED','REQUIREMENT_NOT_MET','OTHER_CANDIDATE_BETTER_MATCH'].includes(code);
@@ -96,15 +108,38 @@ export class RecruitmentService extends FaroStore {
         if (requires && !this.offers.version(row.offer_id, row.offer_version).requirements.some(r => r.id === requirementId && r.kind !== 'WILL_TEACH')) throw new HttpError(400, 'Wybierz wymaganie z wersji zgłoszenia; nauka w firmie nie jest barierą.', 'REJECTION_REQUIREMENT');
         reason = { code, requirementId };
       } else if (command === 'CANCEL') reason = { code: 'RECRUITMENT_CANCELLED', explanation: text(body.explanation, 1000, 5) };
-      if (['ADVANCE','CLARIFY','OFFER'].includes(command)) {
+      if (['ADVANCE','OFFER'].includes(command)) {
         action = text(body.nextAction, 1500, 5); due = date(body.dueAt);
         if (due <= this.now()) throw new HttpError(400, 'Termin musi być w przyszłości.');
       }
-      if (command === 'ANSWER') action = text(body.answer, 1500, 1);
+      if(command==='CLARIFY') {
+        const raw=object(body.question),topic=choice(raw.topic,['REQUIREMENT','AVAILABILITY'] as const);
+        const requirementId=topic==='REQUIREMENT'?text(raw.requirementId,100):null;
+        const requirement=this.offers.version(row.offer_id,row.offer_version).requirements.find(r=>r.id===requirementId);
+        if(topic==='REQUIREMENT'&&!requirement)throw new HttpError(400,'Wybierz wymaganie z wersji zgłoszenia.','CLARIFICATION_REQUIREMENT');
+        question={topic,requirementId,skillId:requirement?.skillId??null,previousStage:row.stage==='CLARIFICATION_REQUESTED'?(row.status==='ACTIVE'?'ACCEPTED_TO_NEXT_STAGE':'AWAITING_EMPLOYER'):row.stage};
+        action=topic==='AVAILABILITY'?'Potwierdź swoją aktualną dostępność.':`Jak deklarujesz kompetencję: ${skillById(requirement!.skillId)!.label}? Podaj poziom i praktykę albo kierunek nauki.`;
+        due=date(body.dueAt);if(due<=this.now())throw new HttpError(400,'Termin odpowiedzi musi być w przyszłości.');
+      }
+      if(command==='ANSWER') {
+        question=this.clarification(id);
+        if(!question)throw new HttpError(409,'Pytanie wymaga ustrukturyzowania przez rekrutera.','STRUCTURED_QUESTION_REQUIRED');
+        if(body.confirmed!==true)throw new HttpError(400,'Potwierdź udostępnianą deklarację.','CONFIRMATION_REQUIRED');
+        const raw=object(body.response);
+        if(question.topic==='AVAILABILITY') {
+          response={kind:'AVAILABILITY',availability:new ProfileService(this.database,this.clock).availability(raw.availability)};
+        } else {
+          const kind=choice(raw.kind,['DECLARE_SKILL','NOT_YET','WANTS_TO_LEARN'] as const);
+          response=kind==='DECLARE_SKILL'?{kind,skillId:question.skillId,level:choice(raw.level,LEVELS),source:choice(raw.source,SOURCES),practice:new ProfileService(this.database,this.clock).practice(raw.practice),verification:'DECLARED'}:{kind,skillId:question.skillId};
+        }
+        next.stage=question.previousStage==='ACCEPTED_TO_NEXT_STAGE'?'ACCEPTED_TO_NEXT_STAGE':'AWAITING_EMPLOYER';
+        action='Kandydat odpowiedział. Firma sprawdzi deklarację i przekaże kolejny krok.';
+        due=new Date(this.clock().getTime()+this.offers.version(row.offer_id,row.offer_version).decisionHours*3600000).toISOString();
+      }
       const first = next.substantive ? row.first_response_at ?? this.now() : row.first_response_at;
       this.db.prepare('UPDATE faro_interests SET status=?,stage=?,revision=revision+1,first_response_at=?,stage_due_at=?,next_action=?,reason=? WHERE id=?').run(next.status, next.stage, first, due, action, reason ? JSON.stringify(reason) : null, id);
       if (TERMINAL.includes(next.status)) this.cancelObligations(id);
-      this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action });
+      this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action,question,response });
       return { id, revision: row.revision + 1 };
     });
   }
@@ -112,6 +147,10 @@ export class RecruitmentService extends FaroStore {
     this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(),id);
     this.db.prepare("UPDATE faro_attempts SET state='WITHDRAWN',revision=revision+1 WHERE process_id=? AND state IN ('INVITED','STARTED')").run(id);
     this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE process_id=? AND state IN ('PROPOSED','CONFIRMED')").run(id);
+  }
+  clarification(id:string):{topic:'REQUIREMENT'|'AVAILABILITY';requirementId:string|null;skillId:string|null;previousStage:Stage}|null {
+    const latest=this.db.prepare("SELECT data FROM faro_events WHERE process_id=? AND kind='CLARIFY' ORDER BY rowid DESC LIMIT 1").get(id) as {data:string}|undefined;
+    return latest?(JSON.parse(latest.data) as {question?:ReturnType<RecruitmentService['clarification']>}).question??null:null;
   }
   watch(userId: string, offerId: string, watching: boolean) {
     if (watching) {
