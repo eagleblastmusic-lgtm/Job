@@ -17,3 +17,6 @@ All `/api/faro/*` routes require a session and mutation origin validation. Domai
 Offer and process mutations require `expectedVersion` where supported; process commands additionally require `idempotencyKey`. 409 means refresh/review changed data, not silently resubmit a decision. Ownership transfer requires current password and an active successor. Account deletion also requires the exact confirmation phrase. Errors return `{error:{code,message}}`; an incorrect reauthentication password does not destroy the session.
 
 Assessment definition editing, appointment endpoints and additional lifecycle commands remain future deltas; do not infer callable endpoints from schema states.
+# Preview confirmation contract
+
+GET `/api/faro/profile/preview-confirmation` returns `{projection, confirmationToken}` for the authenticated candidate. POST `/api/faro/offers/:id/interest` requires this token alongside `projectionConfirmed`, offer version and idempotency key. Within the same transaction the service compares the current allowlisted projection and freezes that exact object. Missing/stale tokens return 409 `PROFILE_CHANGED` without process/event/outbox writes. The token is a consistency digest, not an authorization credential. Existing GET `/profile/preview` retains its projection-only contract.

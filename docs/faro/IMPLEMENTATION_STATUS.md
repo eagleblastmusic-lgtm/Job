@@ -104,3 +104,16 @@ RISKS / DEFERRED: backup restoration must reconcile current deletion ledger; pur
 ROLLBACK: revert code; retain additive ledger; do not reverse completed account erasures from backups.
 STATUS: DONE for CP11-A; CP11 remains PARTIAL.
 NEXT CHECKPOINT: preview/confirmation consistency, structured process responses, interview lifecycle and full assessment workflow. Continue full plan.
+# CP06-B — Confirmed preview consistency (2026-10-03)
+
+GOAL / SCOPE: prevent profile changes in another tab from changing the data shared by a confirmed interest submission.
+DEPENDENCIES: CP03 projection, CP06 transactional commands, CP08 preview dialog.
+IMPLEMENTATION / FILES: ProfileService issues a digest of the user-scoped allowlisted projection; RecruitmentService compares it and inserts the same projection within commandOnce. API and workspace transmit the confirmation token. Existing preview-only contract remains unchanged. Updated recruitment, assessment and privacy test fixtures.
+DB CHANGE / MIGRATIONS: none.
+TESTED: build, lint, typecheck; all 13 Faro API/domain scenarios; all 4 desktop/mobile browser scenarios PASS.
+ACCEPTANCE: missing/stale preview rejects without side effects; learning changes invalidate confirmation; stored data equals approved preview; later changes cannot mutate it; successful command replay remains idempotent.
+LEGAL STATUS: engineering privacy boundary; external release gates remain open.
+RISK: clients using the old interest payload must fetch the new confirmation token.
+ROLLBACK: revert this isolated change together with client contract; no data migration required.
+STATUS: DONE for CP06-B; overall CP06 remains PARTIAL.
+DEFERRED / NEXT CHECKPOINT: interview lifecycle, structured clarification and outstanding assessment/operational work.

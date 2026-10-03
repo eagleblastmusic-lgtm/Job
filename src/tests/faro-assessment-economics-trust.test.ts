@@ -14,7 +14,8 @@ async function assessmentSetup() {
   const draft = await f.request<{ id: string }>(`/api/faro/organizations/${org.id}/offers`, employer.cookie, 'POST', offerInput(employer.id), 201);
   await f.request(`/api/faro/offers/${draft.id}/lifecycle`, employer.cookie, 'POST', { action: 'REVIEW', expectedVersion: 1 });
   const offer = await f.request<{ id: string; version: number; revision: number }>(`/api/faro/offers/${draft.id}/lifecycle`, employer.cookie, 'POST', { action: 'PUBLISH', expectedVersion: 2, confirmed: true });
-  const interest = await f.request<{ id: string }>(`/api/faro/offers/${offer.id}/interest`, candidate.cookie, 'POST', { offerVersion: 1, projectionConfirmed: true, idempotencyKey: 'assessment-interest' }, 201);
+  const preview = await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation', candidate.cookie);
+  const interest = await f.request<{ id: string }>(`/api/faro/offers/${offer.id}/interest`, candidate.cookie, 'POST', { offerVersion: 1, projectionConfirmed: true, confirmationToken:preview.confirmationToken, idempotencyKey: 'assessment-interest' }, 201);
   await f.request(`/api/faro/processes/${interest.id}/commands`, employer.cookie, 'POST', { command: 'ADVANCE', nextAction: 'Ukończ assessment', dueAt: new Date(Date.now() + 86_400_000).toISOString(), expectedVersion: 1, idempotencyKey: 'assessment-advance' });
   return { ...f, employer, candidate, admin, org, offer, interest };
 }

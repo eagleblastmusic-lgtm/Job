@@ -26,7 +26,8 @@ test('native process: private watch, identical preview, rejection requirement, c
     assert.equal((await f.request<{ processes: unknown[] }>(`/api/faro/processes?offerId=${o.id}`, e.cookie)).processes.length, 0);
     assert.equal((await f.request<{ offers: unknown[] }>('/api/faro/watches', e.cookie)).offers.length, 0);
     const preview = await f.request<Record<string, unknown>>('/api/faro/profile/preview', c.cookie);
-    const interestBody = { offerVersion: 1, projectionConfirmed: true, idempotencyKey: 'interest-1' };
+    const confirmation = await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation', c.cookie);
+    const interestBody = { offerVersion: 1, projectionConfirmed: true, confirmationToken:confirmation.confirmationToken, idempotencyKey: 'interest-1' };
     const interest = await f.request<{ id: string }>(`/api/faro/offers/${o.id}/interest`, c.cookie, 'POST', interestBody, 201);
     const replay = await f.request<{ id: string }>(`/api/faro/offers/${o.id}/interest`, c.cookie, 'POST', interestBody, 201);
     assert.equal(interest.id, replay.id);
@@ -61,12 +62,33 @@ test('native process: private watch, identical preview, rejection requirement, c
   } finally { await f.close(); }
 });
 
+test('interest rejects absent or stale preview without side effects and freezes confirmed data', async () => {
+  const f = await setup();
+  try {
+    const profiles = new ProfileService(f.app.db), service = new RecruitmentService(f.app.db);
+    const url = `/api/faro/offers/${f.offer.id}/interest`;
+    const body = { offerVersion:1, projectionConfirmed:true, idempotencyKey:'preview-race' };
+    await f.request(url,f.candidate.cookie,'POST',body,409);
+    const old = profiles.previewConfirmation(f.candidate.id);
+    profiles.learn(f.candidate.id,{skillId:f.offer.data.requirements[0]!.skillId,mode:'WANTS_TO_LEARN',practice:{quantity:null,unit:'MONTHS'}});
+    await f.request(url,f.candidate.cookie,'POST',{...body,confirmationToken:old.confirmationToken},409);
+    assert.equal(service.list(f.candidate.id).length,0);
+    assert.equal((f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events').get() as {n:number}).n,0);
+    const current = profiles.previewConfirmation(f.candidate.id);
+    const accepted = {...body,confirmationToken:current.confirmationToken};
+    const result = await f.request<{id:string}>(url,f.candidate.cookie,'POST',accepted,201);
+    profiles.save(f.candidate.id,{firstName:'Adam',expectedVersion:1,availability:{kind:'IMMEDIATE'}});
+    assert.deepEqual(service.view(f.employer.id,result.id).projection,{...current.projection,processId:result.id});
+    assert.deepEqual(await f.request(url,f.candidate.cookie,'POST',accepted,201),result);
+  } finally { await f.close(); }
+});
+
 test('offer salary validation and stale/paused intake preserve access to existing processes', async () => {
   const f = await setup();
   try {
     await f.request(`/api/faro/organizations/${f.org.id}/offers`, f.employer.cookie, 'POST', { ...offerInput(f.employer.id), salary: [] }, 400);
     const service = new RecruitmentService(f.app.db), offerService = new OfferService(f.app.db);
-    const interest = service.interest(f.candidate.id, f.offer.id, { offerVersion: 1, projectionConfirmed: true, idempotencyKey: 'one' });
+    const interest = service.interest(f.candidate.id, f.offer.id, { offerVersion: 1, projectionConfirmed: true, confirmationToken:new ProfileService(f.app.db).previewConfirmation(f.candidate.id).confirmationToken, idempotencyKey: 'one' });
     offerService.lifecycle(f.employer.id, f.offer.id, { action: 'PAUSE', expectedVersion: f.offer.revision });
     assert.equal(service.view(f.employer.id, interest.id).status, 'INTERESTED');
     await f.request(`/api/faro/offers/${f.offer.id}/interest`, f.outsider.cookie, 'POST', { offerVersion: 1, projectionConfirmed: true, idempotencyKey: 'paused' }, 409);

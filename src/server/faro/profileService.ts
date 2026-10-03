@@ -72,6 +72,11 @@ export class ProfileService extends FaroStore {
     if (!p.firstName) throw new HttpError(400, 'Najpierw zapisz swoje imię w profilu.', 'PROFILE_REQUIRED');
     return employerProjection(processId, p.firstName, p.claims, p.learning, p.availability);
   }
+  previewConfirmation(userId: string) {
+    const projection = this.projection(userId);
+    const confirmationToken = createHash('sha256').update(JSON.stringify({ userId, projection })).digest('hex');
+    return { projection, confirmationToken };
+  }
   organizations(userId: string) {
     return this.db.prepare('SELECT o.id,o.name,o.verification,o.verified_at,m.role FROM faro_organizations o JOIN faro_members m ON m.organization_id=o.id WHERE m.user_id=? AND m.active=1 ORDER BY o.created_at').all(userId);
   }

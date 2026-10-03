@@ -19,7 +19,7 @@ async function setup() {
   offers.lifecycle(employer.id,offer.id,{action:'REVIEW',expectedVersion:1});
   offers.lifecycle(employer.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
   recruitment.watch(candidate.id,offer.id,true);
-  const process=recruitment.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,idempotencyKey:'privacy-interest'});
+  const process=recruitment.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(candidate.id).confirmationToken,idempotencyKey:'privacy-interest'});
   recruitment.change(employer.id,process.id,{command:'ADVANCE',nextAction:'Sprawdź zadanie praktyczne',dueAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'privacy-advance'});
   recruitment.grant(candidate.id,process.id,true);
   const assessments=new AssessmentService(f.app.db);

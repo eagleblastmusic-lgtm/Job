@@ -38,6 +38,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (path === '/api/faro/profile' && method === 'GET') return ok(profiles.profile(user.id));
     if (path === '/api/faro/profile' && method === 'PUT') return ok(profiles.save(user.id, body));
     if (path === '/api/faro/profile/preview' && method === 'GET') return ok(profiles.projection(user.id));
+    if (path === '/api/faro/profile/preview-confirmation' && method === 'GET') return ok(profiles.previewConfirmation(user.id));
     if (path === '/api/faro/claims' && method === 'POST') return ok(profiles.addClaim(user.id, body), 201);
     const claim = path.match(/^\/api\/faro\/claims\/([^/]+)$/);
     if (claim && method === 'DELETE') { profiles.revoke(user.id, claim[1]!); return ok({ ok: true }); }

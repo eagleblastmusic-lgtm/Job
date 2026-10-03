@@ -54,7 +54,9 @@ export class RecruitmentService extends FaroStore {
       if (integer(body.offerVersion, 1) !== offer.version) throw new HttpError(409, 'Warunki oferty zmieniły się. Sprawdź je ponownie.', 'OFFER_CHANGED');
       if (body.projectionConfirmed !== true) throw new HttpError(400, 'Potwierdź zakres udostępnianych danych.');
       if (this.db.prepare("SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=? AND status IN ('INTERESTED','ACTIVE','OFFERED')").get(userId, offerId)) throw new HttpError(409, 'Masz już aktywne zgłoszenie.', 'ACTIVE_INTEREST_EXISTS');
-      const id = randomUUID(), snapshot = new ProfileService(this.database, this.clock).projection(userId, id);
+      const preview = new ProfileService(this.database, this.clock).previewConfirmation(userId);
+      if (body.confirmationToken !== preview.confirmationToken) throw new HttpError(409, 'Profil zmienił się lub brakuje potwierdzonego podglądu. Sprawdź dane ponownie.', 'PROFILE_CHANGED');
+      const id = randomUUID(), snapshot = { ...preview.projection, processId: id };
       const responseDue = new Date(this.clock().getTime() + offer.data.responseHours * 3600000).toISOString();
       this.db.prepare("INSERT INTO faro_interests(id,candidate_id,offer_id,offer_version,snapshot,status,stage,response_due_at,created_at) VALUES(?,?,?,?,?,'INTERESTED','AWAITING_EMPLOYER',?,?)").run(id, userId, offerId, offer.version, JSON.stringify(snapshot), responseDue, this.now());
       this.event(this.row(id), userId, 'INTEREST_CREATED', { offerVersion: offer.version });
