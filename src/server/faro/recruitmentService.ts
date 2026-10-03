@@ -10,6 +10,7 @@ import type { employerProjection } from '../../domain/faro/skills.js';
 import { LEVELS, SOURCES, skillById } from '../../domain/faro/skills.js';
 export interface ProcessRow {
   id: string; candidate_id: string; offer_id: string; offer_version: number; snapshot: string;
+  previous_interest_id:string|null;
   status: InterestStatus; stage: Stage; revision: number; response_due_at: string; first_response_at: string | null;
   stage_due_at: string | null; next_action: string | null; reason: string | null; created_at: string;
 }
@@ -49,18 +50,21 @@ export class RecruitmentService extends FaroStore {
     for (const recruiter of recruiters) this.enqueue(recruiter.user_id, 'process', row.id, 'W przypisanej rekrutacji pojawiła się aktualizacja.', eventId);
   }
   interest(userId: string, offerId: string, body: Record<string, unknown>) {
-    return this.commandOnce(userId, body.idempotencyKey, { offerId, ...body }, () => {
+    return this.commandOnce(userId, body.idempotencyKey, { ...body, offerId }, () => {
       const offer = this.offers.get(offerId);
       if (!this.offers.intake(offer)) throw new HttpError(409, 'Oferta nie przyjmuje nowych zgłoszeń.', 'INTAKE_CLOSED');
       if (integer(body.offerVersion, 1) !== offer.version) throw new HttpError(409, 'Warunki oferty zmieniły się. Sprawdź je ponownie.', 'OFFER_CHANGED');
       if (body.projectionConfirmed !== true) throw new HttpError(400, 'Potwierdź zakres udostępnianych danych.');
       if (this.db.prepare("SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=? AND status IN ('INTERESTED','ACTIVE','OFFERED')").get(userId, offerId)) throw new HttpError(409, 'Masz już aktywne zgłoszenie.', 'ACTIVE_INTEREST_EXISTS');
+      const previous=this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,offerId) as {id:string}|undefined;
+      if(previous&&(body.previousInterestId!==previous.id||body.renewalConfirmed!==true))throw new HttpError(409,'Potwierdź nowy proces powiązany z poprzednim zgłoszeniem.','RENEWAL_CONFIRMATION_REQUIRED');
+      if(!previous&&body.previousInterestId)throw new HttpError(400,'Nieprawidłowy poprzedni proces.','INVALID_HISTORY_LINK');
       const preview = new ProfileService(this.database, this.clock).previewConfirmation(userId);
       if (body.confirmationToken !== preview.confirmationToken) throw new HttpError(409, 'Profil zmienił się lub brakuje potwierdzonego podglądu. Sprawdź dane ponownie.', 'PROFILE_CHANGED');
       const id = randomUUID(), snapshot = { ...preview.projection, processId: id };
       const responseDue = new Date(this.clock().getTime() + offer.data.responseHours * 3600000).toISOString();
-      this.db.prepare("INSERT INTO faro_interests(id,candidate_id,offer_id,offer_version,snapshot,status,stage,response_due_at,created_at) VALUES(?,?,?,?,?,'INTERESTED','AWAITING_EMPLOYER',?,?)").run(id, userId, offerId, offer.version, JSON.stringify(snapshot), responseDue, this.now());
-      this.event(this.row(id), userId, 'INTEREST_CREATED', { offerVersion: offer.version });
+      this.db.prepare("INSERT INTO faro_interests(id,candidate_id,offer_id,offer_version,snapshot,status,stage,response_due_at,created_at,previous_interest_id) VALUES(?,?,?,?,?,'INTERESTED','AWAITING_EMPLOYER',?,?,?)").run(id, userId, offerId, offer.version, JSON.stringify(snapshot), responseDue, this.now(),previous?.id??null);
+      this.event(this.row(id), userId, 'INTEREST_CREATED', { offerVersion: offer.version,previousInterestId:previous?.id??null });
       return { id };
     });
   }
@@ -76,7 +80,7 @@ export class RecruitmentService extends FaroStore {
     });
     const last=this.db.prepare('SELECT kind FROM faro_events WHERE process_id=? ORDER BY rowid DESC LIMIT 1').get(id) as {kind:string}|undefined;
     const grant = this.db.prepare('SELECT granted_at,revoked_at FROM faro_contact_grants WHERE process_id=?').get(id) ?? null;
-    return { id, offerId: row.offer_id, offerVersion: row.offer_version, role: offer.data.role, company: offer.company, status: row.status, stage: row.stage, revision: row.revision,
+    return { id, previousInterestId:row.previous_interest_id, offerId: row.offer_id, offerVersion: row.offer_version, role: offer.data.role, company: offer.company, status: row.status, stage: row.stage, revision: row.revision,
       responseDueAt: row.response_due_at, firstResponseAt: row.first_response_at, stageDueAt: row.stage_due_at, nextAction: last?.kind==='ANSWER'?'Kandydat odpowiedział. Firma sprawdzi deklarację i przekaże kolejny krok.':row.next_action,
       clarification:this.clarification(row.id),
       availableCommands:COMMANDS.filter(command=>transition(row.status,row.stage,candidate?'CANDIDATE':'EMPLOYER',command)||(!candidate&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(row.id))),

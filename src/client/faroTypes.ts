@@ -22,12 +22,14 @@ export interface OfferData {
   responseHours: number; decisionHours: number; stages: string[]; assessmentMinutes: number; interviewCount: number; closesAt: string; recruiterId: string;
 }
 export interface Offer {
+  ownInterest?:{id:string;status:string}|null;
   id: string; company: string; organizationId: string; status: string; version: number; revision: number; data: OfferData;
   acceptingInterest?: boolean;
   explanation?: Array<{ requirementId: string; skillId: string; kind: string; state: string; developing: boolean; wantsToLearn: boolean }>;
 }
 export interface Organization { id: string; name: string; verification: string; role: string; }
 export interface Process {
+  previousInterestId:string|null;
   availableCommands:string[];
   clarification:{topic:'REQUIREMENT'|'AVAILABILITY';requirementId:string|null;skillId:string|null;previousStage:string}|null;
   id: string; offerId: string; role: string; company: string; status: string; stage: string; revision: number;

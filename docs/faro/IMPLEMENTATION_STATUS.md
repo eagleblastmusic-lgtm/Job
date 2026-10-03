@@ -143,3 +143,16 @@ ROLLBACK: coordinated client/server revert; preserve event history and keep priv
 TESTED: build/lint/typecheck; all 16 Faro scenarios PASS; all 6 desktop/mobile browser scenarios PASS. The browser cleanup timeout was diagnosed from trace as fixture connection shutdown and repaired in the disposable test helper. Final legacy-question replacement is additionally covered by the targeted recruitment test.
 STATUS: DONE for CP06-D; overall plan remains in progress.
 NEXT CHECKPOINT: repeated-interest history, bilateral case explanations and assessment lifecycle.
+# CP06-E — Explicit repeated-interest history (2026-10-03)
+
+GOAL / SCOPE: make repeat interest a conscious new relation, preserving existing history and privacy.
+DEPENDENCIES: terminal state machine, exact preview confirmation, private own-interest lookup and workspace.
+IMPLEMENTATION / FILES: RecruitmentService validates latest candidate/offer link and explicit renewal, inserts a self-linked new process and event without rewriting old records; OfferService returns only the reader's own latest interest; client renders active-process action or explicit renewal preview and previous-process link. Targeted recruitment and real browser tests updated.
+DB CHANGE / MIGRATIONS: additive 0025_faro_interest_history.sql, self FK with erasure-safe SET NULL and lookup index.
+ACCEPTANCE: missing/wrong link rejected; active duplicate blocked; old status/clocks/events preserved; exact replay idempotent; employer own-interest field never reveals candidate interest identities.
+TESTED: build/lint/typecheck PASS; 25 migrations PASS; all 17 Faro scenarios PASS; all 6 desktop/mobile browser scenarios PASS including explicit renewal and linked history.
+LEGAL STATUS: engineering history foundation; production/retention gates remain open.
+RISK / DEFERRED: pattern analysis operates over retained history in CP07; no automatic reputation reset or penalty is created here.
+ROLLBACK: revert coordinated client/server contract, retain additive FK/history data.
+STATUS: DONE for CP06-E; CP06 operational scheduled delivery remains open.
+NEXT CHECKPOINT: bilateral no-show explanations/moderation, full assessment lifecycle and worker operations.

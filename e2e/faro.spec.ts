@@ -139,6 +139,14 @@ test('clarification workspace shares only structured declarations and keeps prof
     await expect(page.locator('.f-timeline')).toContainText('Deklaruję kompetencję');
     const view=await f.request<{projection:{skillClaims:unknown[]};stage:string}>(`/api/faro/processes/${p.id}`,employer.cookie);
     expect(view.projection.skillClaims).toHaveLength(0);expect(view.stage).toBe('AWAITING_EMPLOYER');
+    await command.locator('[name=command]').selectOption('WITHDRAW');await command.locator('[name=confirmed]').check();await command.getByRole('button',{name:'Zapisz działanie'}).click();
+    await expect(page.locator('.f-detail').getByText('Wycofane',{exact:true})).toBeVisible();
+    await page.goto(`${f.base}/#offers/${offer.id}`);await page.getByRole('button',{name:'Zgłoś ponownie zainteresowanie'}).click();
+    const dialog=page.getByRole('dialog');await dialog.locator('[name=projectionConfirmed]').check();await dialog.locator('[name=renewalConfirmed]').check();
+    await dialog.getByRole('button',{name:'Zgłoś zainteresowanie',exact:true}).click();
+    await expect(page.getByRole('link',{name:'Otwórz poprzedni proces'})).toBeVisible();
+    const history=await f.request<{processes:Array<{id:string;previousInterestId:string|null}>}>('/api/faro/processes',candidate.cookie);
+    expect(history.processes).toHaveLength(2);expect(history.processes.find(process=>process.id!==p.id)?.previousInterestId).toBe(p.id);
   } finally {await page.goto('about:blank');await f.close();}
 });
 

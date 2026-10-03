@@ -57,7 +57,8 @@ export class OfferService extends FaroStore {
       if (!hasInterest && !watched) this.assigned(userId, id);
     }
     const p = new ProfileService(this.database, this.clock).profile(userId);
-    return { ...offer, acceptingInterest: this.intake(offer), explanation: explainOffer(offer.data, p.claims, p.learning) };
+    const ownInterest=this.db.prepare('SELECT id,status FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,id)??null;
+    return { ...offer, ownInterest, acceptingInterest: this.intake(offer), explanation: explainOffer(offer.data, p.claims, p.learning) };
   }
   create(userId: string, orgId: string, raw: Record<string, unknown>) {
     this.member(userId, orgId, ['OWNER','ADMIN','RECRUITER']); const data = parseOffer(raw);

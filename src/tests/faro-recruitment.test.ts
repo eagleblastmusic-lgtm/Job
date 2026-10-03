@@ -121,6 +121,26 @@ test('clarification cannot close the first clock with an empty acknowledgment or
   }finally{await f.close();}
 });
 
+test('renewed interest requires conscious link to latest own terminal history and does not reset previous clocks or events',async()=>{
+  const f=await setup();try {
+    const service=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db);
+    const body={offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'original'};
+    const original=service.interest(f.candidate.id,f.offer.id,body),due=service.row(original.id).response_due_at;
+    service.change(f.candidate.id,original.id,{command:'WITHDRAW',expectedVersion:1,idempotencyKey:'original-withdraw'});
+    const url=`/api/faro/offers/${f.offer.id}/interest`,renew={...body,idempotencyKey:'renew'};
+    await f.request(url,f.candidate.cookie,'POST',renew,409);
+    await f.request(url,f.candidate.cookie,'POST',{...renew,previousInterestId:'another-candidates-id',renewalConfirmed:true},409);
+    const newBody={...renew,previousInterestId:original.id,renewalConfirmed:true};
+    const next=await f.request<{id:string}>(url,f.candidate.cookie,'POST',newBody,201);
+    assert.notEqual(next.id,original.id);assert.equal(service.view(f.employer.id,next.id).previousInterestId,original.id);
+    assert.equal(service.row(original.id).status,'WITHDRAWN');assert.equal(service.row(original.id).response_due_at,due);
+    assert.equal(service.view(f.employer.id,original.id).events.length,2);
+    assert.deepEqual(await f.request(url,f.candidate.cookie,'POST',newBody,201),next);
+    const detail=await f.request<{ownInterest:{id:string;status:string}}>(`/api/faro/offers/${f.offer.id}`,f.candidate.cookie);assert.equal(detail.ownInterest.id,next.id);
+    assert.equal((await f.request<{ownInterest:unknown}>(`/api/faro/offers/${f.offer.id}`,f.employer.cookie)).ownInterest,null);
+  }finally{await f.close();}
+});
+
 test('offer salary validation and stale/paused intake preserve access to existing processes', async () => {
   const f = await setup();
   try {
