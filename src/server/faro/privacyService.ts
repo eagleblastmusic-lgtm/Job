@@ -14,6 +14,7 @@ export class PrivacyService extends FaroStore {
       own[table] = this.db.prepare(`SELECT * FROM ${table} WHERE candidate_id=?`).all(userId);
     }
     own.faro_events = this.db.prepare('SELECT e.kind,e.data,e.occurred_at,e.process_id FROM faro_events e JOIN faro_interests p ON p.id=e.process_id WHERE p.candidate_id=?').all(userId);
+    own.faro_interviews = this.db.prepare('SELECT i.id,i.process_id,i.state,i.revision,i.starts_at,i.ends_at,i.confirm_by,i.timezone,i.location,i.meeting_url,i.candidate_completed,i.employer_completed FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id WHERE p.candidate_id=? OR i.recruiter_id=?').all(userId,userId);
     own.faro_attempts = this.db.prepare('SELECT a.id,a.process_id,a.assessment_id,a.assessment_version,a.state,a.deadline,a.started_at,a.expires_at,a.answers,a.result,a.revision,a.reviewed_at FROM faro_attempts a JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
     own.faro_cases = this.db.prepare('SELECT id,kind,state,statement,decision,review_at,appeal,created_at FROM faro_cases WHERE reporter_id=?').all(userId);
     own.notifications = this.db.prepare('SELECT id,entity_type,entity_id,message,read_at,created_at FROM notifications WHERE user_id=?').all(userId);
@@ -38,8 +39,7 @@ export class PrivacyService extends FaroStore {
       for (const process of processes) {
         const row = recruitment.row(process.id);
         this.db.prepare("UPDATE faro_interests SET status='CANCELLED',stage='TERMINAL',stage_due_at=NULL,next_action=NULL,reason=?,revision=revision+1 WHERE id=?").run(JSON.stringify({code:'RECRUITMENT_CANCELLED',explanation:'Organizacja zakończyła rekrutację po usunięciu konta jedynego właściciela.'}),row.id);
-        this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(),row.id);
-        this.db.prepare("UPDATE faro_attempts SET state='WITHDRAWN',revision=revision+1 WHERE process_id=? AND state IN ('INVITED','STARTED')").run(row.id);
+        recruitment.cancelObligations(row.id);
         recruitment.event(row,userId,'CANCEL',{reason:{code:'RECRUITMENT_CANCELLED'},source:'ORGANIZATION_CLOSED'});
       }
       const openOffers = this.db.prepare("SELECT id,current_version FROM faro_offers WHERE organization_id=? AND status NOT IN ('CLOSED','ARCHIVED','REMOVED')").all(org.organization_id) as Array<{id:string;current_version:number}>;
@@ -49,6 +49,12 @@ export class PrivacyService extends FaroStore {
       this.db.prepare('DELETE FROM faro_invites WHERE organization_id=?').run(org.organization_id);
     }
     this.db.prepare('DELETE FROM faro_invites WHERE email=? OR created_by=?').run(user.email,userId);
+    const meetings=this.db.prepare("SELECT id,process_id FROM faro_interviews WHERE recruiter_id=? AND state IN ('PROPOSED','CONFIRMED')").all(userId) as Array<{id:string;process_id:string}>;
+    for(const meeting of meetings) {
+      this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE id=?").run(meeting.id);
+      this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=NULL,next_action='Firma musi wyznaczyć nowego rekrutera i termin.',revision=revision+1 WHERE id=? AND status='ACTIVE'").run(meeting.process_id);
+      recruitment.event(recruitment.row(meeting.process_id),userId,'INTERVIEW_CANCEL',{interviewId:meeting.id,reason:'RECRUITER_UNAVAILABLE'});
+    }
     // A transferred organization survives, but intake cannot rely on a deleted responsible recruiter.
     this.db.prepare("UPDATE faro_offers SET status='PAUSED',revision=revision+1 WHERE status='PUBLISHED' AND id IN (SELECT v.offer_id FROM faro_offer_versions v JOIN faro_offers o ON o.id=v.offer_id AND o.current_version=v.version WHERE json_extract(v.content,'$.recruiterId')=?)").run(userId);
     // Shared case history must not retain free-form personal statements after erasure.

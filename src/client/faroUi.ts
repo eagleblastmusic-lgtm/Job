@@ -1,6 +1,9 @@
 import type { Skill, Projection, Salary } from './faroTypes.js';
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export const labels: Record<string, string> = {
+  PROPOSED:'Termin zaproponowany', CONFIRMED:'Rozmowa potwierdzona', COMPLETED:'Rozmowa odbyta', DISPUTED:'Rozbieżność do wyjaśnienia',
+  INTERVIEW_PROPOSED:'Propozycja rozmowy', INTERVIEW_CONFIRMED:'Rozmowa potwierdzona', INTERVIEW_COMPLETED:'Rozmowa odbyta',
+  CONFIRM:'Potwierdź termin', COMPLETE:'Potwierdź odbycie rozmowy', DISPUTE:'Zgłoś rozbieżność', RESCHEDULE:'Potrzebny nowy termin', UNAVAILABLE:'Brak dostępności', NO_SHOW:'Nieobecność do wyjaśnienia', OTHER_DISCREPANCY:'Inna rozbieżność',
   BASICS: 'znam podstawy', INDEPENDENT: 'wykonuję samodzielnie', FLUENT: 'używam swobodnie',
   WORK: 'praktyka w pracy', SELF_LEARNING: 'samodzielna nauka', HOBBY: 'hobby', SCHOOL: 'edukacja', VOLUNTEERING: 'wolontariat',
   SELF_DEVELOPING: 'rozwijam samodzielnie', WANTS_TO_LEARN: 'chcę się nauczyć', DECLARED: 'deklaracja kandydata',

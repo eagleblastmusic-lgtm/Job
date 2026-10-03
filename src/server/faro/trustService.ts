@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
+import { InterviewService } from './interviewService.js';
 import { HttpError } from '../http.js';
 import { text, choice, date } from './validation.js';
 export class TrustService extends FaroStore {
@@ -39,6 +40,7 @@ export class TrustService extends FaroStore {
     this.audit(userId, 'MODERATION_APPEALED', id); return { id, state: 'APPEAL' };
   }
   tick() {
+    new InterviewService(this.database,this.clock).tick();
     const service = new RecruitmentService(this.database, this.clock), now = this.now();
     this.transaction(() => {
       const stale = this.db.prepare("SELECT id,organization_id FROM faro_offers WHERE status='PUBLISHED' AND confirmed_until<=?").all(now) as Array<{ id: string; organization_id: string }>;
@@ -53,12 +55,14 @@ export class TrustService extends FaroStore {
         this.db.prepare("UPDATE faro_offers SET status='CLOSED',revision=revision+1 WHERE id=?").run(offer.id);
         service.offers.notifyChange(offer.id, service.offers.get(offer.id).version, 'CLOSE');
       }
-      const due = this.db.prepare("SELECT id,candidate_id,offer_id,response_due_at,stage_due_at,first_response_at FROM faro_interests WHERE status IN ('INTERESTED','ACTIVE','OFFERED')").all() as unknown as Array<{ id: string; candidate_id: string; offer_id: string; response_due_at: string; stage_due_at: string | null; first_response_at: string | null }>;
+      const due = this.db.prepare("SELECT id,candidate_id,offer_id,stage,response_due_at,stage_due_at,first_response_at FROM faro_interests WHERE status IN ('INTERESTED','ACTIVE','OFFERED')").all() as unknown as Array<{ id: string; candidate_id: string; offer_id: string; stage:string; response_due_at: string; stage_due_at: string | null; first_response_at: string | null }>;
       for (const p of due) {
+        if(['INTERVIEW_PROPOSED','INTERVIEW_CONFIRMED'].includes(p.stage))continue;
         const deadline = p.first_response_at ? p.stage_due_at : p.response_due_at;
         if (!deadline || Date.parse(deadline) > this.clock().getTime() + 24 * 3600000) continue;
         const overdue = deadline < now;
-        const recipients = this.db.prepare('SELECT user_id FROM faro_assignments WHERE offer_id=?').all(p.offer_id) as Array<{ user_id: string }>;
+        const recruiters=this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.organization_id=o.organization_id AND m.user_id=a.user_id WHERE a.offer_id=? AND m.active=1').all(p.offer_id) as Array<{ user_id: string }>;
+        const recipients=['CLARIFICATION_REQUESTED','ASSESSMENT_REQUESTED','OFFERED'].includes(p.stage)?[{user_id:p.candidate_id}]:recruiters;
         for (const recipient of recipients) service.enqueue(recipient.user_id, 'process', p.id, overdue ? 'Minął zadeklarowany termin w rekrutacji. Sprawdź następny krok.' : 'Zbliża się zadeklarowany termin w rekrutacji.', `${p.id}:${deadline}:${overdue ? 'overdue' : 'reminder'}`);
       }
     });

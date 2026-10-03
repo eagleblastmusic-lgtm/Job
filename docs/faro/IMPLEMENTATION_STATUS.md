@@ -117,3 +117,16 @@ RISK: clients using the old interest payload must fetch the new confirmation tok
 ROLLBACK: revert this isolated change together with client contract; no data migration required.
 STATUS: DONE for CP06-B; overall CP06 remains PARTIAL.
 DEFERRED / NEXT CHECKPOINT: interview lifecycle, structured clarification and outstanding assessment/operational work.
+# CP06-C — Manual interview lifecycle (2026-10-03)
+
+GOAL / SCOPE: real workspace proposal, confirmation, cancellation/rescheduling, completion reports, private ICS and review signal.
+DEPENDENCIES: process commandOnce, organization assignments, outbox, CP08 workspace and CP11 erasure.
+IMPLEMENTATION / FILES: new InterviewService and 0024 table with state constraints and single live slot per process; scoped API; client process controls; TrustService reminder recipient correction; RecruitmentService terminal obligation cancellation; privacy export/erasure integration; targeted API/domain and browser tests.
+DB CHANGE / MIGRATIONS: 0024_faro_interviews.sql additive; old data retained.
+ACCEPTANCE: both participant reservations checked in one SQLite write transaction; expected versions and idempotent replay; tenant isolation; spring/autumn DST; neutral proposal expiration; two-party completion; withdrawal releases slots; no-show only opens a review case; ICS has no contact/attendee fields. Candidate confirmation does not reveal phone.
+LEGAL STATUS: manual scheduling foundation; moderation grace/appeal policy and production gates remain LEGAL REVIEW / TEST FIRST.
+RISK / DEFERRED: external calendar integration deferred; reminders use existing admin tick until the operational worker checkpoint. No-show case bilateral explanations and approved policy deadlines remain for CP07; no automatic sanction is implemented. Browser local input is explicitly labelled; stored/displayed slot uses UTC / Europe/Warsaw.
+ROLLBACK: revert code, preserve additive interview data; stop scheduling before rollout reversal.
+TESTED: build/lint/typecheck PASS; 24 migrations PASS; all 15 Faro scenarios PASS; all 4 desktop/mobile browser scenarios PASS including real proposal/confirmation/ICS/reschedule. Final review additionally enforces the interview count from the original offer version, covered in the interview domain scenario.
+STATUS: DONE for CP06-C manual interview foundation. Overall CP06 remains PARTIAL (structured clarification and repeat-interest history still open).
+NEXT CHECKPOINT: structured privacy-safe clarification and bilateral moderation explanations, then assessment lifecycle and operations.

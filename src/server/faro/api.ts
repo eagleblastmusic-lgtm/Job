@@ -13,6 +13,7 @@ import { AssessmentService } from './assessmentService.js';
 import { EconomicsService } from './economicsService.js';
 import { TrustService } from './trustService.js';
 import { PrivacyService } from './privacyService.js';
+import { InterviewService } from './interviewService.js';
 import { verifyPassword, MAX_PASSWORD_LENGTH } from '../auth.js';
 
 export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig) {
@@ -83,6 +84,13 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (path === '/api/faro/processes' && method === 'GET') return ok({ processes: recruitment.list(user.id, url.searchParams.get('offerId') ?? undefined) });
     const processPath = path.match(/^\/api\/faro\/processes\/([^/]+)$/);
     if (processPath && method === 'GET') return ok(recruitment.view(user.id, processPath[1]!));
+    const interviews = path.match(/^\/api\/faro\/processes\/([^/]+)\/interviews$/);
+    if (interviews && method === 'GET') return ok({ interviews:new InterviewService(db).list(user.id,interviews[1]!) });
+    if (interviews && method === 'POST') return ok(new InterviewService(db).propose(user.id,interviews[1]!,body),201);
+    const interview = path.match(/^\/api\/faro\/interviews\/([^/]+)$/);
+    if (interview && method === 'POST') return ok(new InterviewService(db).change(user.id,interview[1]!,body));
+    const calendar = path.match(/^\/api\/faro\/interviews\/([^/]+)\/calendar$/);
+    if (calendar && method === 'GET') return ok(new InterviewService(db).calendar(user.id,calendar[1]!));
     const command = path.match(/^\/api\/faro\/processes\/([^/]+)\/commands$/);
     if (command && method === 'POST') return ok(recruitment.change(user.id, command[1]!, body));
     const grant = path.match(/^\/api\/faro\/processes\/([^/]+)\/phone-grant$/);

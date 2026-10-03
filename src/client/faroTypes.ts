@@ -42,6 +42,10 @@ export interface Attempt {
   tasks: Array<{ id: string; prompt: string; options: string[]; points: number }>;
   answers: Record<string, number>; result: { earned: number; possible: number; unanswered: number; review: string; reviewNote?: string } | null;
 }
+export interface Interview {
+  id:string; processId:string; state:string; revision:number; startsAt:string; endsAt:string; confirmBy:string;
+  timezone:string; location:string; meetingUrl:string|null; candidateCompleted:boolean; employerCompleted:boolean;
+}
 export interface Economics {
   offerVersion: number; scenario: Record<string, string | number | null>;
   result: { estimatedNetRange: { min: number; max: number } | null; netAfterCommute: { min: number; max: number } | null;

@@ -16,3 +16,6 @@
 | Erasure ledger | subject hash, timestamp, local policy version | Restore reconciliation still required |
 
 See the master plan for the target state machine and exact unfinished acceptance contracts. Interview entities, complete assessment transition coverage and external taxonomy/AI activation are not implied by this implemented-table inventory.
+# Interview aggregate
+
+Interview is separate from InterestStatus and CurrentStage: PROPOSED → CONFIRMED → COMPLETED, with CANCELLED and DISPUTED exits. Proposed slots are not obligations. Candidate acceptance of the recruiter's confirmed proposal atomically checks all confirmed participant bookings. All dates are UTC with an IANA display zone. Both completion reports are required; discrepancy/no-show opens human review without automatic restriction. Expired proposals release the pending stage neutrally. Terminal recruitment cancels live slots and live assessment attempts. Rescheduling uses explicit cancellation followed by a new proposal, retaining history.

@@ -39,7 +39,7 @@ export class RecruitmentService extends FaroStore {
   enqueue(recipient: string, type: string, id: string, message: string, key: string) {
     this.db.prepare('INSERT OR IGNORE INTO faro_outbox(id,recipient_id,entity_type,entity_id,message,dedupe_key,next_attempt_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), recipient, type, id, message, key, this.now());
   }
-  event(row: ProcessRow, actor: string, kind: string, data: Record<string, unknown>) {
+  event(row: ProcessRow, actor: string | null, kind: string, data: Record<string, unknown>) {
     const eventId = randomUUID();
     this.db.prepare('INSERT INTO faro_events(id,process_id,actor_id,kind,data,occurred_at) VALUES(?,?,?,?,?,?)').run(eventId, row.id, actor, kind, JSON.stringify(data), this.now());
     this.audit(actor, kind, row.id);
@@ -103,10 +103,15 @@ export class RecruitmentService extends FaroStore {
       if (command === 'ANSWER') action = text(body.answer, 1500, 1);
       const first = next.substantive ? row.first_response_at ?? this.now() : row.first_response_at;
       this.db.prepare('UPDATE faro_interests SET status=?,stage=?,revision=revision+1,first_response_at=?,stage_due_at=?,next_action=?,reason=? WHERE id=?').run(next.status, next.stage, first, due, action, reason ? JSON.stringify(reason) : null, id);
-      if (TERMINAL.includes(next.status)) this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(), id);
+      if (TERMINAL.includes(next.status)) this.cancelObligations(id);
       this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action });
       return { id, revision: row.revision + 1 };
     });
+  }
+  cancelObligations(id:string) {
+    this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(),id);
+    this.db.prepare("UPDATE faro_attempts SET state='WITHDRAWN',revision=revision+1 WHERE process_id=? AND state IN ('INVITED','STARTED')").run(id);
+    this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE process_id=? AND state IN ('PROPOSED','CONFIRMED')").run(id);
   }
   watch(userId: string, offerId: string, watching: boolean) {
     if (watching) {

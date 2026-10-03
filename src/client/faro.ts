@@ -1,4 +1,4 @@
-import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection } from './faroTypes.js';
+import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview } from './faroTypes.js';
 import { esc, label, salary, money, date, chip, empty, input, select, area, check, form, button, projection } from './faroUi.js';
 import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView } from './faroViews.js';
 
@@ -10,6 +10,7 @@ let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setI
 let offers: Offer[] = [], currentOffer: Offer | null = null, currentProcess: Process | null = null, currentAttempt: Attempt | null = null;
 const compared = new Set<string>();
 let watchIds = new Set<string>();
+let interviews:Interview[]=[];
 const value = (f: FormData, name: string) => String(f.get(name) ?? '').trim();
 const number = (f: FormData, name: string) => Number(value(f, name));
 const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit') });
@@ -23,6 +24,13 @@ async function api<T>(path: string, method = 'GET', body?: unknown, signal = con
   if (!r.ok) throw new Error(data.error?.message ?? `Błąd ${r.status}`);
   return data;
 }
+function interviewView(i:Interview,p:Process) {
+  const active=p.status==='ACTIVE'&&['PROPOSED','CONFIRMED'].includes(i.state);
+  const ownCompleted=p.viewer==='CANDIDATE'?i.candidateCompleted:i.employerCompleted;
+  const zoneDate=(value:string)=>new Intl.DateTimeFormat('pl-PL',{timeZone:i.timezone,dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+  const commands=[...(i.state==='PROPOSED'&&p.viewer==='CANDIDATE'?['CONFIRM']:[]),'CANCEL',...(i.state==='CONFIRMED'&&Date.parse(i.endsAt)<=Date.now()?['DISPUTE',...(!ownCompleted?['COMPLETE']:[])]:[])];
+  return `<article class="f-row"><h4>${esc(label(i.state))}</h4><p>${esc(zoneDate(i.startsAt))} – ${esc(zoneDate(i.endsAt))} · ${esc(i.timezone)}</p><p>${esc(i.location)}</p>${i.meetingUrl?`<a href="${esc(i.meetingUrl)}" target="_blank" rel="noopener noreferrer">Otwórz spotkanie</a>`:''}<p>Potwierdzenie do: ${esc(zoneDate(i.confirmBy))}</p>${i.state==='CONFIRMED'?button('interview-calendar','Dodaj do kalendarza',i.id):''}${active?form('interview-change',select('command','Działanie dotyczące rozmowy',commands)+select('reason','Powód anulowania lub rozbieżności',['RESCHEDULE','UNAVAILABLE','TECHNICAL_ISSUE','NO_SHOW','OTHER_DISCREPANCY'])+check('confirmed','Potwierdzam działanie dotyczące rozmowy.'),'Zapisz rozmowę',i.id):''}${ownCompleted&&i.state==='CONFIRMED'?'<p>Twoje potwierdzenie odbycia rozmowy jest zapisane. Czekamy na drugą stronę.</p>':''}</article>`;
+}
 function notify(text: string, error = false) {
   const status = $('#f-status');
   if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
@@ -30,7 +38,7 @@ function notify(text: string, error = false) {
 function loggedOut() {
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
   user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear();
-  currentOffer = null; currentProcess = null; currentAttempt = null; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
+  currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[]; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
   root.replaceChildren(); root.className = 'hidden'; document.body.classList.remove('faro-session');
   $('#authView').classList.remove('hidden'); $('#logoutButton').classList.add('hidden');
   document.querySelectorAll<HTMLFormElement>('#loginForm,#registerForm').forEach(f => f.reset());
@@ -56,7 +64,7 @@ function card(o: Offer, base: string, selected: string) {
 async function render() {
   if (!user) return;
   const mine = ++epoch; controller.abort(); controller = new AbortController(); clearInterval(timer); shell();
-  currentOffer = null; currentProcess = null; currentAttempt = null;
+  currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[];
   const [page = 'offers', id = ''] = location.hash.slice(1).split('/');
   try {
     const [catalog, orgs] = await Promise.all([api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
@@ -98,9 +106,11 @@ async function render() {
       if (mine !== epoch) return;
       $('#f-content').innerHTML = html;
       if (p) {
-        const attempts = await api<{attempts:Attempt[]}>(`/processes/${p.id}/assessment`);
+        const [attempts,meetings] = await Promise.all([api<{attempts:Attempt[]}>(`/processes/${p.id}/assessment`),api<{interviews:Interview[]}>(`/processes/${p.id}/interviews`)]);
         if (mine !== epoch) return;
         $('#f-attempt-list').innerHTML = attemptLinks(attempts.attempts);
+        interviews=meetings.interviews;
+        $('#f-interview-list').innerHTML=interviews.map(i=>interviewView(i,p)).join('')||'<p>Nie ustalono jeszcze terminu rozmowy.</p>';
       }
       finish(mine); return;
     } else if (page === 'economics') {
@@ -171,6 +181,11 @@ root.addEventListener('click', event => {
         const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
         const link=document.createElement('a'); link.href=url; link.download='faro-moje-dane.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notify('Przygotowano eksport Twoich danych.'); return;
       }
+      if(action==='interview-calendar') {
+        const data=await api<{filename:string;content:string}>(`/interviews/${id}/calendar`);if(mine!==epoch)return;
+        const url=URL.createObjectURL(new Blob([data.content],{type:'text/calendar;charset=utf-8'}));
+        const link=document.createElement('a');link.href=url;link.download=data.filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
+      }
       if (action === 'reject-proposal') await api(`/proposals/${id}`,'POST',{status:'REJECTED'});
       if (action === 'preview' || action === 'interest-preview') {
         const p = await api<{projection:Projection;confirmationToken:string}>('/profile/preview-confirmation'); if (mine !== epoch) return;
@@ -213,6 +228,8 @@ root.addEventListener('submit', event => {
       } else if (action === 'lifecycle') await api(`/offers/${id}/lifecycle`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed'),expectedVersion:currentOffer?.revision});
       else if (action === 'interest') { const p=await api<{id:string}>(`/offers/${id}/interest`,'POST',{offerVersion:currentOffer?.version,projectionConfirmed:f.has('projectionConfirmed'),confirmationToken:f.get('confirmationToken'),idempotencyKey:crypto.randomUUID()}); destination=`processes/${p.id}`; }
       else if (action === 'process-command') { const command=value(f,'command'); await api(`/processes/${id}/commands`,'POST',{command,expectedVersion:currentProcess?.revision,idempotencyKey:crypto.randomUUID(),reason:{code:value(f,'reason'),requirementId:value(f,'requirementId')},nextAction:value(f,'nextAction'),dueAt:value(f,'dueAt')?toDate(value(f,'dueAt')):null,answer:value(f,'answer'),explanation:value(f,'explanation')}); }
+      else if(action==='interview-propose') await api(`/processes/${id}/interviews`,'POST',{startsAt:toDate(value(f,'startsAt')),endsAt:toDate(value(f,'endsAt')),confirmBy:toDate(value(f,'confirmBy')),timezone:'Europe/Warsaw',location:value(f,'location'),meetingUrl:value(f,'meetingUrl'),confirmed:f.has('confirmed'),expectedVersion:currentProcess?.revision,idempotencyKey:crypto.randomUUID()});
+      else if(action==='interview-change') await api(`/interviews/${id}`,'POST',{command:value(f,'command'),reason:value(f,'reason'),confirmed:f.has('confirmed'),expectedVersion:interviews.find(i=>i.id===id)?.revision,processVersion:currentProcess?.revision,idempotencyKey:crypto.randomUUID()});
       else if (action === 'report') await api(`/processes/${id}/reports`,'POST',{kind:value(f,'kind'),statement:value(f,'statement')});
       else if (action === 'appeal') await api(`/cases/${id}/appeal`,'POST',{statement:value(f,'statement')});
       else if (action === 'case-review') await api(`/cases/${id}/review`,'POST',{state:value(f,'state'),decision:value(f,'decision'),reviewAt:toDate(value(f,'reviewAt')),restrict:f.has('restrict')});
