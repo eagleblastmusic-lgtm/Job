@@ -1,5 +1,14 @@
-import type { Profile, Skill, Offer, Process, Economics, Attempt } from './faroTypes.js';
+import type { Profile, Skill, Offer, Process, Economics, Attempt, AssessmentDefinition } from './faroTypes.js';
 import { esc, label, salary, date, money, chip, form, select, input, area, check, button, skillSelect, claimFields, practiceFields, projection } from './faroUi.js';
+export function assessmentTask(index:number,task?:AssessmentDefinition['tasks'][number]) {
+  return `<fieldset class="f-card f-wide" data-assessment-task="${index}"><legend>Zadanie ${index+1}</legend>${area(`prompt:${index}`,'Treść zadania',task?.prompt??'','required maxlength="1500"')}${area(`options:${index}`,'Odpowiedzi — jedna w wierszu',task?.options.join('\n')??'','required')}${input(`answer:${index}`,'Numer poprawnej odpowiedzi (od 1)',(task?.answer??0)+1,'number','required min="1" max="8"')}${input(`points:${index}`,'Punkty',task?.points??1,'number','required min="1" max="100"')}${button('assessment-remove-task','Usuń zadanie')}</fieldset>`;
+}
+export function assessmentReview(d:AssessmentDefinition) {
+  return `<details><summary>Sprawdź zadania i kryteria oceny</summary><dl class="f-facts"><dt>Limit od rozpoczęcia</dt><dd>${d.timeLimitMinutes} min</dd><dt>Przewidywany czas</dt><dd>${d.expectedMinutes} min</dd><dt>Kryteria oceny</dt><dd>${esc(d.rubricVersion)}</dd></dl>${d.tasks.map((t,i)=>`<section><h3>Zadanie ${i+1}</h3><p>${esc(t.prompt)}</p><ol>${t.options.map((o,n)=>`<li>${esc(o)}${n===t.answer?' — poprawna odpowiedź':''}</li>`).join('')}</ol><p>Punkty za poprawną odpowiedź: ${t.points}.</p></section>`).join('')}</details>`;
+}
+export function assessmentEditor(id:string,version:number,d:AssessmentDefinition,offerId:string) {
+  return `<h1>Nowa wersja assessmentu</h1><p>Zapis utworzy szkic wymagający ponownego review. Przypisane próby zachowają dotychczasowe zadania, rubrykę i limity.</p>${form('assessment-edit',`<input type="hidden" name="expectedVersion" value="${version}"><input type="hidden" name="offerId" value="${esc(offerId)}">`+input('title','Nazwa',d.title)+input('timeLimitMinutes','Limit czasu (minuty)',d.timeLimitMinutes,'number','required min="1" max="480"')+input('expectedMinutes','Przewidywany czas (minuty)',d.expectedMinutes,'number','required min="1" max="480"')+input('rubricVersion','Oznaczenie kryteriów oceny',d.rubricVersion)+`<div class="f-wide" id="f-assessment-tasks">${d.tasks.map((t,i)=>assessmentTask(i,t)).join('')}</div>`+button('assessment-add-task','Dodaj zadanie'),'Zapisz nowy szkic',id)}<a href="#assessment-create/${esc(offerId)}">Wróć do assessmentów rekrutacji</a>`;
+}
 function clarificationSummary(data:string,skills:Skill[]) {
   const {response:r}=JSON.parse(data) as {response?:{kind:string;skillId?:string;level?:string;source?:string;practice?:{quantity:number|null;unit:string};availability?:{kind:string;value:string|null}}};
   if(!r)return '<p>Historyczna odpowiedź tekstowa pozostaje poza widokiem pracodawcy.</p>';

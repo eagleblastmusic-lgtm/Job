@@ -241,6 +241,18 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await page.locator('[data-form=assessment-approve] [name=confirmed]').check();
     await page.getByRole('button',{name:'Zatwierdź',exact:true}).click();
     await expect(page.getByText('Zatwierdzony',{exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'Utwórz nową wersję'}).click();
+    await page.getByRole('button',{name:'Dodaj zadanie',exact:true}).click();
+    await page.locator('[name="prompt:1"]').fill('Jak potwierdzasz zrozumienie?');
+    await page.locator('[name="options:1"]').fill('Podsumowuję potrzeby\nIgnoruję pytanie');
+    await page.getByRole('button',{name:'Zapisz nowy szkic'}).click();
+    await expect(page.getByText('Wersja 2',{exact:true})).toBeVisible();
+    await page.locator('[data-form=assessment-approve] [name=confirmed]').check();
+    await page.getByRole('button',{name:'Przekaż do review'}).click();
+    await expect(page.getByRole('button',{name:'Zatwierdź',exact:true})).toBeVisible();
+    await page.locator('[data-form=assessment-approve] [name=confirmed]').check();
+    await page.getByRole('button',{name:'Zatwierdź',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Zatwierdź',exact:true})).toHaveCount(0);
     await page.goto(`${f.base}/#assessment-assign/${process.id}`);
     await page.locator('[data-form=assessment-assign] [name=deadline]').fill('2099-01-01T12:00');
     await page.getByRole('button',{name:'Przypisz',exact:true}).click();

@@ -1,6 +1,6 @@
-import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview } from './faroTypes.js';
+import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview, AssessmentDefinition } from './faroTypes.js';
 import { esc, label, salary, money, date, chip, empty, input, select, area, check, form, button, projection } from './faroUi.js';
-import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView } from './faroViews.js';
+import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView, assessmentEditor, assessmentTask, assessmentReview } from './faroViews.js';
 
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)!;
 const root = $('#appView');
@@ -65,7 +65,7 @@ async function render() {
   if (!user) return;
   const mine = ++epoch; controller.abort(); controller = new AbortController(); clearInterval(timer); shell();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[];
-  const [page = 'offers', id = ''] = location.hash.slice(1).split('/');
+  const [page = 'offers', id = '', version = ''] = location.hash.slice(1).split('/');
   try {
     const [catalog, orgs] = await Promise.all([api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
     if (mine !== epoch) return;
@@ -127,11 +127,15 @@ async function render() {
     } else if (page === 'attempts') {
       if (id) { const a = await api<Attempt>(`/attempts/${id}`); currentAttempt = a; html = attemptView(a); }
       else html = `<h1>Twoje assessmenty</h1>${attemptLinks((await api<{attempts:Attempt[]}>('/attempts')).attempts)}`;
+    } else if(page==='assessment-edit') {
+      const d=await api<{id:string;version:number;content:string;offer_id:string}>(`/assessments/${id}/versions/${version}`);
+      html=assessmentEditor(d.id,d.version,JSON.parse(d.content) as AssessmentDefinition,d.offer_id);
     } else if (page === 'assessment-create' || page === 'assessment-assign') {
       const process = page === 'assessment-assign' ? await api<Process>(`/processes/${id}`) : null;
       const offerId = process?.offerId ?? id;
       const definitions = (await api<{assessments:Array<{id:string;version:number;state:string;content:string}>}>(`/offers/${offerId}/assessments`)).assessments;
-      html = `<h1>${process ? 'Przypisz assessment' : 'Assessmenty rekrutacji'}</h1><p>Każda wersja wymaga review. Kandydat pozna liczbę zadań, limit i deadline przed rozpoczęciem.</p>${definitions.map(d=>`<section class="f-card"><h2>${esc((JSON.parse(d.content) as {title:string}).title)}</h2>${chip(label(d.state))}<p>Wersja ${d.version}</p>${process && d.state === 'APPROVED' ? form('assessment-assign', `<input type="hidden" name="expectedVersion" value="${process.revision}"><input type="hidden" name="assessmentId" value="${esc(d.id)}"><input type="hidden" name="version" value="${d.version}">` + input('deadline','Termin wykonania','','datetime-local'), 'Przypisz',process.id) : !process && d.state !== 'APPROVED' ? form('assessment-approve', `<input type="hidden" name="version" value="${d.version}"><input type="hidden" name="action" value="${d.state === 'DRAFT' ? 'REVIEW' : 'APPROVE'}">` + check('confirmed','Sprawdziłem treść, klucz odpowiedzi, limit czasu i prawa do zadania.'),d.state === 'DRAFT' ? 'Przekaż do review' : 'Zatwierdź',d.id) : ''}</section>`).join('') || '<p>Nie ma jeszcze assessmentów.</p>'}${!process ? `<section class="f-card"><h2>Nowy quiz — szkic</h2>${form('assessment-create', input('title','Nazwa') + input('timeLimitMinutes','Limit czasu (minuty)',15,'number','required min="1" max="480"') + input('expectedMinutes','Przewidywany czas (minuty)',10,'number','required min="1" max="480"') + input('rubricVersion','Oznaczenie kryteriów oceny','1') + area('prompt','Treść zadania') + area('options','Odpowiedzi — jedna w wierszu') + input('answer','Numer poprawnej odpowiedzi (od 1)',1,'number','required min="1" max="8"') + input('points','Punkty',1,'number','required min="1" max="100"'),'Zapisz szkic',offerId)}</section>` : ''}`;
+      const latest=new Map<string,number>(); for(const d of definitions)latest.set(d.id,Math.max(latest.get(d.id)??0,d.version));
+      html = `<h1>${process ? 'Przypisz assessment' : 'Assessmenty rekrutacji'}</h1><p>Każda wersja wymaga review. Kandydat pozna liczbę zadań, limit i deadline przed rozpoczęciem.</p>${definitions.map(d=>`<section class="f-card"><h2>${esc((JSON.parse(d.content) as {title:string}).title)}</h2>${chip(label(d.state))}<p>Wersja ${d.version}</p>${!process?assessmentReview(JSON.parse(d.content) as AssessmentDefinition):''}${!process&&latest.get(d.id)===d.version?`<a class="f-button" href="#assessment-edit/${esc(d.id)}/${d.version}">Utwórz nową wersję</a>`:''}${process && d.state === 'APPROVED' && latest.get(d.id)===d.version ? form('assessment-assign', `<input type="hidden" name="expectedVersion" value="${process.revision}"><input type="hidden" name="assessmentId" value="${esc(d.id)}"><input type="hidden" name="version" value="${d.version}">` + input('deadline','Termin wykonania','','datetime-local'), 'Przypisz',process.id) : !process && d.state !== 'APPROVED' && latest.get(d.id)===d.version ? form('assessment-approve', `<input type="hidden" name="version" value="${d.version}"><input type="hidden" name="action" value="${d.state === 'DRAFT' ? 'REVIEW' : 'APPROVE'}">` + check('confirmed','Sprawdziłem treść, klucz odpowiedzi, limit czasu i prawa do zadania.'),d.state === 'DRAFT' ? 'Przekaż do review' : 'Zatwierdź',d.id) : ''}</section>`).join('') || '<p>Nie ma jeszcze assessmentów.</p>'}${!process ? `<section class="f-card"><h2>Nowy quiz — szkic</h2>${form('assessment-create', input('title','Nazwa') + input('timeLimitMinutes','Limit czasu (minuty)',15,'number','required min="1" max="480"') + input('expectedMinutes','Przewidywany czas (minuty)',10,'number','required min="1" max="480"') + input('rubricVersion','Oznaczenie kryteriów oceny','1') + area('prompt','Treść zadania') + area('options','Odpowiedzi — jedna w wierszu') + input('answer','Numer poprawnej odpowiedzi (od 1)',1,'number','required min="1" max="8"') + input('points','Punkty',1,'number','required min="1" max="100"'),'Zapisz szkic',offerId)}</section>` : ''}`;
     } else if (page === 'notifications') {
       const data = await api<{notifications:Array<{message:string;created_at:string;entity_type:string;entity_id:string}>}>('/notifications');
       html = `<h1>Dzisiaj w Twoim Faro</h1>${data.notifications.map(n=>`<article class="f-card"><p>${esc(n.message)}</p><small>${esc(date(n.created_at))}</small><br><a href="#${n.entity_type === 'offer' ? 'offers':n.entity_type==='case'?'cases':'processes'}/${esc(n.entity_id)}">Otwórz szczegóły</a></article>`).join('') || empty('Jesteś na bieżąco','Aktualizacje pojawią się tutaj, gdy zmieni się oferta lub Twój proces.')}`;
@@ -176,6 +180,15 @@ root.addEventListener('click', event => {
   const action = el.dataset.action!, id = el.dataset.id!, mine = epoch; el.disabled = true;
   void (async () => {
     try {
+      if(action==='assessment-add-task') {
+        const tasks=$('#f-assessment-tasks'),items=Array.from(tasks.querySelectorAll<HTMLElement>('[data-assessment-task]'));
+        if(items.length>=50)throw new Error('Assessment może zawierać do 50 zadań.');
+        const index=Math.max(-1,...items.map(t=>Number(t.dataset.assessmentTask)))+1;
+        tasks.insertAdjacentHTML('beforeend',assessmentTask(index));tasks.querySelector(`[name="prompt:${index}"]`)?.scrollIntoView({block:'nearest'});return;
+      }
+      if(action==='assessment-remove-task') {
+        const task=el.closest('[data-assessment-task]');if(task?.parentElement?.children.length===1)throw new Error('Assessment wymaga przynajmniej jednego zadania.');task?.remove();return;
+      }
       if (action === 'logout') { await api('/api/auth/logout','POST',{}); loggedOut(); location.hash=''; return; }
       if (action === 'retry') { await render(); return; }
       if (action === 'compare-add') { if (compared.size >= 4 && !compared.has(id)) throw new Error('Porównuj do 4 ofert jednocześnie.'); compared.add(id); notify('Oferta dodana. Otwórz Porównanie.'); return; }
@@ -243,6 +256,11 @@ root.addEventListener('submit', event => {
       else if (action === 'case-review') await api(`/cases/${id}/review`,'POST',{state:value(f,'state'),decision:value(f,'decision'),decisionCode:value(f,'decisionCode'),reviewAt:toDate(value(f,'reviewAt')),explanationDueAt:value(f,'explanationDueAt')?toDate(value(f,'explanationDueAt')):null,restrict:f.has('restrict'),expectedVersion:number(f,'expectedVersion'),idempotencyKey:crypto.randomUUID()});
       else if (action === 'economics') await api(`/offers/${id}/economics`,'PUT',{salaryOptionIndex:number(f,'salaryOptionIndex'),netMin:value(f,'netMin')?Math.round(number(f,'netMin')*100):null,netMax:value(f,'netMax')?Math.round(number(f,'netMax')*100):null,commuteCost:value(f,'commuteCost')?Math.round(number(f,'commuteCost')*100):null,commuteMinutes:value(f,'commuteMinutes')?number(f,'commuteMinutes'):null,transport:value(f,'transport'),source:value(f,'source'),observedAt:toDate(value(f,'observedAt')),assumptions:value(f,'assumptions')});
       else if (action === 'assessment-create') await api(`/offers/${id}/assessments`,'POST',{title:value(f,'title'),timeLimitMinutes:number(f,'timeLimitMinutes'),expectedMinutes:number(f,'expectedMinutes'),rubricVersion:value(f,'rubricVersion'),tasks:[{prompt:value(f,'prompt'),options:value(f,'options').split('\n').filter(Boolean),answer:number(f,'answer')-1,points:number(f,'points')}]});
+      else if(action==='assessment-edit') {
+        const tasks=Array.from(el.querySelectorAll<HTMLElement>('[data-assessment-task]')).map(t=>{const n=t.dataset.assessmentTask!;return {prompt:value(f,`prompt:${n}`),options:value(f,`options:${n}`).split('\n').filter(Boolean),answer:number(f,`answer:${n}`)-1,points:number(f,`points:${n}`)};});
+        await api<{id:string;version:number;state:string}>(`/assessments/${id}/versions/${number(f,'expectedVersion')}`,'PUT',{expectedVersion:number(f,'expectedVersion'),idempotencyKey:crypto.randomUUID(),data:{title:value(f,'title'),timeLimitMinutes:number(f,'timeLimitMinutes'),expectedMinutes:number(f,'expectedMinutes'),rubricVersion:value(f,'rubricVersion'),tasks}});
+        destination=`assessment-create/${value(f,'offerId')}`;
+      }
       else if (action === 'assessment-approve') await api(`/assessments/${id}/versions/${number(f,'version')}`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed')});
       else if (action === 'assessment-assign') { await api(`/processes/${id}/assessment`,'POST',{assessmentId:value(f,'assessmentId'),version:number(f,'version'),deadline:toDate(value(f,'deadline')),expectedVersion:number(f,'expectedVersion'),idempotencyKey:crypto.randomUUID()}); destination=`processes/${id}`; }
       else if (action === 'attempt-answers') {

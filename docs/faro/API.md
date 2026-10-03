@@ -45,3 +45,7 @@ ADMIN-only GET `/worker/status` returns running/stopped state, interval, run cou
 # Assessment obligation integrity
 
 Assignment POST `/processes/:id/assessment` requires `expectedVersion` of the process and `idempotencyKey`. Exact replay returns the same attempt; a stale process revision or previously attempted definition version is a conflict. All assignment effects are transactional. The worker expires INVITED/STARTED attempts from persisted deadline/expiry, retains saved answers and emits a single audited neutral event. It resumes the employer next-step deadline using the original offer decisionHours; expiry alone does not score or reject. Submission also retains an employer review deadline. Candidate Start/save/submit enforce expiry even between worker cycles.
+
+# Assessment definition configuration
+
+GET `/assessments/:id/versions/:version` returns the scoped employer definition including answer key; candidates/outsiders receive 404. PUT requires `{expectedVersion,idempotencyKey,data}` and creates the next immutable DRAFT from the latest version. Existing AI origin is retained and client approval fields are ignored. Edit replay returns the same version; stale edit gets VERSION_CONFLICT. Earlier versions remain available to existing attempts, but new assignment/approval must target the latest version and complete fresh human review. The editor supports 1–50 objective quiz tasks and the review screen exposes the complete rubric/key/limits.

@@ -200,7 +200,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL BLOCKER production scoring/ranking until review; foundations local
 - RISK: Timer/answers lost, keys exposed, rubric incomparable
 - ROLLBACK: Disable assignment/start; retain completed records for scoped export
-- STATUS: PARTIAL (approved quiz service/API and workspace verified; CP10-B protects assignment/replay and idle expiry with employer deadlines. Definition editing/renewed approval, technical incident policy and result correction remain).
+- STATUS: PARTIAL (approved quiz service/API and workspace verified; CP10-B protects assignment/replay and idle expiry with employer deadlines. CP10-C delivers immutable definition editing and renewed approval; technical incident policy and result correction remain).
 
 ## CP11 — Privacy, operations and release hardening
 - ID: CP11

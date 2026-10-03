@@ -124,6 +124,8 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (orgAssessments && method === 'GET') return ok({ assessments: assessments.list(user.id, orgAssessments[1]!) });
     if (orgAssessments && method === 'POST') return ok(assessments.create(user.id, orgAssessments[1]!, body), 201);
     const assessmentVersion = path.match(/^\/api\/faro\/assessments\/([^/]+)\/versions\/([^/]+)$/);
+    if (assessmentVersion && method === 'GET') return ok(assessments.read(user.id,assessmentVersion[1]!,Number(assessmentVersion[2])));
+    if (assessmentVersion && method === 'PUT') return ok(assessments.edit(user.id,assessmentVersion[1]!,Number(assessmentVersion[2]),body),201);
     if (assessmentVersion && method === 'POST') return ok(assessments.approve(user.id, assessmentVersion[1]!, { ...body, version: Number(assessmentVersion[2]) }));
     const processAssessment = path.match(/^\/api\/faro\/processes\/([^/]+)\/assessment$/);
     if (processAssessment && method === 'GET') return ok({ attempts: assessments.attempts(user.id, processAssessment[1]!) });

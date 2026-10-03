@@ -12,12 +12,27 @@ interface AttemptRow { id: string; process_id: string; assessment_id: string; as
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
   definition(id: string, version: number) {
+    integer(version,1);
     const row = this.db.prepare('SELECT * FROM faro_assessments WHERE id=? AND version=?').get(id, version) as unknown as DefinitionRow | undefined;
     if (!row) throw new HttpError(404, 'Nie znaleziono wersji assessmentu.'); return row;
   }
   list(userId: string, offerId: string) {
     new OfferService(this.database, this.clock).assigned(userId, offerId);
     return this.db.prepare('SELECT id,version,state,origin,content,approved_at FROM faro_assessments WHERE offer_id=? ORDER BY created_at DESC').all(offerId);
+  }
+  read(userId:string,id:string,version:number) {
+    const row=this.definition(id,version);
+    new OfferService(this.database,this.clock).assigned(userId,row.offer_id);
+    return row;
+  }
+  edit(userId:string,id:string,version:number,body:Record<string,unknown>) {
+    this.read(userId,id,version);
+    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,version,operation:'ASSESSMENT_EDIT'},()=>{
+      const prior=this.read(userId,id,version);
+      const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(id) as {version:number};
+      if(integer(body.expectedVersion,1)!==version||latest.version!==version)throw new HttpError(409,'Odśwież najnowszą wersję assessmentu.','VERSION_CONFLICT');
+      return this.create(userId,prior.offer_id,{...object(body.data),origin:prior.origin},id);
+    });
   }
   parse(body: Record<string, unknown>): Definition {
     const tasks = array(body.tasks, 50).map((raw, index) => {
@@ -44,6 +59,8 @@ export class AssessmentService extends FaroStore {
     const version = integer(body.version, 1), row = this.definition(id, version);
     const offer = new OfferService(this.database, this.clock).assigned(userId, row.offer_id);
     this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER','HIRING_MANAGER']);
+    const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(id) as {version:number};
+    if(version!==latest.version)throw new HttpError(409,'Starsza wersja jest historią. Przejrzyj najnowszy szkic.','ASSESSMENT_SUPERSEDED');
     const action = choice(body.action, ['REVIEW','APPROVE'] as const);
     if ((action === 'REVIEW' && row.state !== 'DRAFT') || (action === 'APPROVE' && row.state !== 'IN_REVIEW')) throw new HttpError(409, 'Assessment wymaga właściwego etapu review.');
     if (action === 'APPROVE' && body.confirmed !== true) throw new HttpError(400, 'Zatwierdź treść, rubrykę, czas i prawa do zadań.');
@@ -59,6 +76,8 @@ export class AssessmentService extends FaroStore {
     const definitionId = text(body.assessmentId, 100), version = integer(body.version, 1), definition = this.definition(definitionId, version);
     if (definition.offer_id !== process.offer_id) throw new HttpError(404, 'Nie znaleziono assessmentu.');
     if (definition.state !== 'APPROVED') throw new HttpError(409, 'Przypisanie wymaga zatwierdzonej wersji.', 'ASSESSMENT_NOT_APPROVED');
+    const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(definitionId) as {version:number};
+    if(version!==latest.version)throw new HttpError(409,'Wybierz najnowszą zatwierdzoną wersję.','ASSESSMENT_SUPERSEDED');
     if(integer(body.expectedVersion,1)!==process.revision)throw new HttpError(409,'Odśwież proces.','VERSION_CONFLICT');
     if (process.status !== 'ACTIVE' || process.stage !== 'ACCEPTED_TO_NEXT_STAGE') throw new HttpError(409, 'Najpierw przyjmij do kolejnego etapu.');
     if(this.db.prepare('SELECT id FROM faro_attempts WHERE process_id=? AND assessment_id=? AND assessment_version=?').get(processId,definitionId,version))throw new HttpError(409,'Ta wersja ma już próbę w tym procesie.','ASSESSMENT_ALREADY_ASSIGNED');

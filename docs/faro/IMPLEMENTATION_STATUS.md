@@ -214,3 +214,19 @@ RISK / DEFERRED: quiz only; definition editing, technical incident/retry policy,
 ROLLBACK: revert code/API+client together; retain attempt/event history. Disable local worker if needed.
 STATUS: DONE for CP10-B; overall CP10 remains PARTIAL.
 NEXT CHECKPOINT: immutable edited definitions and renewed approval.
+
+# CP10-C — Immutable assessment editing and meaningful review (2026-10-04)
+ID / TITLE: CP10-C, versioned assessment configuration.
+GOAL / PURPOSE / CURRENT GAP: only service-internal version creation existed; employer could tick approval without seeing task content on the review screen.
+SCOPE / IMPLEMENTATION / FILES: assessmentService.ts/API, faro.ts/faroTypes.ts/faroViews.ts, API tests and assessment browser journey. Scoped version read; idempotent editing creates next DRAFT version, validates current latest version, retains AI origin and rejects client-asserted approval. Historical approved versions remain immutable and existing attempts pinned; new assignment/review uses latest definition. Editor supports all existing quiz tasks, addition/removal (1–50), options/answer/points and rubric/time settings. Review exposes complete tasks, answer key, points, rubric and durations to assigned employer only.
+DEPENDENCIES: CP10-B assignment/revision integrity, CP02 organization isolation, CP08 forms and state handling.
+DB CHANGE / MIGRATIONS: none; existing composite definition/version FK pins attempts.
+API CHANGE: GET /assessments/:id/versions/:version is employer scoped; PUT requires expectedVersion/idempotencyKey/data and returns 201 DRAFT. Superseded versions cannot receive new assignments or approval; stale edits return 409.
+FRONTEND CHANGE: latest definition has a create-new-version action; edit saves back to recruitment assessment list for fresh review; historical versions have read-only preview. Multi-task fieldsets use existing workspace components.
+TESTS / TESTED: build/lint/typecheck PASS; all 5 scenarios in faro-assessment-economics-trust.test PASS (new immutable edit/replay/isolation scenario included). Expanded quiz browser journey PASS on desktop/mobile: approve v1, edit/add second task, approve v2, assign/submit/review result. Other unchanged contracts retain prior checkpoint evidence; no claim of full legacy suite pass.
+ACCEPTANCE: attempts keep v1 tasks/expiry/rubric, v2 starts DRAFT even with asserted APPROVED/origin HUMAN, edit replay creates one version, stale edit fails, candidate cannot retrieve answer keys, v2 assignment waits for fresh approval, v1 new assignment denied.
+LEGAL STATUS: local synthetic foundation; production scoring/ranking review remains blocked.
+RISK / DEFERRED: objective quiz only, no arbitrary file upload or automated complex scoring; incident accommodation/retry and immutable result corrections remain. Human approval checkbox records a conscious declaration, not proof of external task quality validation.
+ROLLBACK: revert client/API together; retain additive version/attempt history and latest-version assignment guard.
+STATUS: DONE for CP10-C; overall CP10 PARTIAL.
+NEXT CHECKPOINT: remaining candidate constraints/watch preferences and operations/release foundations.

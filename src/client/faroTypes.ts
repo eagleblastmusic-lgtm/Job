@@ -55,3 +55,7 @@ export interface Economics {
   result: { estimatedNetRange: { min: number; max: number } | null; netAfterCommute: { min: number; max: number } | null;
     commuteCost: number | null; commuteTimeMinutes: number | null; source: string; sourceDate: string; assumptions: string; calculationVersion: string; period: string };
 }
+export interface AssessmentDefinition {
+  title:string; timeLimitMinutes:number; expectedMinutes:number; rubricVersion:string;
+  tasks:Array<{prompt:string;options:string[];answer:number;points:number}>;
+}

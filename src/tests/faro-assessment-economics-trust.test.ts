@@ -119,6 +119,34 @@ test('economics is private, versioned and honest about unsupported automatic tax
   } finally { await f.close(); }
 });
 
+test('edited assessment is a new draft with fresh approval; replay and stale edit preserve pinned attempts and keys stay scoped',async()=>{
+  const f=await assessmentSetup();try {
+    const service=new AssessmentService(f.app.db),data={title:'Wersjonowane zadanie',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'r1',tasks:[{prompt:'Pierwotne pytanie',options:['A','B'],answer:1,points:2}]};
+    const draft=service.create(f.employer.id,f.offer.id,{...data,origin:'AI'});
+    service.approve(f.employer.id,draft.id,{version:1,action:'REVIEW'});service.approve(f.employer.id,draft.id,{version:1,action:'APPROVE',confirmed:true});
+    const attempt=service.assign(f.employer.id,f.interest.id,{assessmentId:draft.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'version-one-assign'});
+    const start=service.start(f.candidate.id,attempt.id);
+    const body={data:{...data,state:'APPROVED',origin:'HUMAN',rubricVersion:'r2',timeLimitMinutes:10,tasks:[{prompt:'Nowe pytanie',options:['C','D'],answer:0,points:4}]},expectedVersion:1,idempotencyKey:'edit-definition'};
+    const url=`/api/faro/assessments/${draft.id}/versions/1`;
+    await f.request(url,f.candidate.cookie,'GET',undefined,404);
+    await f.request(url,f.candidate.cookie,'PUT',body,404);
+    const edited=await f.request<{id:string;version:number;state:string}>(url,f.employer.cookie,'PUT',body,201);
+    assert.equal(edited.version,2);assert.equal(edited.state,'DRAFT');assert.equal(service.definition(draft.id,2).origin,'AI');
+    assert.deepEqual(await f.request(url,f.employer.cookie,'PUT',body,201),edited);
+    await f.request(url,f.employer.cookie,'PUT',{...body,idempotencyKey:'stale-definition'},409);
+    const pinned=service.overview(f.candidate.id,attempt.id);
+    assert.equal(pinned.tasks[0]!.prompt,'Pierwotne pytanie');assert.equal(pinned.rubricVersion,'r1');assert.equal(pinned.expiresAt,start.expiresAt);
+    assert.equal(service.definition(draft.id,1).state,'APPROVED');assert.equal(service.row(attempt.id).assessment_version,1);
+    f.app.db.db.prepare("UPDATE faro_attempts SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(attempt.id);service.expire();
+    const next={assessmentId:draft.id,version:2,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:4,idempotencyKey:'version-two-assign'};
+    await f.request(`/api/faro/processes/${f.interest.id}/assessment`,f.employer.cookie,'POST',{...next,version:1,idempotencyKey:'old-version-denied'},409);
+    await f.request(`/api/faro/processes/${f.interest.id}/assessment`,f.employer.cookie,'POST',next,409);
+    service.approve(f.employer.id,draft.id,{version:2,action:'REVIEW'});service.approve(f.employer.id,draft.id,{version:2,action:'APPROVE',confirmed:true});
+    const assigned=await f.request<{id:string}>(`/api/faro/processes/${f.interest.id}/assessment`,f.employer.cookie,'POST',next,201);
+    assert.equal(service.row(assigned.id).assessment_version,2);
+  }finally{await f.close();}
+});
+
 test('trust report and stale-offer worker create reviewable signals, proportional restrictions and appeals', async () => {
   const f = await assessmentSetup();
   try {
