@@ -35,6 +35,8 @@ export interface AppConfig {
   joobleTimeoutMs: number;
   pdfRendererBin: string;
   maxUploadBytes: number;
+  faroWorkerEnabled: boolean;
+  faroWorkerIntervalMs: number;
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -62,6 +64,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     joobleApiKeyPl: overrides.joobleApiKeyPl ?? (process.env.JOOBLE_API_KEY_PL?.trim() || null),
     joobleTimeoutMs: overrides.joobleTimeoutMs ?? intEnv('JOOBLE_TIMEOUT_MS', 8000),
     pdfRendererBin: overrides.pdfRendererBin ?? (process.env.PDF_RENDERER_BIN?.trim() || (process.platform === 'win32' ? 'python' : 'python3')),
-    maxUploadBytes: overrides.maxUploadBytes ?? intEnv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024)
+    maxUploadBytes: overrides.maxUploadBytes ?? intEnv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024),
+    faroWorkerEnabled: nodeEnv !== 'production' && (overrides.faroWorkerEnabled ?? boolEnv('FARO_WORKER_ENABLED', nodeEnv === 'development')),
+    faroWorkerIntervalMs: overrides.faroWorkerIntervalMs ?? intEnv('FARO_WORKER_INTERVAL_MS', 60000)
   };
 }

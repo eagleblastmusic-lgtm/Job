@@ -182,3 +182,19 @@ ROLLBACK: preserve additive publication history; coordinated code rollback must 
 TESTED: build/lint/typecheck PASS; 27 migrations PASS; all 20 Faro scenarios PASS; all 8 desktop/mobile browser scenarios PASS.
 STATUS: DONE for CP04-B publication boundary; wider CP04/CP08 acceptance remains in progress.
 NEXT CHECKPOINT: assessment lifecycle, scheduled delivery/worker operation and remaining release foundations.
+
+# CP06-F — Scheduled local obligations and durable delivery (2026-10-03)
+ID / TITLE: CP06-F, single-process Canonical worker.
+GOAL / PURPOSE / CURRENT GAP: reminders and outbox previously required an admin tick or notification GET; idle users must receive durable in-app notifications.
+SCOPE / IMPLEMENTATION / FILES: src/server/faro/worker.ts, faroApp.ts, config.ts, faro/api.ts, trustService.ts; tests faro-worker.test.ts, faro-recruitment.test.ts, fixture config overrides. One development timer calls existing TrustService.tick; app.close stops it before DB closure. Opaque failure status, next-cycle recovery, ADMIN-only aggregate diagnostics. Closing respects published deadlines.
+DEPENDENCIES: existing transactional clocks, interview reminders, outbox dedupe/retry and publication proof.
+DB CHANGE / MIGRATIONS: none; 27 existing migrations unchanged.
+API CHANGE: GET /api/faro/worker/status; POST /worker/tick now uses the same worker and returns 503 on failure.
+FRONTEND CHANGE: none; existing notification list reads delivered records.
+ACCEPTANCE: pending notification delivered without GET, repeated cycles create no duplicate, transient error does not expose payload and recovers, close prevents future cycles, non-admin denied, production override cannot enable scheduler, draft deadline cannot close published offer.
+TESTED: build/lint/typecheck PASS; all 24 Canonical scenarios PASS. No browser rerun: no client change, browser fixtures default to disabled worker. Previous 8 browser scenarios remain recorded for their unchanged inputs.
+LEGAL STATUS: local foundations; production gate remains closed.
+RISK / DEFERRED: no distributed lease, external channel delivery, dead-letter replay administration or production monitor; bounded 100-message batches and five delivery attempts are existing local policy.
+ROLLBACK: disable FARO_WORKER_ENABLED or revert code; preserve outbox and immutable history.
+STATUS: DONE for CP06-F local scheduler; CP06 overall PARTIAL.
+NEXT CHECKPOINT: assessment assignment concurrency/idempotency and server expiry.

@@ -15,8 +15,9 @@ import { TrustService } from './trustService.js';
 import { PrivacyService } from './privacyService.js';
 import { InterviewService } from './interviewService.js';
 import { verifyPassword, MAX_PASSWORD_LENGTH } from '../auth.js';
+import type { FaroWorker } from './worker.js';
 
-export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig) {
+export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig, worker: FaroWorker) {
   const profiles = new ProfileService(db);
   const offers = new OfferService(db), recruitment = new RecruitmentService(db);
   const assessments = new AssessmentService(db), economics = new EconomicsService(db), trust = new TrustService(db);
@@ -103,8 +104,12 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     }
     if (path === '/api/faro/worker/tick' && method === 'POST') {
       if (user.role !== 'ADMIN') throw new HttpError(403, 'Wymagany moderator.', 'FORBIDDEN');
-      trust.tick();
+      if (!worker.run()) throw new HttpError(503, 'Cykl powiadomień nie został ukończony. Sprawdź diagnostykę.', 'WORKER_TICK_FAILED');
       return ok({ ok: true });
+    }
+    if (path === '/api/faro/worker/status' && method === 'GET') {
+      if (user.role !== 'ADMIN') throw new HttpError(403, 'Wymagany administrator.', 'FORBIDDEN');
+      return ok({ ...worker.status(), outbox: db.db.prepare('SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status').all() });
     }
     const report = path.match(/^\/api\/faro\/processes\/([^/]+)\/reports$/);
     if (report && method === 'POST') return ok(trust.report(user.id, report[1]!, body), 201);

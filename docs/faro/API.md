@@ -37,3 +37,7 @@ POST `/cases/:id/explanations`, `/cases/:id/appeal` and `/cases/:id/review` requ
 # Offer publication boundary
 
 Immutable versions record explicit publication proof and first publication date. Candidate detail/watch/process comparison uses the latest published version; current unapproved drafts remain in assigned organization scope. A pending edit pauses intake without exposing its content to watchers/applicants. Material diff becomes candidate-visible only after publication. Intake additionally requires an active assigned responsible recruiter. Legacy approved versions and versions referenced by existing interests get conservative visibility proof with unknown original publication dates; unproven legacy drafts remain private and require deliberate review/publication.
+
+# Worker operations
+
+ADMIN-only GET `/worker/status` returns running/stopped state, interval, run count, last run/success, opaque failure code and aggregate outbox status counts. POST `/worker/tick` executes the same cycle and returns 503 WORKER_TICK_FAILED on failure. Development scheduling runs without any client polling; it is stopped before app database closure and always disabled in production while release gates remain open.

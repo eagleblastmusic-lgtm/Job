@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createFaroApp } from '../server/faroApp.js';
-export async function faroFixture() {
+import type { AppConfig } from '../server/config.js';
+export async function faroFixture(overrides: Partial<AppConfig> = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'faro-contract-'));
-  const app = createFaroApp({ nodeEnv: 'test', databasePath: join(dir, 'db.sqlite'), dataDir: dir });
+  const app = createFaroApp({ nodeEnv: 'test', databasePath: join(dir, 'db.sqlite'), dataDir: dir, ...overrides });
   await new Promise<void>(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
   async function request<T = Record<string, unknown>>(path: string, cookie = '', method = 'GET', body?: unknown, status = 200): Promise<T> {

@@ -4,12 +4,16 @@ import type { AppConfig } from './config.js';
 import { enforceExtendedOrigin } from './extendedAuth.js';
 import { HttpError, sendJson } from './http.js';
 import { createFaroApi } from './faro/api.js';
+import { TrustService } from './faro/trustService.js';
+import { FaroWorker } from './faro/worker.js';
 
 /** Canonical runtime has an explicit API allowlist. Historical modules are not mounted. */
 export function createFaroApp(overrides: Partial<AppConfig> = {}) {
   const app = createJobApp(overrides);
   const original = app.server.listeners('request')[0] as (req: IncomingMessage, res: ServerResponse) => void;
-  const handleFaro = createFaroApi(app.db, app.store, app.config);
+  const worker = new FaroWorker(() => new TrustService(app.db).tick(), app.config.faroWorkerEnabled, app.config.faroWorkerIntervalMs);
+  const handleFaro = createFaroApi(app.db, app.store, app.config, worker);
+  worker.start();
   app.server.removeAllListeners('request');
   app.server.on('request', async (req, res) => {
     const path = new URL(req.url ?? '/', app.config.appOrigin).pathname;
@@ -28,5 +32,5 @@ export function createFaroApp(overrides: Partial<AppConfig> = {}) {
       sendJson(res, failure.status, { error: { code: failure.code, message: failure.message } });
     }
   });
-  return app;
+  return { ...app, worker, close: async () => { worker.stop(); await app.close(); } };
 }

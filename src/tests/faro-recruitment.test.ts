@@ -5,6 +5,7 @@ import { ProfileService } from '../server/faro/profileService.js';
 import { OfferService, type OfferRecord } from '../server/faro/offerService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
 import { explainOffer, sortOffers } from '../domain/faro/offers.js';
+import { TrustService } from '../server/faro/trustService.js';
 
 async function setup() {
   const f = await faroFixture(), employer = await f.user('Firma'), candidate = await f.user('Jan'), outsider = await f.user('Obcy');
@@ -182,6 +183,18 @@ test('offer salary validation and stale/paused intake preserve access to existin
     assert.equal(offerService.list(f.candidate.id).length, 0);
     await f.request(`/api/faro/offers/${f.offer.id}/interest`, f.outsider.cookie, 'POST', { offerVersion: 1, projectionConfirmed: true, idempotencyKey: 'stale' }, 409);
   } finally { await f.close(); }
+});
+
+test('worker closing uses published deadline rather than paused unpublished draft',async()=>{
+  const f=await setup();try {
+    const offers=new OfferService(f.app.db);
+    offers.edit(f.employer.id,f.offer.id,{data:{...f.offer.data,closesAt:new Date(Date.now()+86400000).toISOString()},expectedVersion:f.offer.revision});
+    f.app.db.db.prepare("UPDATE faro_offers SET status='PAUSED' WHERE id=?").run(f.offer.id);
+    new TrustService(f.app.db,()=>new Date(Date.now()+2*86400000)).tick();
+    assert.equal(offers.get(f.offer.id).status,'PAUSED');
+    new TrustService(f.app.db,()=>new Date(Date.now()+31*86400000)).tick();
+    assert.equal(offers.get(f.offer.id).status,'CLOSED');
+  }finally{await f.close();}
 });
 
 test('matching is requirement-specific and billing-independent; pending suggestions cannot satisfy MUST', async () => {

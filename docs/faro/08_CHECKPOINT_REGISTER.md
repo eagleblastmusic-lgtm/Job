@@ -120,7 +120,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL CLEAR local; real data LEGAL BLOCKER
 - RISK: Competing terminal decisions, retry duplications, contact grant race
 - ROLLBACK: Stop worker and intake; rollback code without dropping events
-- STATUS: PARTIAL (transactional process/watch/grants/outbox, candidate/employer workspace, exact preview confirmation, manual interview/ICS, structured clarification and explicit repeated-interest history delivered; operational scheduled delivery remains. CP06-B/C/D/E evidence in IMPLEMENTATION_STATUS.md).
+- STATUS: PARTIAL (transactional process/watch/grants/outbox, workspace, exact preview, manual interview/ICS, structured clarification, repeated-interest history and single-process development scheduler delivered. Production leased execution, channel/preferences and complete obligation policy remain; CP06-B/C/D/E/F evidence in IMPLEMENTATION_STATUS.md).
 
 ## CP07 — Trust and moderation foundations
 - ID: CP07

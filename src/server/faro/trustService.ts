@@ -126,7 +126,7 @@ export class TrustService extends FaroStore {
         const key = `stale:${offer.id}:${now.slice(0,10)}`;
         this.db.prepare("INSERT OR IGNORE INTO faro_cases(id,organization_id,kind,statement,dedupe_key,created_at) VALUES(?,?,'STALE_OFFER',?,?,?)").run(randomUUID(), offer.organization_id, 'Brak aktualnego potwierdzenia wakatu. Sygnał do sprawdzenia, nie ocena firmy.', key, now);
       }
-      const closing = this.db.prepare("SELECT id FROM faro_offers WHERE status IN ('PUBLISHED','PAUSED') AND json_extract((SELECT content FROM faro_offer_versions WHERE offer_id=faro_offers.id AND version=current_version),'$.closesAt')<=?").all(now) as Array<{ id: string }>;
+      const closing = this.db.prepare("SELECT id FROM faro_offers WHERE status IN ('PUBLISHED','PAUSED') AND json_extract((SELECT content FROM faro_offer_versions WHERE offer_id=faro_offers.id AND publication_proof<>'NONE' ORDER BY version DESC LIMIT 1),'$.closesAt')<=?").all(now) as Array<{ id: string }>;
       for (const offer of closing) {
         this.db.prepare("UPDATE faro_offers SET status='CLOSED',revision=revision+1 WHERE id=?").run(offer.id);
         service.offers.notifyChange(offer.id, service.offers.get(offer.id).version, 'CLOSE');
