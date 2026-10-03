@@ -4,6 +4,7 @@ export interface Practice { quantity: number | null; unit: string; }
 export interface Claim { id: string; skillId: string; level: string; source: string; verification: string; practice: Practice; }
 export interface Learning { skillId: string; mode: string; practice: Practice; }
 export interface Profile {
+  preferences:{active?:boolean;workModels?:string[];contracts?:string[];noNights?:boolean;noWeekends?:boolean};
   firstName: string; phone: string | null; version: number;
   availability: { kind: string; value: string | null }; claims: Claim[]; learning: Learning[];
   activities: Array<{ id: string; description: string; source: string }>;
@@ -22,6 +23,7 @@ export interface OfferData {
   responseHours: number; decisionHours: number; stages: string[]; assessmentMinutes: number; interviewCount: number; closesAt: string; recruiterId: string;
 }
 export interface Offer {
+  conditionExplanation?:Array<{field:string;state:string}>;
   watchAlerts?:boolean;
   ownInterest?:{id:string;status:string}|null;
   id: string; company: string; organizationId: string; status: string; version: number; revision: number; data: OfferData;

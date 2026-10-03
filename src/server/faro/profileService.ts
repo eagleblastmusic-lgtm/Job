@@ -1,10 +1,30 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
-import { object, text, choice, integer } from './validation.js';
+import { object, text, choice, integer, array } from './validation.js';
+import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
 import { LEVELS, SOURCES, skillById, suggestSkills, employerProjection, type Claim, type Learning, type Practice, type Availability } from '../../domain/faro/skills.js';
 
 export class ProfileService extends FaroStore {
+  constraints(userId:string):CandidateConstraints {
+    const row=this.db.prepare('SELECT preferences FROM faro_profiles WHERE user_id=?').get(userId) as {preferences:string}|undefined;
+    const preferences=row?JSON.parse(row.preferences) as Partial<CandidateConstraints>:{};
+    return {...DEFAULT_CONSTRAINTS,...preferences} as CandidateConstraints;
+  }
+  saveConstraints(userId:string,body:Record<string,unknown>) {
+    const raw=object(body.constraints);
+    for(const key of ['active','noNights','noWeekends'])if(typeof raw[key]!=='boolean')throw new HttpError(400,'Wybierz jawnie granice warunków.');
+    const constraints:CandidateConstraints={active:raw.active as boolean,noNights:raw.noNights as boolean,noWeekends:raw.noWeekends as boolean,
+      workModels:[...new Set(array(raw.workModels,3).map(v=>choice(v,['ONSITE','HYBRID','REMOTE'] as const)))],
+      contracts:[...new Set(array(raw.contracts,3).map(v=>choice(v,['UOP','CIVIL','B2B'] as const)))]};
+    return this.transaction(()=>{
+      const current=this.profile(userId);
+      if(!current.version)throw new HttpError(409,'Najpierw zapisz swój profil.','PROFILE_REQUIRED');
+      if(integer(body.expectedVersion,1)!==current.version)throw new HttpError(409,'Odśwież profil.','VERSION_CONFLICT');
+      this.db.prepare('UPDATE faro_profiles SET preferences=?,version=version+1,updated_at=? WHERE user_id=?').run(JSON.stringify(constraints),this.now(),userId);
+      return this.profile(userId);
+    });
+  }
   profile(userId: string) {
     const row = this.db.prepare('SELECT * FROM faro_profiles WHERE user_id=?').get(userId) as { first_name: string; availability: string; phone: string | null; version: number; preferences: string } | undefined;
     const claims = (this.db.prepare('SELECT * FROM faro_claims WHERE user_id=? AND revoked_at IS NULL ORDER BY confirmed_at,id').all(userId) as unknown as Array<{ id: string; skill_id: string; level: Claim['level']; source: Claim['source']; practice: string; verification: Claim['verification']; version: number; confirmed_at: string }>).map(c => ({ id: c.id, skillId: c.skill_id, level: c.level, source: c.source, practice: JSON.parse(c.practice) as Practice, verification: c.verification, version: c.version, confirmedAt: c.confirmed_at }));

@@ -244,3 +244,36 @@ test('watch alerts remain private, mute removes pending optional alerts, closing
     await f.request(url,f.candidate.cookie,'DELETE');assert.equal(r.watches(f.candidate.id).length,0);
   }finally{await f.close();}
 });
+
+test('explicit private constraints filter strictly without relaxing unknown; saved history and direct explanations stay available',async()=>{
+  const f=await setup();try {
+    const offers=new OfferService(f.app.db),profiles=new ProfileService(f.app.db),r=new RecruitmentService(f.app.db);
+    for(const [title,nights,model] of [['Brak informacji',null,'REMOTE'],['Nocna praca',true,'REMOTE'],['Na miejscu',false,'ONSITE']] as const) {
+      const draft=offers.create(f.employer.id,f.org.id,{...offerInput(f.employer.id),role:title,nights,workModel:model});
+      offers.lifecycle(f.employer.id,draft.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(f.employer.id,draft.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    }
+    const all=offers.list(f.candidate.id);assert.equal(all.length,4);
+    const unknown=all.find(o=>o.data.role==='Brak informacji')!;r.watch(f.candidate.id,unknown.id,true);
+    const before=profiles.projection(f.candidate.id),version=profiles.profile(f.candidate.id).version;
+    const constraints={active:true,workModels:['REMOTE'],contracts:['UOP'],noNights:true,noWeekends:true,privateNote:'Nie ujawniaj',candidateId:f.outsider.id};
+    const body={expectedVersion:version,constraints};
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',body);
+    assert.deepEqual(offers.list(f.candidate.id).map(o=>o.id),[f.offer.id]);
+    assert.deepEqual(profiles.projection(f.candidate.id),before);
+    assert.equal(JSON.stringify(profiles.constraints(f.candidate.id)).includes('Nie ujawniaj'),false);
+    assert.equal(profiles.profile(f.outsider.id).preferences.active,undefined);
+    const explanation=offers.detail(f.candidate.id,unknown.id).conditionExplanation;
+    assert.equal(explanation.find(c=>c.field==='nights')!.state,'UNKNOWN');
+    assert.equal(r.watches(f.candidate.id).length,1);
+    assert.equal(offers.list(f.employer.id,f.org.id).length,4);
+    assert.deepEqual(offers.detail(f.employer.id,unknown.id).conditionExplanation,[]);
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',body,409);
+    const latest=profiles.profile(f.candidate.id).version;
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:latest,constraints:{...constraints,workModels:['HYBRID']}});
+    assert.equal(offers.list(f.candidate.id).length,0);assert.equal(offers.list(f.candidate.id).length,0);
+    assert.equal(profiles.constraints(f.candidate.id).active,true);
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:latest+1,constraints:{...constraints,active:false}});
+    assert.equal(offers.list(f.candidate.id).length,4);
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:latest+2,constraints:{...constraints,noNights:'false'}},400);
+  }finally{await f.close();}
+});

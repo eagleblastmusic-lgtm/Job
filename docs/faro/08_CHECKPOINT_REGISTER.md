@@ -100,7 +100,7 @@ All rows retain their initial execution contracts; live status is updated with e
 - LEGAL STATUS: LEGAL CLEAR deterministic local; deployment GDPR review
 - RISK: Unknown incorrectly rendered as not capable
 - ROLLBACK: Revert matching presentation; preserve offer conditions
-- STATUS: PARTIAL (requirement explanation in de1d3ec; explicit candidate constraints and explanation UI remain).
+- STATUS: PARTIAL (requirement explanation and workspace delivered; CP05-A adds explicit private model/contract/night/weekend boundaries and unknown states. Salary/commute/unit constraints and broader skills graph validation remain).
 
 ## CP06 — Recruitment, clocks, watch and outbox
 - ID: CP06

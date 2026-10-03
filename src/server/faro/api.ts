@@ -39,6 +39,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (path === '/api/faro/catalog' && method === 'GET') return ok({ skills: SKILL_CATALOG });
     if (path === '/api/faro/profile' && method === 'GET') return ok(profiles.profile(user.id));
     if (path === '/api/faro/profile' && method === 'PUT') return ok(profiles.save(user.id, body));
+    if(path==='/api/faro/profile/constraints'&&method==='PUT')return ok(profiles.saveConstraints(user.id,body));
     if (path === '/api/faro/profile/preview' && method === 'GET') return ok(profiles.projection(user.id));
     if (path === '/api/faro/profile/preview-confirmation' && method === 'GET') return ok(profiles.previewConfirmation(user.id));
     if (path === '/api/faro/claims' && method === 'POST') return ok(profiles.addClaim(user.id, body), 201);

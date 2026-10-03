@@ -214,3 +214,5 @@ CP10-B adds transactional revision/idempotency-protected assignment, server expi
 CP10-C now provides employer-scoped immutable definition editing, latest-version assignment guards and a full task/key/rubric review surface. New versions require renewed approval; existing attempts keep their original versions. Objective quiz foundations are real and verified, while complex assessment and external validity/production gates remain deferred.
 
 CP06-G adds private watch alert toggles and deduplicated upcoming-close notices based on published deadlines. Explicit candidate matching constraints remain the next engineering slice; rollout/notification policies retain their external gates.
+
+CP05-A delivers explicit private work-condition filters with unknown-state explanations and no automatic relaxation. Salary/commute constraints remain pending comparable basis/unit contracts. Current candidate workspace and employer projection evidence is recorded in IMPLEMENTATION_STATUS.md.

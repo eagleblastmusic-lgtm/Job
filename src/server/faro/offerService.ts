@@ -3,7 +3,7 @@ import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { object, text, array, choice, integer, date, nullableBoolean } from './validation.js';
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
-import { materialDiff, explainOffer, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
+import { materialDiff, explainOffer, explainConditions, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
 export interface OfferRecord { id: string; organizationId: string; company: string; status: OfferStatus; version: number; revision: number; approvedVersion: number | null; confirmedUntil: string | null; createdAt: string; data: OfferData; publishedAt?:string|null; publicationSource?:string; }
 export function parseOffer(body: Record<string, unknown>): OfferData {
@@ -56,7 +56,8 @@ export class OfferService extends FaroStore {
   list(userId: string, orgId?: string) {
     if (orgId) this.member(userId, orgId);
     const ids = (orgId ? this.db.prepare('SELECT id FROM faro_offers WHERE organization_id=?').all(orgId) : this.db.prepare("SELECT id FROM faro_offers WHERE status='PUBLISHED'").all()) as Array<{ id: string }>;
-    return sortOffers(ids.map(row => this.get(row.id)).filter(offer => orgId || this.intake(offer)).map(offer=>orgId?offer:this.published(offer.id)));
+    const constraints=new ProfileService(this.database,this.clock).constraints(userId);
+    return sortOffers(ids.map(row => this.get(row.id)).filter(offer => orgId || this.intake(offer)).map(offer=>orgId?offer:this.published(offer.id)).filter(offer=>orgId||explainConditions(offer.data,constraints).every(c=>c.state==='SATISFIED')));
   }
   detail(userId: string, id: string) {
     const current = this.get(id),assigned=Boolean(this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=? AND m.active=1 WHERE a.offer_id=? AND a.user_id=?').get(current.organizationId,id,userId));
@@ -68,7 +69,7 @@ export class OfferService extends FaroStore {
     const offer=assigned?current:this.published(id);
     const p = new ProfileService(this.database, this.clock).profile(userId);
     const ownInterest=this.db.prepare('SELECT id,status FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,id)??null;
-    return { ...offer, ownInterest, acceptingInterest: this.intake(current), explanation: explainOffer(offer.data, p.claims, p.learning) };
+    return { ...offer, ownInterest, acceptingInterest: this.intake(current), explanation: explainOffer(offer.data, p.claims, p.learning),conditionExplanation:assigned?[]:explainConditions(offer.data,new ProfileService(this.database,this.clock).constraints(userId)) };
   }
   create(userId: string, orgId: string, raw: Record<string, unknown>) {
     this.member(userId, orgId, ['OWNER','ADMIN','RECRUITER']); const data = parseOffer(raw);

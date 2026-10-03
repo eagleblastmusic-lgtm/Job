@@ -246,3 +246,19 @@ RISK / DEFERRED: 24-hour reminder window follows existing local reminder convent
 ROLLBACK: revert preference UI/API/worker together; retain existing watches/alerts flags and delivered history.
 STATUS: DONE for CP06-G; overall CP06 remains PARTIAL.
 NEXT CHECKPOINT: explicit private candidate constraints in matching.
+
+# CP05-A — Explicit private work condition constraints (2026-10-04)
+ID / TITLE: CP05-A, user-controlled condition boundaries.
+GOAL / PURPOSE / CURRENT GAP: preferences existed as unused JSON; offer list ignored explicit candidate boundaries.
+SCOPE / IMPLEMENTATION / FILES: domain/faro/offers.ts condition explanation, profileService.ts preference validation/versioned persistence, offerService.ts list/detail, API, client profile/detail and tests. Private active flag, work models, contract types, no-nights/no-weekends. Server list includes only known-satisfied selected conditions; zero results never relax criteria. Detail states SATISFIED/KNOWN_NOT_MET/UNKNOWN separately. Watches/process history/direct permitted detail remain accessible outside list filters.
+DEPENDENCIES: CP03 private profile, CP04 published structured conditions, CP08 workspace.
+DB CHANGE / MIGRATIONS: none; existing preferences JSON and profile revision.
+API CHANGE: PUT /profile/constraints requires expectedVersion and allowlisted constraints. Unknown client fields/candidateId discarded; stale revision 409. Candidate offer detail includes own conditionExplanation; assigned employer view does not receive candidate preferences.
+FRONTEND CHANGE: private condition settings in saved profile, explicit activate/deactivate, empty selections mean all models/contracts; detail explains selected conditions and unknowns. Profile link from offer list.
+TESTS / TESTED: build/lint/typecheck PASS; 10 recruitment scenarios PASS including 4-offer counterexample (satisfied/unknown/night/onsite), no-results stability, stale writes, employer unaffected and no projection leak. Expanded candidate/employer browser journey PASS desktop/mobile including preference persistence/explanation, axe and 320px reflow. Unchanged other contracts retain previous evidence.
+ACCEPTANCE: unknown is not a failed ability or a satisfied condition; no automatic relaxation, billing never enters decisions, saved watch/process remains accessible, settings never enter initial employer projection, deactivate requires explicit user action.
+LEGAL STATUS: deterministic user-selected local filters; external GDPR/fairness/production gates remain open.
+RISK / DEFERRED: salary thresholds, commute-distance/time and exact hours need comparable money/unit/geography contracts; current scope never infers them from free text or converts B2B/UOP bases. Salary conditions stay fully visible in offers.
+ROLLBACK: disable own active preference or revert list/client/API together; preserve private settings/history.
+STATUS: DONE for CP05-A scoped condition filters; overall CP05 PARTIAL.
+NEXT CHECKPOINT: offer salary variant preservation and economics comparison units; operational release foundations.

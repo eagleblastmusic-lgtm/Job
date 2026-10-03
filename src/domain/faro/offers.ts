@@ -6,6 +6,18 @@ export interface SalaryOption {
   variable: string; hoursPerPeriod: number; ftePercent: number;
 }
 export interface Requirement { id: string; skillId: string; kind: 'MUST_HAVE' | 'NICE_TO_HAVE' | 'WILL_TEACH'; level: SkillLevel; rationale: string; }
+export interface CandidateConstraints {
+  active:boolean;workModels:Array<OfferData['workModel']>;contracts:Array<SalaryOption['contract']>;noNights:boolean;noWeekends:boolean;
+}
+export const DEFAULT_CONSTRAINTS:CandidateConstraints={active:false,workModels:[],contracts:[],noNights:false,noWeekends:false};
+export function explainConditions(offer:OfferData,c:CandidateConstraints) {
+  const result:Array<{field:string;state:'SATISFIED'|'KNOWN_NOT_MET'|'UNKNOWN'}>=[];
+  if(!c.active)return result;
+  if(c.workModels.length)result.push({field:'workModel',state:c.workModels.includes(offer.workModel)?'SATISFIED':'KNOWN_NOT_MET'});
+  if(c.contracts.length)result.push({field:'contract',state:offer.salary.some(s=>c.contracts.includes(s.contract))?'SATISFIED':'KNOWN_NOT_MET'});
+  for(const [field,enabled,value] of [['nights',c.noNights,offer.nights],['weekends',c.noWeekends,offer.weekends]] as const)if(enabled)result.push({field,state:value===null?'UNKNOWN':value?'KNOWN_NOT_MET':'SATISFIED'});
+  return result;
+}
 export interface OfferData {
   role: string; responsibilities: string[]; requirements: Requirement[]; salary: SalaryOption[];
   location: string; workModel: 'ONSITE' | 'HYBRID' | 'REMOTE'; remoteDays: number;

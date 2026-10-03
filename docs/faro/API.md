@@ -53,3 +53,7 @@ GET `/assessments/:id/versions/:version` returns the scoped employer definition 
 # Private watch alert preferences
 
 PUT `/offers/:id/watch` accepts only boolean `alerts` for the current authenticated user's saved watch (404 if absent). GET `/watches` includes that user's `watchAlerts`; organization roles do not gain watcher access. Muting/unwatching removes pending optional offer alerts but preserves updates attached to an interest. The local worker sends a deduplicated upcoming-close alert to enabled watches within 24 hours of the last published deadline. Delivered notices remain in own history; no email/SMS delivery is added.
+
+# Private condition constraints
+
+PUT `/profile/constraints` accepts `{expectedVersion,constraints:{active,workModels,contracts,noNights,noWeekends}}`; booleans and enums are validated, unlisted fields are discarded and current profile revision is required. Empty model/contract sets impose no boundary. Candidate offer list respects active constraints server-side without automatic relaxation: selected unknown conditions do not enter the known-matching list. Own detail explains SATISFIED/KNOWN_NOT_MET/UNKNOWN; watches and process history remain accessible. Organization list is unaffected and initial employer projection excludes preferences.
