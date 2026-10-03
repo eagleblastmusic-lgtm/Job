@@ -6,6 +6,8 @@ import { OfferService } from '../server/faro/offerService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
 import { InterviewService } from '../server/faro/interviewService.js';
 import { HttpError } from '../server/http.js';
+import { TrustService } from '../server/faro/trustService.js';
+import { PrivacyService } from '../server/faro/privacyService.js';
 
 async function setup() {
   const f=await faroFixture(),employer=await f.user('MeetingEmployer'),candidate=await f.user('MeetingCandidate'),other=await f.user('MeetingOther');
@@ -22,9 +24,57 @@ async function setup() {
   };
   const first=process(candidate.id,'first'),second=process(other.id,'second');
   const proposal={startsAt:'2026-10-25T02:30:00+02:00',endsAt:'2026-10-25T02:30:00+01:00',confirmBy:'2026-10-24T21:00:00+02:00',timezone:'Europe/Warsaw',location:'Spotkanie online',meetingUrl:'https://example.pl/meeting',expectedVersion:2,confirmed:true,idempotencyKey:'proposal'};
-  return {...f,employer,candidate,other,profiles,recruitment,interviews,org,first,second,proposal,setNow:(value:string)=>{now=new Date(value);}};
+  return {...f,employer,candidate,other,profiles,recruitment,interviews,org,first,second,proposal,clock,setNow:(value:string)=>{now=new Date(value);}};
 }
 const code=(expected:string)=>(error:unknown)=>error instanceof HttpError&&error.code===expected;
+
+test('appointment case gives both parties private explanations, guards grace and stale revisions, supports candidate appeal and cannot punish wrong subject',async()=>{
+  const f=await setup();try {
+    const admin=await f.user('CaseModerator');f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
+    const meeting=f.interviews.propose(f.employer.id,f.first,f.proposal);
+    f.interviews.change(f.candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'case-confirm'});
+    f.setNow('2026-10-25T03:00:00Z');
+    f.interviews.change(f.employer.id,meeting.id,{command:'DISPUTE',reason:'NO_SHOW',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'case-report'});
+    const row=f.app.db.db.prepare('SELECT id FROM faro_cases').get() as {id:string},trust=new TrustService(f.app.db,f.clock);
+    assert.equal(trust.list(f.candidate.id).length,1);assert.equal(trust.list(f.employer.id).length,1);assert.equal(trust.list(f.other.id).length,0);
+    const reply={statement:'Prywatne wyjaśnienie: choroba i dane medyczne kandydata.',expectedVersion:1,idempotencyKey:'candidate-explanation'};
+    const result=trust.explain(f.candidate.id,row.id,reply);assert.deepEqual(trust.explain(f.candidate.id,row.id,reply),result);
+    assert.throws(()=>trust.explain(f.other.id,row.id,{...reply,idempotencyKey:'outsider'}));
+    assert.throws(()=>trust.explain(f.employer.id,row.id,{statement:'Wyjaśnienie pracodawcy.',expectedVersion:1,idempotencyKey:'stale'}),code('VERSION_CONFLICT'));
+    const decision={decision:'Prywatna notatka moderatora: dane medyczne kandydata.',reviewAt:'2026-10-28T00:00:00Z',decisionCode:'INSUFFICIENT_EVIDENCE'};
+    f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(f.employer.id);
+    assert.doesNotMatch(JSON.stringify(trust.list(f.employer.id)),/dane medyczne/);
+    assert.throws(()=>trust.review(f.employer.id,row.id,{...decision,state:'EVIDENCE_REVIEW',explanationDueAt:'2026-10-26T03:00:00Z',expectedVersion:2,idempotencyKey:'own-case'}),code('MODERATION_CONFLICT'));
+    f.app.db.db.prepare("UPDATE users SET role='USER' WHERE id=?").run(f.employer.id);
+    trust.review(admin.id,row.id,{...decision,state:'EVIDENCE_REVIEW',explanationDueAt:'2026-10-26T03:00:00Z',expectedVersion:2,idempotencyKey:'open-window'});
+    assert.throws(()=>trust.review(admin.id,row.id,{...decision,state:'NO_ACTION',expectedVersion:3,idempotencyKey:'too-soon'}),code('EXPLANATION_WINDOW_OPEN'));
+    trust.explain(f.employer.id,row.id,{statement:'Prywatne wyjaśnienie pracodawcy o połączeniu.',expectedVersion:3,idempotencyKey:'employer-explanation'});
+    assert.throws(()=>trust.review(admin.id,row.id,{...decision,state:'ACTION',restrict:true,expectedVersion:4,idempotencyKey:'wrong-subject'}),code('RESTRICTION_SCOPE'));
+    trust.review(admin.id,row.id,{...decision,state:'NO_ACTION',expectedVersion:4,idempotencyKey:'review-no-action'});
+    trust.appeal(f.candidate.id,row.id,{statement:'Prywatne odwołanie: dane medyczne kandydata.',expectedVersion:5,idempotencyKey:'candidate-appeal'});
+    assert.doesNotMatch(JSON.stringify(trust.list(f.employer.id)),/choroba|dane medyczne|Prywatne odwołanie/);
+    assert.match(JSON.stringify(trust.list(admin.id)),/dane medyczne/);
+    assert.doesNotMatch(JSON.stringify(new PrivacyService(f.app.db).exportOwn(f.employer.id)),/dane medyczne/);
+    const resolve={...decision,state:'RESOLVED',decisionCode:'CASE_RESOLVED',expectedVersion:6,idempotencyKey:'resolve-appeal'};
+    const resolved=trust.review(admin.id,row.id,resolve);assert.equal(resolved.state,'RESOLVED');assert.deepEqual(trust.review(admin.id,row.id,resolve),resolved);
+    assert.equal((f.app.db.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(f.org.id) as {verification:string}).verification,'VERIFIED');
+    assert.ok(f.app.db.db.prepare("SELECT id FROM audit_logs WHERE user_id=? AND action='MODERATION_CASES_READ'").get(admin.id));
+  }finally{await f.close();}
+});
+
+test('moderator can close appointment evidence review after the explicit explanation deadline without an automatic sanction',async()=>{
+  const f=await setup();try {
+    const admin=await f.user('GraceModerator');f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
+    const meeting=f.interviews.propose(f.employer.id,f.first,f.proposal);
+    f.interviews.change(f.candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'grace-confirm'});
+    f.setNow('2026-10-25T03:00:00Z');f.interviews.change(f.candidate.id,meeting.id,{command:'DISPUTE',reason:'TECHNICAL_ISSUE',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'grace-report'});
+    const row=f.app.db.db.prepare('SELECT id FROM faro_cases').get() as {id:string},trust=new TrustService(f.app.db,f.clock);
+    trust.review(admin.id,row.id,{state:'EVIDENCE_REVIEW',decision:'Sprawdzamy problem połączenia.',reviewAt:'2026-10-28T03:00:00Z',explanationDueAt:'2026-10-26T03:00:00Z',expectedVersion:1,idempotencyKey:'grace-open'});
+    f.setNow('2026-10-26T03:00:00Z');f.interviews.tick();assert.equal(trust.caseRow(row.id).state,'EVIDENCE_REVIEW');
+    trust.review(admin.id,row.id,{state:'NO_ACTION',decision:'Problem techniczny, bez naruszenia.',decisionCode:'TECHNICAL_ISSUE',reviewAt:'2026-10-28T03:00:00Z',expectedVersion:2,idempotencyKey:'grace-close'});
+    assert.equal(trust.caseRow(row.id).state,'NO_ACTION');
+  }finally{await f.close();}
+});
 
 test('interview confirmation reserves participants atomically, scopes API, freezes UTC across autumn DST, exports private ICS and requires both completion reports',async()=>{
   const f=await setup();try {

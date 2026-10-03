@@ -1,6 +1,8 @@
 import type { Skill, Projection, Salary } from './faroTypes.js';
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export const labels: Record<string, string> = {
+  NO_SHOW_CASE:'Nieobecność do wyjaśnienia',INTERVIEW_DISCREPANCY:'Rozbieżność po rozmowie',CANDIDATE:'Kandydat',EMPLOYER:'Pracodawca',
+  PROCESS_VIOLATION_CONFIRMED:'Potwierdzone naruszenie procesu',INSUFFICIENT_EVIDENCE:'Za mało dowodów',NO_VIOLATION_CONFIRMED:'Nie potwierdzono naruszenia',CASE_RESOLVED:'Sprawa rozstrzygnięta',
   REQUIREMENT:'Kompetencja z oferty',AVAILABILITY:'Dostępność',DECLARE_SKILL:'Deklaruję kompetencję',NOT_YET:'Jeszcze tego nie potrafię',
   PROPOSED:'Termin zaproponowany', CONFIRMED:'Rozmowa potwierdzona', COMPLETED:'Rozmowa odbyta', DISPUTED:'Rozbieżność do wyjaśnienia',
   INTERVIEW_PROPOSED:'Propozycja rozmowy', INTERVIEW_CONFIRMED:'Rozmowa potwierdzona', INTERVIEW_COMPLETED:'Rozmowa odbyta',

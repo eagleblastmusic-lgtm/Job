@@ -16,3 +16,6 @@ LEGAL REVIEW: approved purposes, retention/holds, controller/processor responsib
 # Clarification boundary
 
 Candidate process responses use enums, catalog skill identifiers, bounded practice and validated availability. Raw identity/CV/employer-history text has no response field in the current contract. Historical raw ANSWER action and nextAction are suppressed in process API presentation. Own export may still contain the candidate's historical raw answer; it is not organization export. Response declarations remain separate from confirmed profile history and from verified evidence.
+# Moderation conflict and evidence
+
+Private case explanations and appeal text are visible to their author and an independent authorized moderator. The other party receives case state and a structured public reason. Global ADMIN does not override this projection for cases in which that user is a party or organization member. Own export excludes the other party's explanation/appeal and raw moderator notes. Export includes relevant candidate case metadata; erasure redacts linked free-form evidence before relation deletion. Production retention/legal-hold and access review remain external gates.

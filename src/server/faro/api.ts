@@ -108,7 +108,9 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     }
     const report = path.match(/^\/api\/faro\/processes\/([^/]+)\/reports$/);
     if (report && method === 'POST') return ok(trust.report(user.id, report[1]!, body), 201);
-    if (path === '/api/faro/cases' && method === 'GET') return ok({ cases: trust.list(user.id, user.role === 'ADMIN') });
+    if (path === '/api/faro/cases' && method === 'GET') return ok({ cases: trust.list(user.id) });
+    const explanation = path.match(/^\/api\/faro\/cases\/([^/]+)\/explanations$/);
+    if(explanation&&method==='POST')return ok(trust.explain(user.id,explanation[1]!,body),201);
     const caseReview = path.match(/^\/api\/faro\/cases\/([^/]+)\/review$/);
     if (caseReview && method === 'POST') return ok(trust.review(user.id, caseReview[1]!, body));
     const caseAppeal = path.match(/^\/api\/faro\/cases\/([^/]+)\/appeal$/);

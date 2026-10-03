@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
 import { faroFixture, offerInput } from '../src/tests/faro-fixture.js';
+import { InterviewService } from '../src/server/faro/interviewService.js';
 
 async function login(page: Page, base: string, email: string) {
   await page.goto(base);
@@ -148,6 +149,42 @@ test('clarification workspace shares only structured declarations and keeps prof
     const history=await f.request<{processes:Array<{id:string;previousInterestId:string|null}>}>('/api/faro/processes',candidate.cookie);
     expect(history.processes).toHaveLength(2);expect(history.processes.find(process=>process.id!==p.id)?.previousInterestId).toBe(p.id);
   } finally {await page.goto('about:blank');await f.close();}
+});
+
+test('case workspace supports private explanations from both sides, independent review and candidate appeal',async({page})=>{
+  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  try {
+    const employer=await f.user('CaseBrowserEmployer'),candidate=await f.user('CaseBrowserCandidate'),admin=await f.user('CaseBrowserModerator');
+    f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
+    const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Sprawa po rozmowie'},201);
+    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const preview=await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation',candidate.cookie);
+    const p=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'case-browser-interest'},201);
+    await f.request(`/api/faro/processes/${p.id}/commands`,employer.cookie,'POST',{command:'ADVANCE',nextAction:'Uzgodnijmy rozmowę',dueAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'case-browser-advance'});
+    // A controlled fixture clock reaches the meeting outcome without a wall-clock sleep.
+    const now=Date.now(),interviews=new InterviewService(f.app.db,()=>new Date(now-3*3600000));
+    const meeting=interviews.propose(employer.id,p.id,{startsAt:new Date(now-2*3600000).toISOString(),endsAt:new Date(now-3600000).toISOString(),confirmBy:new Date(now-2.5*3600000).toISOString(),timezone:'Europe/Warsaw',location:'Online',confirmed:true,expectedVersion:2,idempotencyKey:'case-browser-propose'});
+    interviews.change(candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'case-browser-confirm'});
+    await f.request(`/api/faro/interviews/${meeting.id}`,employer.cookie,'POST',{command:'DISPUTE',reason:'NO_SHOW',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'case-browser-dispute'});
+    await login(page,f.base,candidate.email);await page.getByRole('link',{name:'Zgłoszenia',exact:true}).click();
+    const explanation=page.locator('[data-form=case-explain]');await explanation.locator('[name=statement]').fill('Prywatna informacja medyczna kandydata.');await explanation.getByRole('button',{name:'Przekaż wyjaśnienie'}).click();
+    await expect(page.locator('#f-content')).toContainText('Prywatna informacja medyczna kandydata.');
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,employer.email);await page.getByRole('link',{name:'Zgłoszenia',exact:true}).click();
+    await expect(page.locator('#f-content')).not.toContainText('informacja medyczna');
+    await explanation.locator('[name=statement]').fill('Prywatne wyjaśnienie firmy dotyczące połączenia.');await explanation.getByRole('button',{name:'Przekaż wyjaśnienie'}).click();
+    await expect(page.locator('#f-content')).toContainText('Prywatne wyjaśnienie firmy');
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,admin.email);await page.getByRole('link',{name:'Zgłoszenia',exact:true}).click();
+    await expect(page.locator('#f-content')).toContainText('informacja medyczna');await expect(page.locator('#f-content')).toContainText('wyjaśnienie firmy');
+    const review=page.locator('[data-form=case-review]');await review.locator('[name=state]').selectOption('EVIDENCE_REVIEW');await review.locator('[name=decision]').fill('Prywatna notatka moderatora o sprawdzeniu materiału.');await review.locator('[name=reviewAt]').fill('2099-01-03T12:00');await review.locator('[name=explanationDueAt]').fill('2099-01-02T12:00');await review.getByRole('button',{name:'Zapisz przegląd'}).click();
+    await expect(page.locator('.f-chip')).toHaveText('EVIDENCE_REVIEW');
+    await review.locator('[name=state]').selectOption('NO_ACTION');await review.locator('[name=decision]').fill('Prywatna notatka moderatora o braku naruszenia.');await review.locator('[name=decisionCode]').selectOption('NO_VIOLATION_CONFIRMED');await review.locator('[name=reviewAt]').fill('2099-01-03T12:00');await review.getByRole('button',{name:'Zapisz przegląd'}).click();
+    await expect(page.locator('.f-chip')).toHaveText('NO_ACTION');await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);await page.getByRole('link',{name:'Zgłoszenia',exact:true}).click();
+    await expect(page.locator('#f-content')).not.toContainText('notatka moderatora');
+    const appeal=page.locator('[data-form=appeal]');await appeal.locator('[name=statement]').fill('Proszę o ponowne prywatne sprawdzenie rozbieżności.');await appeal.getByRole('button',{name:'Zapisz odwołanie'}).click();await expect(page.locator('.f-chip')).toHaveText('APPEAL');
+  }finally{await page.goto('about:blank');await f.close();}
 });
 
 test('privacy workspace exports own data and requires reauthentication before erasure',async({page})=>{

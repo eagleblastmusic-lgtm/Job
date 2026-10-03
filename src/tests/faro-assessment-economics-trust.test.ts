@@ -88,14 +88,14 @@ test('economics is private, versioned and honest about unsupported automatic tax
 test('trust report and stale-offer worker create reviewable signals, proportional restrictions and appeals', async () => {
   const f = await assessmentSetup();
   try {
-    const report = await f.request<{ id: string; state: string }>(`/api/faro/processes/${f.interest.id}/reports`, f.candidate.cookie, 'POST', { kind: 'CV_REQUEST', statement: 'Pracodawca poprosił o dokument poza natywnym procesem.' }, 201);
+    const report = await f.request<{ id: string; state: string }>(`/api/faro/processes/${f.interest.id}/reports`, f.candidate.cookie, 'POST', { kind: 'CV_REQUEST', statement: 'Pracodawca poprosił o dokument poza natywnym procesem.',idempotencyKey:'cv-report' }, 201);
     assert.equal(report.state, 'OPEN');
     assert.equal((await f.request<{ cases: unknown[] }>('/api/faro/cases', f.candidate.cookie)).cases.length, 1);
     await f.request(`/api/faro/cases/${report.id}/review`, f.candidate.cookie, 'POST', { state: 'ACTION', decision: 'Wstrzymano ofertę do sprawdzenia.', reviewAt: new Date().toISOString(), restrict: true }, 403);
-    await f.request(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'EVIDENCE_REVIEW', decision: 'Sprawdzamy dowody.', reviewAt: new Date().toISOString() });
-    await f.request(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'ACTION', decision: 'Wstrzymano ofertę do sprawdzenia.', reviewAt: new Date().toISOString(), restrict: true });
-    await f.request(`/api/faro/cases/${report.id}/appeal`, f.candidate.cookie, 'POST', { statement: 'Proszę o ponowne sprawdzenie.' });
-    const appeal = await f.request<{ state: string }>(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'RESOLVED', decision: 'Rozstrzygnięcie po odwołaniu.', reviewAt: new Date().toISOString() });
+    await f.request(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'EVIDENCE_REVIEW', decision: 'Sprawdzamy dowody.', reviewAt: new Date().toISOString(),expectedVersion:1,idempotencyKey:'review-evidence' });
+    await f.request(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'ACTION', decision: 'Wstrzymano ofertę do sprawdzenia.', decisionCode:'PROCESS_VIOLATION_CONFIRMED',reviewAt: new Date().toISOString(), restrict: true,expectedVersion:2,idempotencyKey:'review-action' });
+    await f.request(`/api/faro/cases/${report.id}/appeal`, f.candidate.cookie, 'POST', { statement: 'Proszę o ponowne sprawdzenie.',expectedVersion:3,idempotencyKey:'case-appeal' });
+    const appeal = await f.request<{ state: string }>(`/api/faro/cases/${report.id}/review`, f.admin.cookie, 'POST', { state: 'RESOLVED', decision: 'Rozstrzygnięcie po odwołaniu.',decisionCode:'CASE_RESOLVED', reviewAt: new Date().toISOString(),expectedVersion:4,idempotencyKey:'review-resolved' });
     assert.equal(appeal.state, 'RESOLVED');
     const service = new TrustService(f.app.db, () => new Date('2026-09-17T12:00:00.000Z'));
     f.app.db.db.prepare("UPDATE faro_offers SET status='PUBLISHED',confirmed_until='2026-09-16T00:00:00.000Z' WHERE id=?").run(f.offer.id);

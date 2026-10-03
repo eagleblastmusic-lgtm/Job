@@ -111,7 +111,7 @@ export class InterviewService extends FaroStore {
       if(p.status!=='ACTIVE'||!['PROPOSED','CONFIRMED'].includes(row.state))throw new HttpError(409,'Rozmowa nie jest aktywna.','INVALID_TRANSITION');
       const command=choice(body.command,['CONFIRM','CANCEL','COMPLETE','DISPUTE'] as const);
       if(body.confirmed!==true)throw new HttpError(400,'Potwierdź działanie dotyczące rozmowy.','CONFIRMATION_REQUIRED');
-      let state:InterviewRow['state']=row.state,stage=p.stage,due=p.stage_due_at,action=p.next_action;
+      let state:InterviewRow['state']=row.state,stage=p.stage,due=p.stage_due_at,action=p.next_action,caseId:string|null=null;
       if(command==='CONFIRM') {
         if(!candidate||row.state!=='PROPOSED'||row.confirm_by<=this.now())throw new HttpError(409,'Potwierdzenie nie jest już dostępne.');
         if(!row.recruiter_id)throw new HttpError(409,'Rekruter nie jest dostępny.');
@@ -134,12 +134,17 @@ export class InterviewService extends FaroStore {
         } else {
           state='DISPUTED';stage='ACCEPTED_TO_NEXT_STAGE';action='Rozbieżność dotycząca rozmowy czeka na wyjaśnienie.';due=null;
           const reason=choice(body.reason,['NO_SHOW','TECHNICAL_ISSUE','OTHER_DISCREPANCY'] as const);
-          this.db.prepare("INSERT INTO faro_cases(id,organization_id,process_id,reporter_id,kind,statement,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?)").run(randomUUID(),this.recruitment.offers.get(p.offer_id).organizationId,p.id,userId,reason==='NO_SHOW'?'NO_SHOW_CASE':'INTERVIEW_DISCREPANCY',`Rozmowa ${id}: ${reason}. Wymaga wyjaśnienia przez obie strony; bez automatycznej sankcji.`,`interview:${id}`,this.now());
+          caseId=randomUUID();
+          this.db.prepare("INSERT INTO faro_cases(id,organization_id,process_id,reporter_id,kind,statement,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?)").run(caseId,this.recruitment.offers.get(p.offer_id).organizationId,p.id,userId,reason==='NO_SHOW'?'NO_SHOW_CASE':'INTERVIEW_DISCREPANCY',`Rozmowa ${id}: ${reason}. Wymaga wyjaśnienia przez obie strony; bez automatycznej sankcji.`,`interview:${id}`,this.now());
+          const moderators=this.db.prepare("SELECT id FROM users WHERE role='ADMIN'").all() as Array<{id:string}>;
+          for(const moderator of moderators)this.recruitment.enqueue(moderator.id,'case',caseId,'Nowa rozbieżność po rozmowie wymaga przeglądu.',`case:${caseId}:opened`);
+          const assigned=this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=o.organization_id AND m.active=1 WHERE a.offer_id=?').all(p.offer_id) as Array<{user_id:string}>;
+          for(const recipient of [p.candidate_id,...assigned.map(a=>a.user_id)])this.recruitment.enqueue(recipient,'case',caseId,'Możesz przekazać prywatne wyjaśnienie rozbieżności po rozmowie.',`case:${caseId}:opened`);
         }
       }
       this.db.prepare('UPDATE faro_interviews SET state=?,revision=revision+1 WHERE id=?').run(state,id);
       this.db.prepare('UPDATE faro_interests SET stage=?,stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?').run(stage,due,action,p.id);
-      this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,reason:command==='CANCEL'||command==='DISPUTE'?body.reason:null});
+      this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,caseId,reason:command==='CANCEL'||command==='DISPUTE'?body.reason:null});
       return this.view(userId,id);
     });
   }

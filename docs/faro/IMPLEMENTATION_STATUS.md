@@ -156,3 +156,16 @@ RISK / DEFERRED: pattern analysis operates over retained history in CP07; no aut
 ROLLBACK: revert coordinated client/server contract, retain additive FK/history data.
 STATUS: DONE for CP06-E; CP06 operational scheduled delivery remains open.
 NEXT CHECKPOINT: bilateral no-show explanations/moderation, full assessment lifecycle and worker operations.
+# CP07-B — Bilateral explanations and independent moderation (2026-10-03)
+
+GOAL / SCOPE: provide symmetric private explanation and appeal after a confirmed appointment dispute, preserving employer privacy boundaries and concurrent case integrity.
+DEPENDENCIES: CP06-C interview case, scoped assignments, process commandOnce/outbox, data rights and workspace.
+IMPLEMENTATION / FILES: TrustService scopes case reads, immutable private explanations, versioned/idempotent review/appeal/report commands, explicit explanation deadline, independent moderator check, safe public reason and restriction-target guard. InterviewService notifies both parties/moderation without private statements. API/client expose explain/review/appeal and proper case notification links. PrivacyService own export/redaction follows the new evidence boundary. Domain/API/browser tests updated.
+DB CHANGE / MIGRATIONS: 0026_faro_case_explanations.sql; case revision/deadline/public reason/appeal author, FK-cascaded private explanation records.
+ACCEPTANCE: candidate can explain and appeal an employer report; employer cannot read candidate health text or appeal through list/export; moderator can read both sides with audit; involved moderator cannot read the other party's private evidence or decide the case; stale command conflicts; replay is idempotent; review waits for both sides or explicit deadline. No automatic sanction after timer expiry.
+LEGAL STATUS: engineering workflow; production grace/retention/consequence policy remains LEGAL REVIEW / TEST FIRST. No default research-backed grace period is invented; independent moderator chooses a visible deadline.
+RISK / DEFERRED: production staffed moderation and purpose-specific retention; candidate restrictions; proportional organization restriction restoration and pattern metrics remain open CP07 tasks. No portable reputation score.
+ROLLBACK: coordinated API/client revert, keep additive evidence table and keep employer projection filtering; preserve legitimate case history subject to approved retention.
+TESTED: build/lint/typecheck PASS; 26 migrations PASS; all 19 Faro scenarios PASS; all 8 desktop/mobile browser scenarios PASS, including both explanations, independent review, safe public reason and candidate appeal. Final own-export scope correction rechecked in privacy/interview scenarios.
+STATUS: DONE for CP07-B; CP07 remains PARTIAL for pattern metrics, proportional restriction restoration and production policy gates.
+NEXT CHECKPOINT: offer publication boundary, assessment lifecycle, worker scheduling and operational release evidence; continue the master plan.
