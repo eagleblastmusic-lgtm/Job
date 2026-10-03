@@ -70,7 +70,7 @@ export class RecruitmentService extends FaroStore {
   }
   view(userId: string, id: string) {
     const row = this.authorize(userId, id), candidate = row.candidate_id === userId;
-    const offer = this.offers.get(row.offer_id);
+    const offer = candidate?this.offers.published(row.offer_id):this.offers.get(row.offer_id);
     const events = (this.db.prepare('SELECT kind,data,occurred_at FROM faro_events WHERE process_id=? ORDER BY occurred_at,rowid').all(id) as Array<{kind:string;data:string;occurred_at:string}>).map(event=>{
       if(event.kind!=='ANSWER')return event;
       const data=JSON.parse(event.data) as Record<string,unknown>;
@@ -165,7 +165,10 @@ export class RecruitmentService extends FaroStore {
   }
   watches(userId: string) {
     const rows = this.db.prepare('SELECT offer_id FROM faro_watches WHERE candidate_id=? ORDER BY created_at DESC').all(userId) as Array<{ offer_id: string }>;
-    return rows.map(row => this.offers.get(row.offer_id));
+    return rows.flatMap(row=>{
+      try {return [this.offers.published(row.offer_id)];}
+      catch(error){if(error instanceof HttpError&&error.code==='PUBLICATION_NOT_FOUND')return [];throw error;}
+    });
   }
   grant(userId: string, id: string, grant: boolean) {
     const row = this.row(id);

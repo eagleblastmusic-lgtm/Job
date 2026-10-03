@@ -169,3 +169,16 @@ ROLLBACK: coordinated API/client revert, keep additive evidence table and keep e
 TESTED: build/lint/typecheck PASS; 26 migrations PASS; all 19 Faro scenarios PASS; all 8 desktop/mobile browser scenarios PASS, including both explanations, independent review, safe public reason and candidate appeal. Final own-export scope correction rechecked in privacy/interview scenarios.
 STATUS: DONE for CP07-B; CP07 remains PARTIAL for pattern metrics, proportional restriction restoration and production policy gates.
 NEXT CHECKPOINT: offer publication boundary, assessment lifecycle, worker scheduling and operational release evidence; continue the master plan.
+# CP04-B — Published offer facts and active recruiter boundary (2026-10-03)
+
+GOAL / SCOPE: protect candidate/watch projections from unapproved material offer edits and prevent intake after responsible recruiter revocation.
+DEPENDENCIES: immutable offer versions, review/publication lifecycle, private watch and process snapshot.
+IMPLEMENTATION / FILES: OfferService separates assigned draft reads and latest published reads with explicit version proof; candidate list/detail/watch/process diff follow published facts. Publishing stamps a version atomically; intake checks active role/assignment and publication. Edit/lifecycle rechecks revision inside transaction. RecruitmentService candidate comparisons use published facts; tests verify salary/title drafts stay private, diff after publication and revoked recruiter intake closure.
+DB CHANGE / MIGRATIONS: 0027_faro_offer_publication.sql, additive publication proof/date/actor and reconfirmation timestamp. Legacy approval/interest witnesses establish visibility without inventing publication dates; unproven watched drafts stay quarantined until review.
+ACCEPTANCE: assigned employer sees v2 draft while candidate/watch sees v1; outsider cannot read draft; candidate diff only changes after explicit publish; original interest remains on v1; responsible recruiter revocation removes public intake.
+LEGAL STATUS: manual publication/privacy foundation; salary law and production gates remain open.
+RISK / DEFERRED: legacy watcher-only versions without proof require operator review; no speculative backfill. Wider quality review and future AI offer generation are separate checkpoints.
+ROLLBACK: preserve additive publication history; coordinated code rollback must retain candidate draft filtering.
+TESTED: build/lint/typecheck PASS; 27 migrations PASS; all 20 Faro scenarios PASS; all 8 desktop/mobile browser scenarios PASS.
+STATUS: DONE for CP04-B publication boundary; wider CP04/CP08 acceptance remains in progress.
+NEXT CHECKPOINT: assessment lifecycle, scheduled delivery/worker operation and remaining release foundations.

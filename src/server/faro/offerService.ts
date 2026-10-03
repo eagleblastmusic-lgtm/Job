@@ -5,7 +5,7 @@ import { object, text, array, choice, integer, date, nullableBoolean } from './v
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
 import { materialDiff, explainOffer, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
-export interface OfferRecord { id: string; organizationId: string; company: string; status: OfferStatus; version: number; revision: number; approvedVersion: number | null; confirmedUntil: string | null; createdAt: string; data: OfferData; }
+export interface OfferRecord { id: string; organizationId: string; company: string; status: OfferStatus; version: number; revision: number; approvedVersion: number | null; confirmedUntil: string | null; createdAt: string; data: OfferData; publishedAt?:string|null; publicationSource?:string; }
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
     const s = object(raw), contract = choice(s.contract, ['UOP','CIVIL','B2B'] as const);
@@ -35,6 +35,13 @@ export class OfferService extends FaroStore {
     const row = this.db.prepare('SELECT content FROM faro_offer_versions WHERE offer_id=? AND version=?').get(id, version) as { content: string } | undefined;
     if (!row) throw new HttpError(404, 'Nie znaleziono wersji.'); return JSON.parse(row.content) as OfferData;
   }
+  published(id:string):OfferRecord {
+    const offer=this.get(id);
+    const version=this.db.prepare("SELECT version,content,published_at,publication_proof FROM faro_offer_versions WHERE offer_id=? AND publication_proof<>'NONE' ORDER BY version DESC LIMIT 1").get(id) as {version:number;content:string;published_at:string|null;publication_proof:string}|undefined;
+    if(!version)throw new HttpError(404,'Nie znaleziono potwierdzonej publikacji oferty.','PUBLICATION_NOT_FOUND');
+    return {...offer,version:version.version,data:JSON.parse(version.content) as OfferData,publishedAt:version.published_at,publicationSource:version.publication_proof,
+      status:['DRAFT','IN_REVIEW'].includes(offer.status)||(offer.status==='PUBLISHED'&&!this.intake(offer))?'PAUSED':offer.status};
+  }
   assigned(userId: string, offerId: string) {
     const offer = this.get(offerId); this.member(userId, offer.organizationId);
     if (!this.db.prepare('SELECT user_id FROM faro_assignments WHERE user_id=? AND offer_id=?').get(userId, offerId)) throw new HttpError(404, 'Nie znaleziono rekrutacji.', 'NOT_FOUND');
@@ -42,23 +49,26 @@ export class OfferService extends FaroStore {
   }
   intake(offer: OfferRecord) {
     const org = this.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(offer.organizationId) as { verification: string };
-    return offer.status === 'PUBLISHED' && offer.approvedVersion === offer.version && org.verification === 'VERIFIED' && Boolean(offer.confirmedUntil && offer.confirmedUntil > this.now()) && offer.data.closesAt > this.now();
+    const recruiter=this.db.prepare("SELECT m.user_id FROM faro_members m JOIN faro_assignments a ON a.user_id=m.user_id AND a.offer_id=? WHERE m.organization_id=? AND m.user_id=? AND m.active=1 AND m.role IN ('OWNER','ADMIN','RECRUITER')").get(offer.id,offer.organizationId,offer.data.recruiterId);
+    const publication=this.db.prepare("SELECT version FROM faro_offer_versions WHERE offer_id=? AND version=? AND publication_proof<>'NONE'").get(offer.id,offer.version);
+    return offer.status === 'PUBLISHED' && offer.approvedVersion === offer.version && org.verification === 'VERIFIED' && Boolean(recruiter&&publication) && Boolean(offer.confirmedUntil && offer.confirmedUntil > this.now()) && offer.data.closesAt > this.now();
   }
   list(userId: string, orgId?: string) {
     if (orgId) this.member(userId, orgId);
     const ids = (orgId ? this.db.prepare('SELECT id FROM faro_offers WHERE organization_id=?').all(orgId) : this.db.prepare("SELECT id FROM faro_offers WHERE status='PUBLISHED'").all()) as Array<{ id: string }>;
-    return sortOffers(ids.map(row => this.get(row.id)).filter(offer => orgId || this.intake(offer)));
+    return sortOffers(ids.map(row => this.get(row.id)).filter(offer => orgId || this.intake(offer)).map(offer=>orgId?offer:this.published(offer.id)));
   }
   detail(userId: string, id: string) {
-    const offer = this.get(id);
-    if (!this.intake(offer)) {
+    const current = this.get(id),assigned=Boolean(this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=? AND m.active=1 WHERE a.offer_id=? AND a.user_id=?').get(current.organizationId,id,userId));
+    if (!this.intake(current)) {
       const hasInterest = this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=?').get(userId, id);
       const watched = this.db.prepare('SELECT offer_id FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(userId, id);
       if (!hasInterest && !watched) this.assigned(userId, id);
     }
+    const offer=assigned?current:this.published(id);
     const p = new ProfileService(this.database, this.clock).profile(userId);
     const ownInterest=this.db.prepare('SELECT id,status FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,id)??null;
-    return { ...offer, ownInterest, acceptingInterest: this.intake(offer), explanation: explainOffer(offer.data, p.claims, p.learning) };
+    return { ...offer, ownInterest, acceptingInterest: this.intake(current), explanation: explainOffer(offer.data, p.claims, p.learning) };
   }
   create(userId: string, orgId: string, raw: Record<string, unknown>) {
     this.member(userId, orgId, ['OWNER','ADMIN','RECRUITER']); const data = parseOffer(raw);
@@ -78,6 +88,7 @@ export class OfferService extends FaroStore {
     if (['CLOSED','ARCHIVED','REMOVED'].includes(offer.status)) throw new HttpError(409, 'Ta oferta jest zakończona.');
     const diff = materialDiff(offer.data, data); if (!diff.length) return offer;
     this.transaction(() => {
+      if(this.get(id).revision!==offer.revision)throw new HttpError(409,'Oferta zmieniła się.','VERSION_CONFLICT');
       this.db.prepare('INSERT INTO faro_offer_versions(offer_id,version,content,author_id,created_at) VALUES(?,?,?,?,?)').run(id, offer.version + 1, JSON.stringify(data), userId, this.now());
       this.db.prepare("UPDATE faro_offers SET current_version=current_version+1,revision=revision+1,approved_version=NULL,status='DRAFT' WHERE id=?").run(id);
       this.db.prepare('INSERT OR IGNORE INTO faro_assignments(offer_id,user_id) VALUES(?,?)').run(id, data.recruiterId);
@@ -99,7 +110,12 @@ export class OfferService extends FaroStore {
     }
     const status: OfferStatus = ({ REVIEW: 'IN_REVIEW', PUBLISH: 'PUBLISHED', PAUSE: 'PAUSED', CLOSE: 'CLOSED', ARCHIVE: 'ARCHIVED', RECONFIRM: 'PUBLISHED' } as const)[action];
     this.transaction(() => {
+      if(this.get(id).revision!==offer.revision)throw new HttpError(409,'Oferta zmieniła się.','VERSION_CONFLICT');
       this.db.prepare('UPDATE faro_offers SET status=?,revision=revision+1,approved_version=?,confirmed_until=? WHERE id=?').run(status, publish ? offer.version : offer.approvedVersion, publish ? new Date(Math.min(Date.parse(offer.data.closesAt), this.clock().getTime() + 14 * 86400000)).toISOString() : offer.confirmedUntil, id);
+      if(publish) {
+        this.db.prepare("UPDATE faro_offer_versions SET publication_proof='EXPLICIT',published_at=COALESCE(published_at,?),published_by=COALESCE(published_by,?) WHERE offer_id=? AND version=?").run(this.now(),userId,id,offer.version);
+        this.db.prepare('UPDATE faro_offers SET confirmed_at=? WHERE id=?').run(this.now(),id);
+      }
       this.audit(userId, `OFFER_${action}`, id);
       if (publish || action === 'CLOSE') this.notifyChange(id, offer.version, action);
     }); return this.get(id);

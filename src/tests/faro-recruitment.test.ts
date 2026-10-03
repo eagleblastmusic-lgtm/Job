@@ -52,6 +52,10 @@ test('native process: private watch, identical preview, rejection requirement, c
     const updated = { ...o.data, hours: '9:00–17:00' };
     const edited = await f.request<OfferRecord>(`/api/faro/offers/${o.id}`, e.cookie, 'PUT', { data: updated, expectedVersion: o.revision });
     assert.equal(edited.version, 2); assert.equal(edited.approvedVersion, null); assert.equal(edited.status, 'DRAFT');
+    assert.equal(service.view(c.id, interest.id).changes.length,0);
+    assert.equal(service.view(e.id, interest.id).changes[0]!.field,'hours');
+    await f.request(`/api/faro/offers/${o.id}/lifecycle`,e.cookie,'POST',{action:'REVIEW',expectedVersion:edited.revision});
+    await f.request(`/api/faro/offers/${o.id}/lifecycle`,e.cookie,'POST',{action:'PUBLISH',expectedVersion:edited.revision+1,confirmed:true});
     assert.equal(service.view(c.id, interest.id).changes[0]!.field, 'hours');
     assert.equal(service.row(interest.id).offer_version, 1);
     await f.request(`/api/faro/processes/${interest.id}/commands`, c.cookie, 'POST', { command: 'WITHDRAW', expectedVersion: 2, idempotencyKey: 'withdraw' });
@@ -138,6 +142,30 @@ test('renewed interest requires conscious link to latest own terminal history an
     assert.deepEqual(await f.request(url,f.candidate.cookie,'POST',newBody,201),next);
     const detail=await f.request<{ownInterest:{id:string;status:string}}>(`/api/faro/offers/${f.offer.id}`,f.candidate.cookie);assert.equal(detail.ownInterest.id,next.id);
     assert.equal((await f.request<{ownInterest:unknown}>(`/api/faro/offers/${f.offer.id}`,f.employer.cookie)).ownInterest,null);
+  }finally{await f.close();}
+});
+
+test('unpublished material changes stay in employer scope until publication; watches and applicant diff retain last published facts; revoked recruiter closes intake',async()=>{
+  const f=await setup();try {
+    const offers=new OfferService(f.app.db),recruitment=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db);
+    recruitment.watch(f.candidate.id,f.offer.id,true);
+    const p=recruitment.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'publication-interest'});
+    const draft=offers.edit(f.employer.id,f.offer.id,{data:{...f.offer.data,role:'NIEPUBLIKOWANY SZKIC',salary:[{...f.offer.data.salary[0]!,min:900000,max:950000}]},expectedVersion:f.offer.revision});
+    assert.equal(offers.detail(f.employer.id,f.offer.id).version,2);
+    const visible=offers.detail(f.candidate.id,f.offer.id);assert.equal(visible.version,1);assert.equal(visible.status,'PAUSED');assert.equal(visible.acceptingInterest,false);
+    assert.doesNotMatch(JSON.stringify(visible),/NIEPUBLIKOWANY|900000/);
+    assert.doesNotMatch(JSON.stringify(recruitment.watches(f.candidate.id)),/NIEPUBLIKOWANY|900000/);
+    assert.equal(recruitment.view(f.candidate.id,p.id).changes.length,0);
+    await f.request(`/api/faro/offers/${f.offer.id}`,f.outsider.cookie,'GET',undefined,404);
+    offers.lifecycle(f.employer.id,f.offer.id,{action:'REVIEW',expectedVersion:draft.revision});
+    assert.equal(offers.detail(f.candidate.id,f.offer.id).version,1);
+    offers.lifecycle(f.employer.id,f.offer.id,{action:'PUBLISH',expectedVersion:draft.revision+1,confirmed:true});
+    const published=offers.detail(f.candidate.id,f.offer.id);assert.equal(published.version,2);assert.equal(published.publicationSource,'EXPLICIT');assert.ok(published.publishedAt);
+    assert.equal(recruitment.view(f.candidate.id,p.id).changes.find(c=>c.field==='role')?.after,'NIEPUBLIKOWANY SZKIC');
+    assert.equal(recruitment.row(p.id).offer_version,1);
+    f.app.db.db.prepare('UPDATE faro_members SET active=0 WHERE user_id=? AND organization_id=?').run(f.employer.id,f.org.id);
+    assert.equal(offers.intake(offers.get(f.offer.id)),false);assert.equal(offers.list(f.candidate.id).length,0);
+    await f.request(`/api/faro/offers/${f.offer.id}/interest`,f.outsider.cookie,'POST',{offerVersion:2,projectionConfirmed:true,idempotencyKey:'revoked-recruiter'},409);
   }finally{await f.close();}
 });
 
