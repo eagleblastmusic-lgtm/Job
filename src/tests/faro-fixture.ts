@@ -23,3 +23,7 @@ export async function faroFixture() {
   }
   return { app, base, request, user, close: async () => { await app.close(); await rm(dir, { recursive: true, force: true }); } };
 }
+
+export function offerInput(recruiterId: string) {
+  return { role: 'Obsługa klienta', responsibilities: ['Pomoc klientom'], requirements: [{ id: 'req-customer', skillId: 'faro:activity:customer-service', kind: 'MUST_HAVE', level: 'BASICS', rationale: 'Codzienny kontakt z klientem' }, { id: 'req-cash', skillId: 'faro:activity:cash-register', kind: 'WILL_TEACH', level: 'BASICS', rationale: 'Wdrożenie z opiekunem' }], salary: [{ contract: 'UOP', basis: 'GROSS_EMPLOYMENT', min: 550000, max: 650000, currency: 'PLN', period: 'MONTH', variable: '', hoursPerPeriod: 168, ftePercent: 100 }], location: 'Cała Polska', workModel: 'REMOTE', remoteDays: 5, hours: '8:00–16:00', shifts: 'Jedna zmiana', nights: false, weekends: false, learningSupport: 'Opiekun podczas wdrożenia', responseHours: 48, stages: ['Rozmowa'], assessmentMinutes: 0, interviewCount: 1, decisionHours: 72, closesAt: new Date(Date.now() + 30 * 86400000).toISOString(), recruiterId };
+}

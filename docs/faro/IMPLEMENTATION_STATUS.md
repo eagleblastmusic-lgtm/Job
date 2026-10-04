@@ -33,3 +33,13 @@ MIGRATIONS: 0020 additive; existing data untouched.
 RISKS: ESCO licensed mapping, MFA/recovery, full UI, process assignments and backup owner transfer remain open; local authored labels explicitly not labelled ESCO.
 DEFERRED: external AI provider activation, real-data production (runtime returns RELEASE_GATES_OPEN in production).
 NEXT CHECKPOINT: CP04/CP05 native offers and deterministic matching; then CP06 transactional recruitment.
+
+## CP04–CP06 native process delivery
+
+DONE: typed salary-required native offers with human review and immutable versions; material diff; deterministic requirement matching; transactional interest, original snapshot, actor/state/version/idempotency checks, structured rejection bound to original requirement, separate clocks, private watch, explicit phone grant/revoke, durable deduplicated outbox/inbox.
+TESTED: build PASS; 21 migrations PASS; 3 end-to-end API contract tests PASS covering full interest/advance/withdraw flow, foreign organization denial, salary/paused/stale restrictions, missing rejection requirement, immutable diff, billing invariance and notification replay.
+CHANGED FILES: migrations/0021_faro_recruitment.sql; domain/faro/{offers,recruitment}.ts; server/faro/{offerService,recruitmentService,api}.ts; tests/faro-{fixture,recruitment}.ts.
+MIGRATIONS: 0021 additive.
+RISKS: periodic worker, moderation, UI and appointments not yet delivered; active confirmation interval 14 elapsed days is provisional local policy TEST FIRST, not a release-approved standard.
+DEFERRED: production legal gates; business-day SLA calendar (current contract explicitly elapsed calendar hours).
+NEXT CHECKPOINT: CP07 trust worker; CP08 workspace; CP09/CP10 economics and assessments.
