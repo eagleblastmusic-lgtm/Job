@@ -324,3 +324,19 @@ RISK / DEFERRED: immutable result correction, accommodation/retry and complex/ma
 ROLLBACK: revert API/client together while retaining transactional stale/result guards and immutable event history.
 STATUS: DONE for CP10-D; overall CP10 PARTIAL.
 NEXT CHECKPOINT: final CI for this checkpoint and remaining trust/assessment/domain engineering.
+
+## CP07-D — Private factual reliability report (2026-10-04)
+ID / TITLE: CP07-D, explicit response/progression cohorts.
+GOAL / PURPOSE / CURRENT GAP: deadline history existed but had no inspectable denominator/median/censored-wait report; fast rejections could look like complete success without progression context.
+SCOPE / IMPLEMENTATION / FILES: domain/faro/reliability.ts pure calculation; TrustService scoped consistent report; api.ts; client types/views/controller portal organization section; new reliability tests and expanded existing browser journey.
+DB CHANGE / MIGRATIONS: none; original dueAt and immutable events reused.
+API CHANGE: owner/admin organization reliability GET, explicit past window or server last30days; max366days/10000records, no silent truncation; private aggregates only.
+FRONTEND CHANGE: original organization portal shows window/asOf/sample/matured denominator, early withdrawals, median answered n, unanswered/current waits/overdue age and distinct progression/assessment/confirmed-interview/rejection counts. No percentage headline or global score.
+DEPENDENCIES: CP06 immutable clocks/events, CP07 private scope, CP08 components, CP11-A erasure limits acknowledged.
+TESTS / TESTED: build/typecheck/lint and2 reliability scenarios PASS; expanded candidate/employer browser workflow PASS mobile/desktop with actual sample and axe. Historical unaffected contracts retain prior evidence; new remote CI pending.
+ACCEPTANCE CRITERIA: exact original dueAt; early withdrawal never credited as response; unanswered censoring beside median; empty denominator/null median is insufficient data; deduped progression distinct from rejection; no private identities/watchers, no automatic sanction/case/ranking change; no hidden truncation.
+LEGAL STATUS: local private factual report; public metrics/small-sample disclosure and operational/legal policy remain review gates.
+RISK / DEFERRED: retained records only, erasure changes cohorts; no public reputation, fraud inference, approved pattern threshold, similar-offer/repost linkage or automatic consequences. Default30days is reporting presentation, not sanction policy; custom window API supported, UI selector pending.
+ROLLBACK: remove report endpoint/portal section together; underlying immutable clocks/events retained.
+STATUS: DONE for CP07-D private foundation; full K041/K082 and CP07 remain PARTIAL.
+NEXT CHECKPOINT: new CI acceptance, remaining trust/moderation and assessment engineering.

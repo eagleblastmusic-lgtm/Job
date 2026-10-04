@@ -85,6 +85,12 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();
     await login(page,f.base,employer.email);
     await page.locator('#f-role').selectOption('employer');
+    await page.getByRole('link',{name:'Organizacja',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Rzetelność procesu — fakty'})).toBeVisible();
+    await expect(page.getByText('Brak dojrzałej próby',{exact:true})).toBeVisible();
+    await expect(page.locator('.f-facts dt').filter({hasText:'Zgłoszenia w oknie'}).locator('xpath=following-sibling::dd[1]')).toHaveText('1');
+    expect((await new AxeBuilder({page}).include('#appView').analyze()).violations).toEqual([]);
+    await page.getByRole('link',{name:'Oferty',exact:true}).click();
     await page.locator(`.f-offer-card[href="#employer/${draft.id}"]`).click();
     await page.locator('.f-detail').getByRole('link',{name:'Zgłoszenia',exact:true}).click();
     await page.getByRole('heading',{name:'Anna',exact:true}).click();

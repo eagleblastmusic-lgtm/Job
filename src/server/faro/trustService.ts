@@ -3,10 +3,24 @@ import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { InterviewService } from './interviewService.js';
 import { AssessmentService } from './assessmentService.js';
+import { reliabilitySnapshot,type ReliabilityInterest,type ReliabilityEvent } from '../../domain/faro/reliability.js';
 import { HttpError } from '../http.js';
 import { text, choice, date, integer } from './validation.js';
 interface CaseRow {id:string;organization_id:string;process_id:string|null;reporter_id:string|null;kind:string;state:string;revision:number;explanation_due_at:string|null;public_reason:string|null;statement:string;decision:string|null;review_at:string|null;created_at:string;}
 export class TrustService extends FaroStore {
+  reliability(userId:string,orgId:string,from:string,to:string) {
+    this.member(userId,orgId,['OWNER','ADMIN']);
+    const asOf=this.now();
+    const start=from||to?date(from):new Date(Date.parse(asOf)-30*86400000).toISOString(),end=from||to?date(to):asOf;
+    if(start>=end||end>asOf||Date.parse(end)-Date.parse(start)>366*86400000)throw new HttpError(400,'Wybierz przeszłe okno do 366 dni.','INVALID_METRICS_WINDOW');
+    return this.transaction(()=>{
+      this.member(userId,orgId,['OWNER','ADMIN']);
+      const rows=this.db.prepare("SELECT p.id,p.created_at createdAt,p.response_due_at responseDueAt,p.first_response_at firstResponseAt,p.status,(SELECT MIN(occurred_at) FROM faro_events WHERE process_id=p.id AND kind='WITHDRAW') withdrawnAt FROM faro_interests p JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=? AND p.created_at>=? AND p.created_at<? ORDER BY p.created_at LIMIT 10001").all(orgId,start,end) as unknown as ReliabilityInterest[];
+      if(rows.length>10000)throw new HttpError(400,'Zawęź okno raportu. Nie pokazujemy uciętych statystyk.','METRICS_WINDOW_TOO_LARGE');
+      const events=this.db.prepare("SELECT e.process_id processId,e.kind,e.occurred_at createdAt FROM faro_events e JOIN faro_interests p ON p.id=e.process_id JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=? AND p.created_at>=? AND p.created_at<? AND e.kind IN ('ADVANCE','ASSESSMENT_ASSIGNED','INTERVIEW_CONFIRM','REJECT')").all(orgId,start,end) as unknown as ReliabilityEvent[];
+      return reliabilitySnapshot(rows,events,start,end,asOf);
+    });
+  }
   notifyModerators(id:string,message:string,key:string) {
     const recipients=this.db.prepare("SELECT id FROM users WHERE role='ADMIN'").all() as Array<{id:string}>;
     for(const recipient of recipients)new RecruitmentService(this.database,this.clock).enqueue(recipient.id,'case',id,message,key);

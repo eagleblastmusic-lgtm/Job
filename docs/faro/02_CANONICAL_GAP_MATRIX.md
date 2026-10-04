@@ -532,3 +532,5 @@ Acceptance: Żadna niepodparta statystykaEB nie jest przedstawiana jako fakt; ka
 | INV16 | Retentionnieexpiry | CP03 + CP11 result retention independent of claim |
 
 Legacy crosswalk: all 72 records retained at `source/FARO-CANONICAL/specs/legacy-backlog-crosswalk.json`; targets resolved against all 86 K IDs. Rejected historical decisions are not implementation authorization.
+
+Execution delta2026-10-04: K041 PARTIAL — private organization owner/admin cohort report and real workspace now implemented (CP07-D); original deadline numerator/denominator, n/window/exclusions/censored unanswered/median and progress counts tested. Public reputation/low-sample policy and external validation remain LEGAL REVIEW/TEST FIRST. K082 PARTIAL — existing private cases/independent review plus these factual inputs; similarity/repost identity, evergreen exceptions and approved pattern policy remain missing. No count is a fraud verdict or automatic penalty. Baseline rows above continue to describe the audited original main.

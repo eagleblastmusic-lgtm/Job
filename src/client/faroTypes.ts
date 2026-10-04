@@ -64,3 +64,11 @@ export interface AssessmentDefinition {
   title:string; timeLimitMinutes:number; expectedMinutes:number; rubricVersion:string;
   tasks:Array<{prompt:string;options:string[];answer:number;points:number}>;
 }
+
+export interface Reliability {
+  window:{from:string;to:string;asOf:string};sampleSize:number;maturedCohort:number;
+  exclusions:{withdrawnBeforeOriginalDeadline:number};
+  firstResponse:{numerator:number;denominator:number;answered:number;late:number;unanswered:number;rightCensored:number;medianAnsweredHours:number|null;medianSampleSize:number};
+  currentWaiting:{count:number;overdue:number;maxOverdueHours:number|null};
+  progression:{processesWithNextStage:number;processesWithAssessmentInvitation:number;processesWithConfirmedInterview:number;processesRejected:number};
+}
