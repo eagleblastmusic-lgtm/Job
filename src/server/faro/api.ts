@@ -51,6 +51,10 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (proposal && method === 'POST') return ok(profiles.decideProposal(user.id, proposal[1]!, body));
     if (path === '/api/faro/organizations' && method === 'GET') return ok({ organizations: profiles.organizations(user.id) });
     if (path === '/api/faro/organizations' && method === 'POST') return ok(profiles.organization(user.id, body), 201);
+    const restrictions=path.match(/^\/api\/faro\/organizations\/([^/]+)\/restrictions$/);
+    if(restrictions&&method==='GET')return ok({restrictions:trust.restrictions(user.id,restrictions[1]!)});
+    const restrictionCommand=path.match(/^\/api\/faro\/restrictions\/([^/]+)\/(appeal|restore)$/);
+    if(restrictionCommand&&method==='POST')return ok(restrictionCommand[2]==='appeal'?trust.appealRestriction(user.id,restrictionCommand[1]!,body):trust.restoreRestriction(user.id,restrictionCommand[1]!,body));
     const verify = path.match(/^\/api\/faro\/organizations\/([^/]+)\/verify$/);
     if (verify && method === 'POST') { profiles.verify(user.id, verify[1]!, text(body.note, 1000, 10)); return ok({ ok: true }); }
     const invites = path.match(/^\/api\/faro\/organizations\/([^/]+)\/invites$/);
