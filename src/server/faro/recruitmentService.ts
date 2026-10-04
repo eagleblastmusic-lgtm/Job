@@ -217,17 +217,68 @@ export class RecruitmentService extends FaroStore {
     this.audit(userId, 'GRANTED_PHONE_READ', id);
     return { phone: new ProfileService(this.database, this.clock).profile(row.candidate_id).phone };
   }
-  deliverOutbox() {
-    const rows = this.db.prepare("SELECT * FROM faro_outbox WHERE status='PENDING' AND next_attempt_at<=? ORDER BY next_attempt_at LIMIT 100").all(this.now()) as unknown as Array<{ id: string; recipient_id: string; entity_type: string; entity_id: string; message: string; dedupe_key: string; attempts: number }>;
-    for (const row of rows) {
-      try {
-        this.transaction(() => {
-          this.db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,notification_type,entity_type,entity_id,message,dedupe_key,created_at,updated_at) VALUES(?,?,'FOLLOW_UP',?,?,?,?,?,?)").run(randomUUID(), row.recipient_id, row.entity_type, row.entity_id, row.message, `faro:${row.dedupe_key}`, this.now(), this.now());
-          this.db.prepare("UPDATE faro_outbox SET status='DELIVERED',attempts=attempts+1,error_code=NULL WHERE id=?").run(row.id);
-        });
-      } catch {
-        this.db.prepare('UPDATE faro_outbox SET attempts=attempts+1,status=?,error_code=?,next_attempt_at=? WHERE id=?').run(row.attempts >= 4 ? 'DEAD_LETTER' : 'PENDING', 'DELIVERY_FAILED', new Date(this.clock().getTime() + Math.min(3600000, 1000 * 2 ** row.attempts)).toISOString(), row.id);
-      }
+  claimOutbox(limit=100,leaseMs=30000) {
+    integer(limit,1,100);integer(leaseMs,1000,300000);
+    return this.transaction(()=>{
+      const now=this.now(),until=new Date(this.clock().getTime()+leaseMs).toISOString();
+      // A crashed reservation consumes its attempt budget; expiry never grants an unbounded retry loop.
+      this.db.prepare("UPDATE faro_outbox SET status='DEAD_LETTER',error_code=CASE WHEN lease_until IS NULL THEN 'ATTEMPT_BUDGET_EXHAUSTED' ELSE 'LEASE_EXPIRED' END,claim_token=NULL,lease_until=NULL WHERE status='PENDING' AND attempts>=max_attempts AND (lease_until IS NULL OR lease_until<=?)").run(now);
+      const rows=this.db.prepare("SELECT id FROM faro_outbox WHERE status='PENDING' AND attempts<max_attempts AND next_attempt_at<=? AND (lease_until IS NULL OR lease_until<=?) ORDER BY next_attempt_at,id LIMIT ?").all(now,now,limit) as Array<{id:string}>;
+      return rows.map(row=>{
+        const claimToken=randomUUID();
+        this.db.prepare('UPDATE faro_outbox SET claim_token=?,lease_until=?,attempts=attempts+1 WHERE id=?').run(claimToken,until,row.id);
+        return {id:row.id,claimToken};
+      });
+    });
+  }
+  private outboxEligible(row:{recipient_id:string;entity_type:string;entity_id:string;dedupe_key:string}) {
+    if(row.entity_type!=='offer')return true;
+    const watch=this.db.prepare('SELECT alerts FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(row.recipient_id,row.entity_id) as {alerts:number}|undefined;
+    if(watch?.alerts===1)return true;
+    if(row.dedupe_key.endsWith(':closing-soon'))return false;
+    return !!this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=?').get(row.recipient_id,row.entity_id);
+  }
+  deliverClaimedOutbox(id:string,claimToken:string) {
+    try {
+      return this.transaction(()=>{
+        const row=this.db.prepare("SELECT recipient_id,entity_type,entity_id,message,dedupe_key FROM faro_outbox WHERE id=? AND status='PENDING' AND claim_token=? AND lease_until>?").get(id,claimToken,this.now()) as {recipient_id:string;entity_type:string;entity_id:string;message:string;dedupe_key:string}|undefined;
+        // Re-read under the write transaction. Erasure/mute or an expired/replaced claim cannot deliver cached content.
+        if(!row)return false;
+        if(!this.outboxEligible(row)) {
+          this.db.prepare('DELETE FROM faro_outbox WHERE id=? AND claim_token=?').run(id,claimToken);
+          return false;
+        }
+        this.db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,notification_type,entity_type,entity_id,message,dedupe_key,created_at,updated_at) VALUES(?,?,'FOLLOW_UP',?,?,?,?,?,?)").run(randomUUID(),row.recipient_id,row.entity_type,row.entity_id,row.message,`faro:${row.dedupe_key}`,this.now(),this.now());
+        this.db.prepare("UPDATE faro_outbox SET status='DELIVERED',error_code=NULL,claim_token=NULL,lease_until=NULL WHERE id=? AND claim_token=?").run(id,claimToken);
+        return true;
+      });
+    } catch {
+      // Preserve a newer owner's claim if this worker resumes after its lease expired.
+      this.transaction(()=>{
+        const row=this.db.prepare("SELECT attempts,max_attempts FROM faro_outbox WHERE id=? AND status='PENDING' AND claim_token=? AND lease_until>?").get(id,claimToken,this.now()) as {attempts:number;max_attempts:number}|undefined;
+        if(!row)return;
+        this.db.prepare('UPDATE faro_outbox SET status=?,error_code=?,next_attempt_at=?,claim_token=NULL,lease_until=NULL WHERE id=? AND claim_token=?').run(row.attempts>=row.max_attempts?'DEAD_LETTER':'PENDING','DELIVERY_FAILED',new Date(this.clock().getTime()+Math.min(3600000,1000*2**Math.min(row.attempts-1,12))).toISOString(),id,claimToken);
+      });
+      return false;
     }
+  }
+  deliverOutbox() {
+    for(const claim of this.claimOutbox())this.deliverClaimedOutbox(claim.id,claim.claimToken);
+  }
+  retryDeadLetter(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{if((this.db.prepare('SELECT role FROM users WHERE id=?').get(userId) as {role:string}|undefined)?.role!=='ADMIN')throw new HttpError(403,'Wymagany administrator.','FORBIDDEN');};
+    authorize();
+    return this.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'OUTBOX_RETRY'},()=>{
+      authorize();
+      const row=this.db.prepare('SELECT status,attempts,recipient_id,entity_type,entity_id,dedupe_key FROM faro_outbox WHERE id=?').get(id) as {status:string;attempts:number;recipient_id:string;entity_type:string;entity_id:string;dedupe_key:string}|undefined;
+      if(!row)throw new HttpError(404,'Nie znaleziono operacji.');
+      if(row.status!=='DEAD_LETTER'||integer(body.expectedAttempts)!==row.attempts)throw new HttpError(409,'Stan operacji zmienił się.','VERSION_CONFLICT');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź sprawdzenie przyczyny niepowodzenia.','CONFIRMATION_REQUIRED');
+      const reasonCode=choice(body.reasonCode,['TRANSIENT_FAILURE_RESOLVED','LEASE_RECOVERY_REVIEWED'] as const);
+      if(!this.outboxEligible(row))throw new HttpError(409,'Operacja nie spełnia aktualnych warunków dostarczenia.','OUTBOX_NO_LONGER_ELIGIBLE');
+      this.db.prepare("UPDATE faro_outbox SET status='PENDING',max_attempts=?,next_attempt_at=?,claim_token=NULL,lease_until=NULL WHERE id=?").run(row.attempts+5,this.now(),id);
+      this.audit(userId,`OUTBOX_RETRY_${reasonCode}`,id);
+      return {id,queued:true};
+    });
   }
 }

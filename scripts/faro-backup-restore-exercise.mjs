@@ -51,6 +51,9 @@ try {
   const otherOffer=offers.create(kept.id,otherOrg.id,offerInput(kept.id));
   offers.lifecycle(kept.id,otherOffer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(kept.id,otherOffer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
   const backup=join(root,'backup');await mkdir(backup);
+  r.enqueue(kept.id,'process',surviving.id,'Syntetyczna aktualizacja odtworzenia.','restore-lease-proof');
+  const leasedId=f.app.db.db.prepare("SELECT id FROM faro_outbox WHERE dedupe_key='restore-lease-proof'").get().id;
+  const oldClaim=r.claimOutbox(100,300000).find(claim=>claim.id===leasedId);assert.ok(oldClaim);
   const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
   await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
   // Current source advances after the old snapshot: owner transfer and two erasures.
@@ -77,6 +80,9 @@ try {
     assert.equal(db.prepare('SELECT process_id FROM faro_contact_grants WHERE process_id=?').get(removed.id),undefined);
     assert.deepEqual(pr.projection(kept.id),before);assert.equal(pr.member(successor.id,org.id).role,'OWNER');
     assert.equal(rec.row(surviving.id).first_response_at,firstClock);assert.equal(rec.row(surviving.id).status,'ACTIVE');
+    const restoredClaim=db.prepare('SELECT claim_token,lease_until,attempts FROM faro_outbox WHERE id=?').get(oldClaim.id);
+    assert.deepEqual({...restoredClaim},{claim_token:null,lease_until:null,attempts:1});
+    assert.equal(rec.deliverClaimedOutbox(oldClaim.id,oldClaim.claimToken),false,'historical reservation must not deliver into restored DB');
     assert.equal(new InterviewService(restored).row(slot.id).state,'CANCELLED');
     assert.equal(new OfferService(restored).get(offer.id).status,'PAUSED');
     assert.equal(new OfferService(restored).get(otherOffer.id).status,'PAUSED');

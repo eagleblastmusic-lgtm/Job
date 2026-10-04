@@ -145,3 +145,14 @@ Initial planned PR IDs above remain the intended capability sequence, not a clai
 | Versioned offers and interest | [#42](https://github.com/eagleblastmusic-lgtm/Job/pull/42) | codex/faro-03-recruitment | previous | de1d3ec | 0021 | concurrency/clock/version review; later hardening required before activation |
 
 All are draft and unmerged. Each compares only its checkpoint with the previous branch. Later checkpoint commits remain on codex/faro-canonical for integration CI; no giant implementation PR was opened. Original historical CI failures are disclosed in each body. Later phone/publication/preview fixes do not retroactively certify intermediate snapshots. Revert code/runtime changes together; keep initial plan and additive data history. Main remains ae4af4e.
+
+## Current dependent checkpoint slices (2026-10-04, supersedes older table scope)
+| Slice | Draft | Branch | Base | Code checkpoint | Migration |
+| --- | --- | --- | --- | --- | --- |
+| Assessment/trust/economics foundations | [#43](https://github.com/eagleblastmusic-lgtm/Job/pull/43) | codex/faro-04-foundations | codex/faro-03-recruitment | 82bdb1a | 0022 |
+| CP11-F default browser and historical disposition | [#44](https://github.com/eagleblastmusic-lgtm/Job/pull/44) | codex/faro-cp11f-browser | codex/faro-cp11f-base | 6a4be07 | none |
+| CP05-B explicit private comparable salary minimum | [#45](https://github.com/eagleblastmusic-lgtm/Job/pull/45) | codex/faro-cp05b-salary | codex/faro-cp11f-browser | d75bc7f | none |
+| CP10-G attempt technical incident/human resolution | [#46](https://github.com/eagleblastmusic-lgtm/Job/pull/46) | codex/faro-cp10g-incidents | codex/faro-cp05b-salary | e42798e | 0029 |
+| CP06-I durable outbox lease/conscious retry | [#47](https://github.com/eagleblastmusic-lgtm/Job/pull/47) | codex/faro-cp06i-outbox | codex/faro-cp10g-incidents | a4755a6 | 0030 |
+
+All five are verified OPEN/DRAFT/unmerged. CP11-F base pins the existing integration at1816066; it is deliberately not main and not a claim that earlier hardening was merged. Earlier integration checkpoints remain dependencies that need their own review/slicing before main integration. This table records bounded review diffs, not a release-ready stack. Later documentation-only acceptance updates do not change the listed code checkpoints. Current main must be rechecked at integration time; the historical ae4af4e statement above is not a current-main assertion. No force push, merge or deployment performed.

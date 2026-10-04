@@ -115,8 +115,10 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     }
     if (path === '/api/faro/worker/status' && method === 'GET') {
       if (user.role !== 'ADMIN') throw new HttpError(403, 'Wymagany administrator.', 'FORBIDDEN');
-      return ok({ ...worker.status(), outbox: db.db.prepare('SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status').all() });
+      return ok({ ...worker.status(), outbox: db.db.prepare('SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status').all(), leases:db.db.prepare("SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>?").get(new Date().toISOString()) });
     }
+    const outboxRetry=path.match(/^\/api\/faro\/worker\/outbox\/([^/]+)\/retry$/);
+    if(outboxRetry&&method==='POST')return ok(recruitment.retryDeadLetter(user.id,outboxRetry[1]!,body));
     const report = path.match(/^\/api\/faro\/processes\/([^/]+)\/reports$/);
     if (report && method === 'POST') return ok(trust.report(user.id, report[1]!, body), 201);
     if (path === '/api/faro/cases' && method === 'GET') return ok({ cases: trust.list(user.id) });

@@ -68,6 +68,8 @@ export class RecoveryService extends FaroStore {
       const oldAssignments=this.db.prepare('SELECT offer_id,user_id FROM faro_assignments').all() as Array<{offer_id:string;user_id:string}>;
       for(const old of oldAssignments)if(!assignments.has(JSON.stringify([old.offer_id,old.user_id])))this.db.prepare('DELETE FROM faro_assignments WHERE offer_id=? AND user_id=?').run(old.offer_id,old.user_id);
       const invalidatedSessions=Number(this.db.prepare('DELETE FROM sessions').run().changes);
+      // An old worker reservation is not authority to deliver into a restored database.
+      this.db.prepare('UPDATE faro_outbox SET claim_token=NULL,lease_until=NULL WHERE claim_token IS NOT NULL').run();
       this.db.prepare('DELETE FROM faro_invites').run();
       const revokedPhoneGrants=Number(this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE revoked_at IS NULL').run(this.now()).changes);
       for(const user of users) {
