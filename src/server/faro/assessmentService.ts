@@ -111,9 +111,12 @@ export class AssessmentService extends FaroStore {
   overview(userId: string, id: string) {
     const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
     const candidate = process.candidate_id === userId;
-    return { id, processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
+    const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
+    const savedAnswers=JSON.parse(row.answers) as Record<string,number>;
+    return { id, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
-      answers: candidate ? JSON.parse(row.answers) as Record<string, number> : {}, result: row.result && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
+      reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
+      answers: candidate ? savedAnswers : {}, result: row.result && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
   }
   attempts(userId: string, processId?: string) {
     if (processId) this.recruitment.authorize(userId, processId);

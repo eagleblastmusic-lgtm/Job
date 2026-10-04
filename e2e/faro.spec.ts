@@ -293,6 +293,8 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);
     await page.goto(`${f.base}/#attempts/${id}`);
     await expect(page.getByText('Liczba zadań',{exact:true})).toBeVisible();
+    await expect(page.getByText(/Odpowiedzi robocze nie są pokazywane firmie/)).toBeVisible();
+    await expect(page.getByRole('link',{name:'formularz problemu w procesie'})).toBeVisible();
     await expect(page.getByText('Co robisz najpierw?',{exact:true})).toHaveCount(0);
     await page.getByRole('button',{name:'Rozpocznij assessment'}).click();
     await page.getByLabel('Słucham klienta',{exact:true}).check();
@@ -302,6 +304,9 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await expect(page.getByRole('heading',{name:'Wynik w tej rekrutacji'})).toHaveCount(0);
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,employer.email);
     await page.locator('#f-role').selectOption('employer');await page.goto(`${f.base}/#attempts/${id}`);
+    await expect(page.getByRole('heading',{name:'Odpowiedzi do przeglądu'})).toBeVisible();
+    await expect(page.getByText('Odpowiedź kandydata: Słucham klienta',{exact:true})).toBeVisible();
+    await expect(page.getByText(/Odpowiedź kandydata: Brak odpowiedzi/)).toBeVisible();
     await page.locator('[data-form=attempt-review] [name=note]').fill('Sprawdzono odpowiedź zgodnie z rubryką.');
     await page.locator('[data-form=attempt-review] [name=confirmed]').check();
     await page.getByRole('button',{name:'Udostępnij wynik kandydatowi'}).click();

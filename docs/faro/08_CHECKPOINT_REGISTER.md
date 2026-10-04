@@ -363,3 +363,19 @@ RISK / DEFERRED: retained records only, erasure changes cohorts; no public reput
 ROLLBACK: remove report endpoint/portal section together; underlying immutable clocks/events retained.
 STATUS: DONE for CP07-D private foundation; full K041/K082 and CP07 remain PARTIAL.
 NEXT CHECKPOINT: new CI acceptance, remaining trust/moderation and assessment engineering.
+
+## CP10-E — Meaningful review of pinned submitted answers (2026-10-04)
+ID / TITLE: CP10-E, make human review inspectable.
+GOAL / PURPOSE / CURRENT GAP: employer result page showed points without submitted choice/key/question; oversight could become a blind checkbox. Candidate pre-Start lacked exact disclosure/help and employer could see candidate-only buttons.
+SCOPE / IMPLEMENTATION / FILES: assessmentService overview allowlist; client types/attemptView role-aware actions and pinned response/key display; assessment API/browser assertions; documentation.
+DB CHANGE / MIGRATIONS: none; immutable attempt definition/answers reused.
+API CHANGE: viewer and submitted-only employer reviewTasks. Candidate remains key-free; employer draft answers remain private.
+FRONTEND CHANGE: assigned employer sees question/chosen answer/key/possible points and rubric before finalizing; before Start candidate sees disclosure and existing private technical help path. No timer reset or automated penalty promise.
+DEPENDENCIES: CP10-C pinned definitions, CP10-D guarded human review, CP07 private reports, CP08 forms.
+TESTS / TESTED: build/typecheck/lint,6 assessment/economics/trust scenarios and expanded real review journey desktop/mobile(2) PASS. Candidate reviewTasks empty even after result; employer before submission gets no chosen answer; unanswered differs from wrong choice.
+ACCEPTANCE CRITERIA: reviewer can inspect actual submitted answer against original rubric/key; no live draft monitoring or candidate key response; explicit pre-Start disclosure and technical help; candidate-only actions not shown to employer.
+LEGAL STATUS: local foundation; production scoring/quality/fairness gates unchanged.
+RISK / DEFERRED: objective quiz only; missing answer is null. Structured technical incident/retry policy and immutable correction remain separate pending requirements; no AI/manual complex scoring is implied.
+ROLLBACK: revert DTO/UI together, retain candidate/draft answer boundary and human review gate.
+STATUS: DONE for CP10-E; overall CP10 PARTIAL.
+NEXT CHECKPOINT: stable curated skill identities independent of legacy ontology ordering; current CI acceptance.

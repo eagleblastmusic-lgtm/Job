@@ -44,6 +44,8 @@ export interface Process {
   contactGrant: { granted_at: string; revoked_at: string | null } | null;
 }
 export interface Attempt {
+  viewer:'CANDIDATE'|'EMPLOYER';rubricVersion:string;
+  reviewTasks:Array<{id:string;prompt:string;options:string[];points:number;correctOption:number;chosenOption:number|null}>;
   processVersion:number;
   id: string; title: string; state: string; processId: string; taskCount: number; timeLimitMinutes: number; expectedMinutes: number;
   deadline: string; startedAt: string | null; expiresAt: string | null; serverNow: string; revision: number;
