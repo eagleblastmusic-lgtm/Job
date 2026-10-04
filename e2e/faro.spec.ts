@@ -27,6 +27,7 @@ test('Faro real candidate and employer process, private watch, economics and res
     await login(page, f.base, candidate.email);
     await page.getByRole('link', { name: 'Profil', exact: true }).click();
     await page.locator('[data-form=profile] [name=firstName]').fill('Anna');
+    await page.locator('[data-form=profile] [name=phone]').fill('+48500100200');
     await page.getByRole('button', { name: 'Zapisz profil', exact: true }).click();
     await expect(page.locator('#f-status')).toHaveText('Zapisano.');
     await page.getByText('Dodaj kompetencję', { exact: true }).click();
@@ -107,6 +108,16 @@ test('Faro real candidate and employer process, private watch, economics and res
     await expect(page.locator('#f-interview-list').getByText('Termin zaproponowany',{exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();
     await login(page,f.base,candidate.email);await page.goto(`${f.base}/#processes/${processId}`);
+    await page.getByRole('button',{name:'Udostępnij telefon tej rekrutacji',exact:true}).click();
+    const phoneDialog=page.getByRole('dialog');await expect(phoneDialog).toContainText('+48500100200');
+    expect((await f.request<{contactGrant:unknown}>(`/api/faro/processes/${processId}`,candidate.cookie)).contactGrant).toBeNull();
+    await phoneDialog.locator('[name=phoneConfirmed]').check();
+    await phoneDialog.getByRole('button',{name:'Potwierdź udostępnienie',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Cofnij udostępnienie telefonu'})).toBeVisible();
+    expect((await f.request<{phone:string}>(`/api/faro/processes/${processId}/phone`,employer.cookie)).phone).toBe('+48500100200');
+    await page.getByRole('button',{name:'Cofnij udostępnienie telefonu'}).click();
+    await expect(page.getByRole('button',{name:'Udostępnij telefon tej rekrutacji',exact:true})).toBeVisible();
+    await f.request(`/api/faro/processes/${processId}/phone`,employer.cookie,'GET',undefined,403);
     const change=page.locator('[data-form=interview-change]');
     await change.locator('[name=command]').selectOption('CONFIRM');await change.locator('[name=confirmed]').check();
     await change.getByRole('button',{name:'Zapisz rozmowę'}).click();

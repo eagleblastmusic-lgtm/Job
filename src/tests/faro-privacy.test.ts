@@ -21,7 +21,7 @@ async function setup() {
   recruitment.watch(candidate.id,offer.id,true);
   const process=recruitment.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(candidate.id).confirmationToken,idempotencyKey:'privacy-interest'});
   recruitment.change(employer.id,process.id,{command:'ADVANCE',nextAction:'Sprawdź zadanie praktyczne',dueAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'privacy-advance'});
-  recruitment.grant(candidate.id,process.id,true);
+  recruitment.grant(candidate.id,process.id,true,{phoneConfirmed:true,confirmationToken:recruitment.phonePreview(candidate.id,process.id).confirmationToken});
   const assessments=new AssessmentService(f.app.db);
   const definition=assessments.create(employer.id,offer.id,{title:'Prywatna próba',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'r1',tasks:[{prompt:'Pytanie',options:['A','B'],answer:1,points:2}]});
   assessments.approve(employer.id,definition.id,{version:1,action:'REVIEW'});

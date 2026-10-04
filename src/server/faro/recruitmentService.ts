@@ -187,16 +187,28 @@ export class RecruitmentService extends FaroStore {
       catch(error){if(error instanceof HttpError&&error.code==='PUBLICATION_NOT_FOUND')return [];throw error;}
     });
   }
-  grant(userId: string, id: string, grant: boolean) {
-    const row = this.row(id);
-    if (row.candidate_id !== userId) throw new HttpError(404, 'Nie znaleziono procesu.');
-    if (grant) {
-      if (!['ACTIVE','OFFERED'].includes(row.status)) throw new HttpError(409, 'Telefon udostępnisz dopiero po przyjęciu do kolejnego etapu.');
-      if (!new ProfileService(this.database, this.clock).profile(userId).phone) throw new HttpError(400, 'Najpierw zapisz prywatny numer w profilu.');
-      this.db.prepare('INSERT INTO faro_contact_grants(process_id,candidate_id,organization_id,granted_at) VALUES(?,?,?,?) ON CONFLICT(process_id) DO UPDATE SET granted_at=excluded.granted_at,revoked_at=NULL').run(id, userId, this.offers.get(row.offer_id).organizationId, this.now());
-    } else this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE process_id=? AND candidate_id=?').run(this.now(), id, userId);
-    this.audit(userId, grant ? 'PHONE_GRANTED' : 'PHONE_REVOKED', id);
-    return { granted: grant };
+  phonePreview(userId:string,id:string) {
+    const row=this.row(id);
+    if(row.candidate_id!==userId)throw new HttpError(404,'Nie znaleziono procesu.');
+    if(!['ACTIVE','OFFERED'].includes(row.status))throw new HttpError(409,'Telefon udostępnisz dopiero po przyjęciu do kolejnego etapu.');
+    const phone=new ProfileService(this.database,this.clock).profile(userId).phone;
+    if(!phone)throw new HttpError(400,'Najpierw zapisz prywatny numer w profilu.');
+    const confirmationToken=createHash('sha256').update(JSON.stringify([userId,id,phone])).digest('hex');
+    return {phone,confirmationToken};
+  }
+  grant(userId: string, id: string, grant: boolean, body:Record<string,unknown>={}) {
+    return this.transaction(()=>{
+      const row = this.row(id);
+      if (row.candidate_id !== userId) throw new HttpError(404, 'Nie znaleziono procesu.');
+      if (grant) {
+        const preview=this.phonePreview(userId,id);
+        if(body.phoneConfirmed!==true)throw new HttpError(400,'Potwierdź udostępnienie wyświetlonego numeru.','CONFIRMATION_REQUIRED');
+        if(body.confirmationToken!==preview.confirmationToken)throw new HttpError(409,'Numer zmienił się. Otwórz aktualny podgląd.','PHONE_PREVIEW_STALE');
+        this.db.prepare('INSERT INTO faro_contact_grants(process_id,candidate_id,organization_id,granted_at) VALUES(?,?,?,?) ON CONFLICT(process_id) DO UPDATE SET granted_at=excluded.granted_at,revoked_at=NULL').run(id, userId, this.offers.get(row.offer_id).organizationId, this.now());
+      } else this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE process_id=? AND candidate_id=?').run(this.now(), id, userId);
+      this.audit(userId, grant ? 'PHONE_GRANTED' : 'PHONE_REVOKED', id);
+      return { granted: grant };
+    });
   }
   phone(userId: string, id: string) {
     const row = this.row(id); this.offers.assigned(userId, row.offer_id);

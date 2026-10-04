@@ -216,7 +216,13 @@ root.addEventListener('click', event => {
         const dialog = document.createElement('dialog'); dialog.className='faro f-dialog'; dialog.innerHTML = `<div>${button('close-dialog','Zamknij')}${content}</div>`; root.append(dialog); dialog.showModal(); dialog.addEventListener('close',()=>dialog.remove(),{once:true}); return;
       }
       if (action === 'close-dialog') { el.closest('dialog')?.close(); return; }
-      if (action === 'grant-phone' || action === 'revoke-phone') await api(`/processes/${id}/phone-grant`,action === 'grant-phone' ? 'POST':'DELETE',{});
+      if(action==='grant-phone') {
+        const p=await api<{phone:string;confirmationToken:string}>(`/processes/${id}/phone-preview`);if(mine!==epoch)return;
+        const dialog=document.createElement('dialog');dialog.className='faro f-dialog';dialog.setAttribute('aria-labelledby','f-phone-title');
+        dialog.innerHTML=`<div>${button('close-dialog','Zamknij')}<h2 id="f-phone-title">Udostępnij telefon tej rekrutacji</h2><p>Pracodawca otrzyma numer: <strong>${esc(p.phone)}</strong></p><p>Możesz cofnąć dostęp. Zmiana numeru w profilu wycofa dotychczasowe zgody; nowy numer wymaga osobnego potwierdzenia.</p>${form('phone-grant',`<input type="hidden" name="confirmationToken" value="${esc(p.confirmationToken)}">`+check('phoneConfirmed','Potwierdzam udostępnienie powyższego numeru w tej rekrutacji.'),'Potwierdź udostępnienie',id)}</div>`;
+        root.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove(),{once:true});return;
+      }
+      if(action==='revoke-phone')await api(`/processes/${id}/phone-grant`,'DELETE',{});
       if (action === 'read-phone') { const data = await api<{phone:string}>(`/processes/${id}/phone`); if (mine === epoch) notify(`Udostępniony numer: ${data.phone}`); return; }
       if (action === 'attempt-start') await api(`/attempts/${id}`,'POST',{});
       if (mine === epoch) await render();
@@ -234,6 +240,7 @@ root.addEventListener('submit', event => {
       if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model'); }
       else if (action === 'profile') await api('/profile','PUT',{firstName:value(f,'firstName'),phone:value(f,'phone'),expectedVersion:number(f,'version'),availability:{kind:value(f,'availability'),value:value(f,'availabilityValue')}});
       else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends')}});
+      else if(action==='phone-grant') {await api(`/processes/${id}/phone-grant`,'POST',{phoneConfirmed:f.has('phoneConfirmed'),confirmationToken:f.get('confirmationToken')});el.closest('dialog')?.close();}
       else if (action === 'claim') await api('/claims','POST',claim(f));
       else if (action === 'learning') await api('/learning','POST',{skillId:value(f,'skillId'),mode:value(f,'mode'),practice:practice(f)});
       else if (action === 'activity') await api('/activities','POST',{description:value(f,'description'),source:value(f,'source')});

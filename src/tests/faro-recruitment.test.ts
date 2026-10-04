@@ -46,7 +46,8 @@ test('native process: private watch, identical preview, rejection requirement, c
     process = service.view(e.id, interest.id);
     assert.ok(process.firstResponseAt); assert.equal(process.stageDueAt, dueAt); assert.notEqual(process.responseDueAt, process.stageDueAt);
     await f.request(`/api/faro/processes/${interest.id}/phone`, e.cookie, 'GET', undefined, 403);
-    await f.request(`/api/faro/processes/${interest.id}/phone-grant`, c.cookie, 'POST');
+    const phonePreview=await f.request<{confirmationToken:string}>(`/api/faro/processes/${interest.id}/phone-preview`,c.cookie);
+    await f.request(`/api/faro/processes/${interest.id}/phone-grant`, c.cookie, 'POST',{phoneConfirmed:true,confirmationToken:phonePreview.confirmationToken});
     assert.equal((await f.request<{ phone: string }>(`/api/faro/processes/${interest.id}/phone`, e.cookie)).phone, '+48500100200');
     await f.request(`/api/faro/processes/${interest.id}/phone-grant`, c.cookie, 'DELETE');
     await f.request(`/api/faro/processes/${interest.id}/phone`, e.cookie, 'GET', undefined, 403);
@@ -275,5 +276,45 @@ test('explicit private constraints filter strictly without relaxing unknown; sav
     await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:latest+1,constraints:{...constraints,active:false}});
     assert.equal(offers.list(f.candidate.id).length,4);
     await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:latest+2,constraints:{...constraints,noNights:'false'}},400);
+  }finally{await f.close();}
+});
+
+test('phone consent binds exact number and process; profile changes atomically revoke every old grant',async()=>{
+  const f=await setup();try {
+    const r=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db);
+    const body={offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'phone-first'};
+    const p=r.interest(f.candidate.id,f.offer.id,body);
+    await f.request(`/api/faro/processes/${p.id}/phone-preview`,f.candidate.cookie,'GET',undefined,409);
+    r.change(f.employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'phone-advance',nextAction:'Uzgodnienie rozmowy',dueAt:new Date(Date.now()+86400000).toISOString()});
+    const previewUrl=`/api/faro/processes/${p.id}/phone-preview`,grantUrl=`/api/faro/processes/${p.id}/phone-grant`;
+    await f.request(previewUrl,f.employer.cookie,'GET',undefined,404);
+    await f.request(previewUrl,f.outsider.cookie,'GET',undefined,404);
+    const old=await f.request<{phone:string;confirmationToken:string}>(previewUrl,f.candidate.cookie);
+    assert.equal(old.phone,'+48500100200');
+    await f.request(grantUrl,f.candidate.cookie,'POST',{},400);
+    await f.request(grantUrl,f.candidate.cookie,'POST',{phoneConfirmed:true},409);
+    await f.request(grantUrl,f.employer.cookie,'POST',{phoneConfirmed:true,confirmationToken:old.confirmationToken},404);
+    assert.equal(r.view(f.candidate.id,p.id).contactGrant,null);
+    await f.request(grantUrl,f.candidate.cookie,'POST',{phoneConfirmed:true,confirmationToken:old.confirmationToken});
+    const draft=offers.create(f.employer.id,f.org.id,offerInput(f.employer.id));
+    offers.lifecycle(f.employer.id,draft.id,{action:'REVIEW',expectedVersion:1});
+    offers.lifecycle(f.employer.id,draft.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const second=r.interest(f.candidate.id,draft.id,{...body,idempotencyKey:'phone-second'});
+    r.change(f.employer.id,second.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'phone-second-advance',nextAction:'Uzgodnienie rozmowy',dueAt:new Date(Date.now()+86400000).toISOString()});
+    await f.request(`/api/faro/processes/${second.id}/phone-grant`,f.candidate.cookie,'POST',{phoneConfirmed:true,confirmationToken:old.confirmationToken},409);
+    r.grant(f.candidate.id,second.id,true,{phoneConfirmed:true,confirmationToken:r.phonePreview(f.candidate.id,second.id).confirmationToken});
+    profiles.save(f.candidate.id,{firstName:'Jan',expectedVersion:1,phone:old.phone,availability:{kind:'IMMEDIATE'}});
+    assert.equal(r.phone(f.employer.id,p.id).phone,old.phone); // Other edits preserve consent to the same number.
+    profiles.save(f.candidate.id,{firstName:'Jan',expectedVersion:2,phone:'+48600200300',availability:{kind:'IMMEDIATE'}});
+    for(const id of [p.id,second.id])await f.request(`/api/faro/processes/${id}/phone`,f.employer.cookie,'GET',undefined,403);
+    await f.request(grantUrl,f.candidate.cookie,'POST',{phoneConfirmed:true,confirmationToken:old.confirmationToken},409);
+    const current=r.phonePreview(f.candidate.id,p.id);
+    await f.request(grantUrl,f.candidate.cookie,'POST',{phoneConfirmed:true,confirmationToken:current.confirmationToken});
+    assert.equal(r.phone(f.employer.id,p.id).phone,'+48600200300');
+    profiles.save(f.candidate.id,{firstName:'Jan',expectedVersion:3,phone:null,availability:{kind:'IMMEDIATE'}});
+    await f.request(`/api/faro/processes/${p.id}/phone`,f.employer.cookie,'GET',undefined,403);
+    await f.request(previewUrl,f.candidate.cookie,'GET',undefined,400);
+    const audit=JSON.stringify(f.app.db.db.prepare("SELECT * FROM audit_logs WHERE action LIKE 'PHONE_%'").all());
+    assert.doesNotMatch(audit,/48500100200|48600200300/);
   }finally{await f.close();}
 });

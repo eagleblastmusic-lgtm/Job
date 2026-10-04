@@ -34,8 +34,8 @@ try {
   const interest=u=>r.interest(u.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(u.id).confirmationToken,idempotencyKey:`recovery:${u.id}`});
   const removed=interest(gone),surviving=interest(kept);
   for(const p of [removed,surviving])r.change(employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:`advance:${p.id}`,nextAction:'Sprawdź następny etap',dueAt:new Date(Date.now()+86400000).toISOString()});
-  r.watch(gone.id,offer.id,true);r.grant(gone.id,removed.id,true);
-  r.grant(kept.id,surviving.id,true);f.app.store.recordConsent(kept.id,'ANALYTICS',true,'synthetic-before-backup');
+  r.watch(gone.id,offer.id,true);r.grant(gone.id,removed.id,true,{phoneConfirmed:true,confirmationToken:r.phonePreview(gone.id,removed.id).confirmationToken});
+  r.grant(kept.id,surviving.id,true,{phoneConfirmed:true,confirmationToken:r.phonePreview(kept.id,surviving.id).confirmationToken});f.app.store.recordConsent(kept.id,'ANALYTICS',true,'synthetic-before-backup');
   const assessments=new AssessmentService(f.app.db);
   const definition=assessments.create(employer.id,offer.id,{title:'Kopia próby',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'backup-r1',tasks:[{prompt:'Zadanie',options:['A','B'],answer:1,points:2}]});
   assessments.approve(employer.id,definition.id,{version:1,action:'REVIEW'});assessments.approve(employer.id,definition.id,{version:1,action:'APPROVE',confirmed:true});

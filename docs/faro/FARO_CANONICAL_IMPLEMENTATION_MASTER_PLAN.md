@@ -233,3 +233,19 @@ RISK / DEFERRED: DB-only; uploads refused. Current authoritative source must sur
 ROLLBACK: revert offline helper/service only; preserve erasure history and safe default API deletion. Do not activate failed or unreconciled snapshots.
 STATUS: DONE for bounded CP11-B foundation; overall CP11 PARTIAL.
 NEXT CHECKPOINT: explicit confirmation of exact phone number and revocation on profile change.
+
+## CP06-H — Conscious exact-number phone disclosure (2026-10-04)
+ID / TITLE: CP06-H, phone preview and consent consistency.
+GOAL / PURPOSE / CURRENT GAP: profile edits could expose a replacement phone under an old grant; workspace granted immediately without showing the number.
+SCOPE / IMPLEMENTATION / FILES: profileService.ts transactional save/version check/revocation, recruitmentService.ts scoped preview and transactional grant, api.ts, client faro.ts, recruitment/privacy/recovery/browser fixtures and docs.
+DB CHANGE / MIGRATIONS: none; existing revoked_at and audit reused.
+API CHANGE: candidate-only GET phone-preview and explicit phoneConfirmed/current token POST phone-grant. No employer access to preview. Existing DELETE unchanged.
+FRONTEND CHANGE: workspace modal shows actual number, explains revocation, requires conscious confirmation; no login change.
+DEPENDENCIES: CP03 private profile, CP06 recruitment/contact grants, CP08 dialogs, CP11-B recovery.
+TESTS / TESTED: build/typecheck/lint PASS; 11 recruitment + 3 privacy scenarios PASS; real DB recovery PASS; expanded actual candidate/employer browser journey PASS mobile/desktop (2).
+ACCEPTANCE CRITERIA: stage advance never discloses; stale/missing/cross-process confirmation cannot grant; wrong actors receive 404; changed or removed number revokes all active grants atomically; unchanged number preserves consent; grant audit has no phone/token; candidate can revoke.
+LEGAL STATUS: local privacy foundation; wider retention/production legal gates remain open.
+RISK / DEFERRED: revocation cannot erase a previously observed number from human memory. No automatic contact exchange or external messaging.
+ROLLBACK: revert UI/API together while retaining revoke-on-number-change protection; never restore immediate unconfirmed disclosure.
+STATUS: DONE for CP06-H; overall CP06 PARTIAL.
+NEXT CHECKPOINT: malformed request URL boundary and relevant CI release verification.

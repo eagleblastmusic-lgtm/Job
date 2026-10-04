@@ -96,8 +96,10 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (calendar && method === 'GET') return ok(new InterviewService(db).calendar(user.id,calendar[1]!));
     const command = path.match(/^\/api\/faro\/processes\/([^/]+)\/commands$/);
     if (command && method === 'POST') return ok(recruitment.change(user.id, command[1]!, body));
+    const phonePreview=path.match(/^\/api\/faro\/processes\/([^/]+)\/phone-preview$/);
+    if(phonePreview&&method==='GET')return ok(recruitment.phonePreview(user.id,phonePreview[1]!));
     const grant = path.match(/^\/api\/faro\/processes\/([^/]+)\/phone-grant$/);
-    if (grant && ['POST','DELETE'].includes(method)) return ok(recruitment.grant(user.id, grant[1]!, method === 'POST'));
+    if (grant && ['POST','DELETE'].includes(method)) return ok(recruitment.grant(user.id, grant[1]!, method === 'POST',body));
     const phone = path.match(/^\/api\/faro\/processes\/([^/]+)\/phone$/);
     if (phone && method === 'GET') return ok(recruitment.phone(user.id, phone[1]!));
     if (path === '/api/faro/notifications' && method === 'GET') {

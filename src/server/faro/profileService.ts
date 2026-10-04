@@ -34,13 +34,19 @@ export class ProfileService extends FaroStore {
   save(userId: string, body: Record<string, unknown>) {
     const name = text(body.firstName, 60);
     if (!/^[\p{L}][\p{L}\p{M}'’-]*$/u.test(name)) throw new HttpError(400, 'Wpisz tylko imię, bez nazwiska.', 'FIRST_NAME_ONLY');
-    const current = this.profile(userId);
-    if (integer(body.expectedVersion) !== current.version) throw new HttpError(409, 'Profil zmienił się. Odśwież dane.', 'VERSION_CONFLICT');
     const availability=this.availability(body.availability);
     const phone = body.phone ? text(body.phone, 20) : null;
     if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) throw new HttpError(400, 'Nieprawidłowy telefon.');
+    return this.transaction(()=>{
+    const current = this.profile(userId);
+    if (integer(body.expectedVersion) !== current.version) throw new HttpError(409, 'Profil zmienił się. Odśwież dane.', 'VERSION_CONFLICT');
+    if(current.phone!==phone) {
+      this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE candidate_id=? AND revoked_at IS NULL').run(this.now(),userId);
+      this.audit(userId,'PHONE_CHANGED_GRANTS_REVOKED',userId);
+    }
     this.db.prepare('INSERT INTO faro_profiles(user_id,first_name,availability,phone,version,updated_at) VALUES(?,?,?,?,1,?) ON CONFLICT(user_id) DO UPDATE SET first_name=excluded.first_name,availability=excluded.availability,phone=excluded.phone,version=faro_profiles.version+1,updated_at=excluded.updated_at').run(userId, name, JSON.stringify(availability), phone, this.now());
     return this.profile(userId);
+    });
   }
   availability(input:unknown):Availability {
     const raw = object(input);
