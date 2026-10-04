@@ -51,3 +51,5 @@ Archive content must match pre-checkpoint Git blobs, with all 22 historical scen
 CP10-G discovery update: new real incident/review journey e2e/faro-incidents.spec.ts is discovered automatically by default/FARO CI. Current scope is now14 scenarios/28 executions. It retains all CP11-F contracts and adds both-role assessment axe/320px reflow and technical evidence. This does not change the22 historical dispositions above. Scoped legend contrast regression was fixed after actual test failure rather than excluded.
 
 CP10-H expands existing incident scenario (still14 scenarios/28 executions) with conscious employer same-version retry, candidate separate Start and original-history navigation. Both-role axe/320px evidence retained. Hover-label regression repaired; no historical test restored or current rule skipped.
+
+CP07-E adds one current real restriction/appeal/restoration scenario; default scope15 scenarios/30 desktop/mobile executions. Both-party privacy, manual restoration, paused vacancies/PENDING verification, axe and320px remain required. Historical archive/disposition unchanged.

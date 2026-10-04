@@ -7,7 +7,50 @@ import { reliabilitySnapshot,type ReliabilityInterest,type ReliabilityEvent } fr
 import { HttpError } from '../http.js';
 import { text, choice, date, integer } from './validation.js';
 interface CaseRow {id:string;organization_id:string;process_id:string|null;reporter_id:string|null;kind:string;state:string;revision:number;explanation_due_at:string|null;public_reason:string|null;statement:string;decision:string|null;review_at:string|null;created_at:string;}
+interface RestrictionRow {id:string;organization_id:string;source_case_id:string|null;source_reporter_id:string|null;source_candidate_id:string|null;state:string;scope:string;reason_code:string;restoration_condition:string|null;created_at:string|null;review_at:string|null;revision:number;appeal:string|null;appealed_at:string|null;restoration_reason:string|null;restored_at:string|null;}
 export class TrustService extends FaroStore {
+  private restriction(id:string) {
+    const row=this.db.prepare('SELECT * FROM faro_restrictions WHERE id=?').get(id) as unknown as RestrictionRow|undefined;
+    if(!row)throw new HttpError(404,'Nie znaleziono ograniczenia.');return row;
+  }
+  private restrictionModerator(userId:string,row:RestrictionRow) {
+    return !!this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId)&&row.source_reporter_id!==userId&&row.source_candidate_id!==userId&&!this.affiliated(userId,row.organization_id)&&(!row.source_case_id||!this.involved(userId,this.caseRow(row.source_case_id)));
+  }
+  restrictions(userId:string,orgId:string) {
+    const own=this.db.prepare("SELECT user_id FROM faro_members WHERE organization_id=? AND user_id=? AND active=1 AND role IN ('OWNER','ADMIN')").get(orgId,userId);
+    if(!own&&!this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId))throw new HttpError(404,'Nie znaleziono organizacji.');
+    if(!own&&this.affiliated(userId,orgId))throw new HttpError(404,'Nie znaleziono organizacji.');
+    if(!own)this.audit(userId,'MODERATION_RESTRICTIONS_READ',orgId);
+    const rows=this.db.prepare('SELECT * FROM faro_restrictions WHERE organization_id=? ORDER BY rowid DESC').all(orgId) as unknown as RestrictionRow[];
+    if(!own&&rows.some(row=>!this.restrictionModerator(userId,row)))throw new HttpError(404,'Nie znaleziono niezależnego przeglądu.');
+    return rows.map(row=>({id:row.id,scope:row.scope,state:row.state,reasonCode:row.reason_code,restorationCondition:row.restoration_condition,createdAt:row.created_at,reviewAt:row.review_at,revision:row.revision,appeal:row.appeal,appealedAt:row.appealed_at,restorationReason:row.restoration_reason,restoredAt:row.restored_at,canAppeal:!!own&&row.state==='ACTIVE'&&!row.appeal,canReview:row.state==='ACTIVE'&&this.restrictionModerator(userId,row)}));
+  }
+  private notifyRestriction(row:RestrictionRow) {
+    const recipients=this.db.prepare("SELECT user_id FROM faro_members WHERE organization_id=? AND active=1 AND role IN ('OWNER','ADMIN')").all(row.organization_id) as Array<{user_id:string}>;
+    for(const recipient of recipients)new RecruitmentService(this.database,this.clock).enqueue(recipient.user_id,'organization',row.organization_id,'Zmieniono stan ograniczenia organizacji. Sprawdź zakres i ręczny przegląd.',`restriction:${row.id}:${row.revision}`);
+  }
+  appealRestriction(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{const row=this.restriction(id);this.member(userId,row.organization_id,['OWNER','ADMIN']);return row;};authorize();
+    return new RecruitmentService(this.database,this.clock).commandOnce(userId,body.idempotencyKey,{...body,id,operation:'RESTRICTION_APPEAL'},()=>{
+      const row=authorize();if(integer(body.expectedVersion,1)!==row.revision)throw new HttpError(409,'Odśwież ograniczenie.','VERSION_CONFLICT');
+      if(row.state!=='ACTIVE'||row.appeal)throw new HttpError(409,'Odwołanie nie jest teraz dostępne.');
+      this.db.prepare('UPDATE faro_restrictions SET appeal=?,appealed_at=?,appeal_by=?,revision=revision+1 WHERE id=?').run(text(body.reason,1500,10),this.now(),userId,id);
+      this.audit(userId,'RESTRICTION_APPEALED',id);this.notifyModerators(row.organization_id,'Odwołanie od ograniczenia organizacji wymaga ręcznego przeglądu.',`restriction:${id}:appeal`,'organization');
+      return {id};
+    });
+  }
+  restoreRestriction(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{const row=this.restriction(id);if(!this.restrictionModerator(userId,row))throw new HttpError(403,'Wymagany niezależny moderator.','MODERATION_CONFLICT');return row;};authorize();
+    return new RecruitmentService(this.database,this.clock).commandOnce(userId,body.idempotencyKey,{...body,id,operation:'RESTRICTION_RESTORE'},()=>{
+      const row=authorize();if(integer(body.expectedVersion,1)!==row.revision)throw new HttpError(409,'Odśwież ograniczenie.','VERSION_CONFLICT');
+      if(row.state!=='ACTIVE')throw new HttpError(409,'Ograniczenie zostało już rozpatrzone.');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ręczne sprawdzenie warunków przywrócenia.','CONFIRMATION_REQUIRED');
+      this.db.prepare("UPDATE faro_restrictions SET state='RESTORED',restoration_reason=?,restored_at=?,restored_by=?,revision=revision+1 WHERE id=?").run(text(body.reason,1500,10),this.now(),userId,id);
+      // Releasing one restriction never clears another or republishes a vacancy.
+      if(!this.db.prepare("SELECT id FROM faro_restrictions WHERE organization_id=? AND state='ACTIVE'").get(row.organization_id))this.db.prepare("UPDATE faro_organizations SET verification='PENDING' WHERE id=? AND verification='RESTRICTED'").run(row.organization_id);
+      this.audit(userId,'RESTRICTION_RESTORED',id);this.notifyRestriction(this.restriction(id));return {id};
+    });
+  }
   reliability(userId:string,orgId:string,from:string,to:string) {
     this.member(userId,orgId,['OWNER','ADMIN']);
     const asOf=this.now();
@@ -21,9 +64,9 @@ export class TrustService extends FaroStore {
       return reliabilitySnapshot(rows,events,start,end,asOf);
     });
   }
-  notifyModerators(id:string,message:string,key:string) {
+  notifyModerators(id:string,message:string,key:string,entityType='case') {
     const recipients=this.db.prepare("SELECT id FROM users WHERE role='ADMIN'").all() as Array<{id:string}>;
-    for(const recipient of recipients)new RecruitmentService(this.database,this.clock).enqueue(recipient.id,'case',id,message,key);
+    for(const recipient of recipients)new RecruitmentService(this.database,this.clock).enqueue(recipient.id,entityType,id,message,key);
   }
   report(userId: string, processId: string, body: Record<string, unknown>) {
     new RecruitmentService(this.database,this.clock).authorize(userId,processId);
@@ -107,8 +150,13 @@ export class TrustService extends FaroStore {
     }
       this.db.prepare('UPDATE faro_cases SET state=?,decision=?,public_reason=?,review_at=?,explanation_due_at=?,revision=revision+1 WHERE id=?').run(target, decision,publicReason, reviewAt,explanationDue, id);
       if (target === 'ACTION' && body.restrict === true) {
+        const condition=text(body.restorationCondition,1000,10);
+        if(reviewAt<=this.now())throw new HttpError(400,'Wybierz przyszły termin przeglądu ograniczenia.');
+        const candidateId=row.process_id?new RecruitmentService(this.database,this.clock).row(row.process_id).candidate_id:null;
+        this.db.prepare('INSERT INTO faro_restrictions(id,organization_id,source_case_id,source_reporter_id,source_candidate_id,reason_code,restoration_condition,created_at,review_at) VALUES(?,?,?,?,?,?,?,?,?)').run(randomUUID(),row.organization_id,id,row.reporter_id,candidateId,publicReason,condition,this.now(),reviewAt);
         this.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(row.organization_id);
         this.db.prepare("UPDATE faro_offers SET status='PAUSED',revision=revision+1 WHERE organization_id=? AND status='PUBLISHED'").run(row.organization_id);
+        const restriction=this.db.prepare('SELECT id FROM faro_restrictions WHERE source_case_id=?').get(id) as {id:string};this.notifyRestriction(this.restriction(restriction.id));
       }
       this.audit(userId, 'MODERATION_REVIEWED', id);
       if(row.process_id)new RecruitmentService(this.database,this.clock).event(new RecruitmentService(this.database,this.clock).row(row.process_id),userId,'MODERATION_CASE_UPDATED',{caseId:id,state:target,explanationDueAt:explanationDue});

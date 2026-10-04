@@ -17,7 +17,8 @@ export function readLatestLedger(databasePath) {
     const assignments=db.prepare('SELECT a.offer_id,a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.organization_id=o.organization_id AND m.user_id=a.user_id AND m.active=1').all();
     const accounts=db.prepare('SELECT id,role,password_hash,email,name FROM users').all();
     const organizations=db.prepare('SELECT id,verification FROM faro_organizations').all();
-    db.exec('COMMIT');return {erasures,owners,members,assignments,accounts,organizations};
+    const restrictions=db.prepare('SELECT id,organization_id,source_case_id,source_reporter_id,source_candidate_id,scope,state,reason_code,restoration_condition,created_at,review_at,revision,appeal,appealed_at,appeal_by,restoration_reason,restored_at,restored_by FROM faro_restrictions').all();
+    db.exec('COMMIT');return {erasures,owners,members,assignments,accounts,organizations,restrictions};
   } finally {db.close();}
 }
 /** Database-only Canonical recovery. Never overwrites a live target or silently drops uploads. */

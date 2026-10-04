@@ -10,6 +10,7 @@ export interface RecoveryLedger {
   /** Sensitive authority snapshot: never log or serialize this input to diagnostics. */
   accounts:Array<{id:string;role:'USER'|'ADMIN';password_hash:string;email:string;name:string}>;
   organizations:Array<{id:string;verification:'PENDING'|'VERIFIED'|'RESTRICTED'}>;
+  restrictions:Array<{id:string;organization_id:string;source_case_id:string|null;source_reporter_id:string|null;source_candidate_id:string|null;scope:string;state:string;reason_code:string;restoration_condition:string|null;created_at:string|null;review_at:string|null;revision:number;appeal:string|null;appealed_at:string|null;appeal_by:string|null;restoration_reason:string|null;restored_at:string|null;restored_by:string|null}>;
 }
 /** Offline only: caller must use a new isolated database, with a consistent latest ledger snapshot. */
 export class RecoveryService extends FaroStore {
@@ -34,6 +35,7 @@ export class RecoveryService extends FaroStore {
     for(const user of users)if(!erasedIds.has(user.id)&&!accounts.has(user.id))throw new Error('Bieżący rejestr nie rozstrzyga konta z kopii. Odtworzenie wstrzymane.');
     const members=new Map(ledger.members.map(m=>[JSON.stringify([m.organization_id,m.user_id]),m]));
     const assignments=new Set(ledger.assignments.map(a=>JSON.stringify([a.offer_id,a.user_id])));
+    if(!Array.isArray(ledger.restrictions))throw new Error('Brak bieżącego rejestru ograniczeń. Odtworzenie wstrzymane.');
     return this.transaction(()=>{
       let restoredOwnerships=0,closedOrganizations=0;
       const closedIds=new Set<string>();
@@ -78,8 +80,16 @@ export class RecoveryService extends FaroStore {
         if(consent?.granted===1)this.db.prepare("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES(?,?,'ANALYTICS',0,'recovery-default-off-v1',?)").run(randomUUID(),user.id,this.now());
       }
       const orgStates=new Map(ledger.organizations.map(o=>[o.id,o.verification]));
+      // Use current authority and current surviving actor references, never stale private appeals.
+      this.db.prepare('DELETE FROM faro_restrictions').run();
+      for(const r of ledger.restrictions)if(this.db.prepare('SELECT id FROM faro_organizations WHERE id=?').get(r.organization_id)) {
+        const actor=(id:string|null)=>id&&this.db.prepare('SELECT id FROM users WHERE id=?').get(id)?id:null;
+        const caseId=r.source_case_id&&this.db.prepare('SELECT id FROM faro_cases WHERE id=?').get(r.source_case_id)?r.source_case_id:null;
+        this.db.prepare('INSERT INTO faro_restrictions(id,organization_id,source_case_id,source_reporter_id,source_candidate_id,scope,state,reason_code,restoration_condition,created_at,review_at,revision,appeal,appealed_at,appeal_by,restoration_reason,restored_at,restored_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(r.id,r.organization_id,caseId,actor(r.source_reporter_id),actor(r.source_candidate_id),r.scope,r.state,r.reason_code,r.restoration_condition,r.created_at,r.review_at,r.revision,actor(r.appeal_by)?r.appeal:null,actor(r.appeal_by)?r.appealed_at:null,actor(r.appeal_by),r.restoration_reason,r.restored_at,actor(r.restored_by));
+      }
       const oldOrgs=this.db.prepare('SELECT id FROM faro_organizations').all() as Array<{id:string}>;
       for(const org of oldOrgs)this.db.prepare('UPDATE faro_organizations SET verification=? WHERE id=?').run(closedIds.has(org.id)?'RESTRICTED':orgStates.get(org.id)??'RESTRICTED',org.id);
+      this.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE EXISTS(SELECT 1 FROM faro_restrictions r WHERE r.organization_id=faro_organizations.id AND r.state='ACTIVE')").run();
       // A historical snapshot cannot prove the vacancy is still open today.
       const published=this.db.prepare("SELECT id FROM faro_offers WHERE status='PUBLISHED'").all() as Array<{id:string}>;
       for(const offer of published)this.audit(null,'RECOVERY_INTAKE_PAUSED',offer.id);

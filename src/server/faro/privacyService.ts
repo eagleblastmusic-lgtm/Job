@@ -14,6 +14,7 @@ export class PrivacyService extends FaroStore {
       own[table] = this.db.prepare(`SELECT * FROM ${table} WHERE candidate_id=?`).all(userId);
     }
     own.faro_events = this.db.prepare('SELECT e.kind,e.data,e.occurred_at,e.process_id FROM faro_events e JOIN faro_interests p ON p.id=e.process_id WHERE p.candidate_id=?').all(userId);
+    own.faro_restriction_appeals=this.db.prepare('SELECT id,organization_id,appeal,appealed_at FROM faro_restrictions WHERE appeal_by=?').all(userId);
     own.faro_interviews = this.db.prepare('SELECT i.id,i.process_id,i.state,i.revision,i.starts_at,i.ends_at,i.confirm_by,i.timezone,i.location,i.meeting_url,i.candidate_completed,i.employer_completed FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id WHERE p.candidate_id=? OR i.recruiter_id=?').all(userId,userId);
     own.faro_attempts = this.db.prepare('SELECT a.id,a.process_id,a.assessment_id,a.assessment_version,a.state,a.deadline,a.started_at,a.expires_at,a.answers,a.result,a.revision,a.reviewed_at,a.attempt_number,a.retry_of,a.retry_reason,a.retry_authorized_at FROM faro_attempts a JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
     own.faro_result_history = this.db.prepare('SELECT h.attempt_id,h.revision,h.validity,h.result,h.reason_code,h.reason,h.created_at FROM faro_result_history h JOIN faro_attempts a ON a.id=h.attempt_id JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
@@ -63,6 +64,7 @@ export class PrivacyService extends FaroStore {
     // A transferred organization survives, but intake cannot rely on a deleted responsible recruiter.
     this.db.prepare("UPDATE faro_offers SET status='PAUSED',revision=revision+1 WHERE status='PUBLISHED' AND id IN (SELECT v.offer_id FROM faro_offer_versions v JOIN faro_offers o ON o.id=v.offer_id AND o.current_version=v.version WHERE json_extract(v.content,'$.recruiterId')=?)").run(userId);
     // Shared case history must not retain free-form personal statements after erasure.
+    this.db.prepare("UPDATE faro_restrictions SET appeal=NULL,appealed_at=NULL WHERE appeal_by=?").run(userId);
     this.db.prepare("UPDATE faro_cases SET statement='Treść usunięta w ramach realizacji prawa do danych.',appeal=NULL,decision=NULL WHERE reporter_id=? OR process_id IN (SELECT id FROM faro_interests WHERE candidate_id=?)").run(userId,userId);
     this.db.prepare("UPDATE faro_case_explanations SET statement='Treść usunięta w ramach realizacji prawa do danych.' WHERE case_id IN (SELECT id FROM faro_cases WHERE reporter_id=? OR process_id IN (SELECT id FROM faro_interests WHERE candidate_id=?))").run(userId,userId);
     this.db.prepare('DELETE FROM faro_outbox WHERE entity_type=? AND entity_id IN (SELECT id FROM faro_interests WHERE candidate_id=?)').run('process',userId);
