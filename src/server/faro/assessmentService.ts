@@ -8,7 +8,7 @@ import { TERMINAL } from '../../domain/faro/recruitment.js';
 interface Task { id: string; prompt: string; options: string[]; answer: number; points: number; }
 interface Definition { title: string; type: 'QUIZ'; tasks: Task[]; timeLimitMinutes: number; expectedMinutes: number; rubricVersion: string; scoringMode: 'OBJECTIVE'; }
 interface DefinitionRow { id: string; version: number; offer_id: string; state: 'DRAFT' | 'IN_REVIEW' | 'APPROVED'; content: string; origin: string; }
-interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; }
+interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; attempt_number:number;retry_of:string|null;retry_reason:string|null;retry_authorized_at:string|null; }
 interface IncidentRow { id:string; category:string; statement:string; reportedAt:string; observedState:string; observedRevision:number; originalDeadline:string; originalStartedAt:string|null; originalExpiresAt:string|null; state:string; revision:number; resolution:string|null; reason:string|null; resolvedAt:string|null; }
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
@@ -166,13 +166,42 @@ export class AssessmentService extends FaroStore {
     });
     return this.overview(userId,acknowledgement.id);
   }
+  retry(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{
+      const row=this.row(id),process=this.recruitment.row(row.process_id);
+      if(process.candidate_id===userId)throw new HttpError(404,'Nie znaleziono próby do ponowienia.');
+      const offer=this.recruitment.offers.assigned(userId,process.offer_id);
+      this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);
+      return {row,process};
+    };
+    authorize();
+    const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_RETRY'},()=>{
+      const {row,process}=authorize(),incident=this.incident(id);
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
+      if(row.state!=='TECHNICAL_ISSUE'||incident?.state!=='RESOLVED'||incident.resolution!=='ISSUE_CONFIRMED')throw new HttpError(409,'Ponowienie wymaga potwierdzonego problemu technicznego.','RETRY_NOT_ELIGIBLE');
+      if(process.status!=='ACTIVE'||process.stage!=='ACCEPTED_TO_NEXT_STAGE')throw new HttpError(409,'Proces nie pozwala teraz na ponowienie.');
+      if(this.db.prepare('SELECT id FROM faro_attempts WHERE retry_of=?').get(id)||this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id))throw new HttpError(409,'Istnieje już ponowienie lub aktywna próba.','RETRY_ALREADY_EXISTS');
+      if(this.definition(row.assessment_id,row.assessment_version).state!=='APPROVED')throw new HttpError(409,'Wersja próby nie jest zatwierdzona.');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ponowienie tej samej wersji.','CONFIRMATION_REQUIRED');
+      const reason=text(body.reason,1000,10),deadline=date(body.deadline);
+      if(deadline<=this.now())throw new HttpError(400,'Deadline musi być w przyszłości.');
+      const nextId=randomUUID();
+      this.db.prepare("INSERT INTO faro_attempts(id,process_id,assessment_id,assessment_version,state,deadline,attempt_number,retry_of,retry_reason,retry_authorized_at,retry_authorized_by) VALUES(?,?,?,?,'INVITED',?,?,?,?,?,?)").run(nextId,process.id,row.assessment_id,row.assessment_version,deadline,row.attempt_number+1,id,reason,this.now(),userId);
+      this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_REQUESTED',stage_due_at=?,revision=revision+1 WHERE id=?").run(deadline,process.id);
+      this.recruitment.event(process,userId,'ATTEMPT_RETRY_AUTHORIZED',{attemptId:nextId,previousAttemptId:id});
+      return {id:nextId};
+    });
+    return this.overview(userId,acknowledgement.id);
+  }
   overview(userId: string, id: string) {
     const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
     const candidate = process.candidate_id === userId;
     const history=row.state==='FINALIZED'?this.resultHistory(id):[];
     const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
     const savedAnswers=JSON.parse(row.answers) as Record<string,number>;
-    return { id, incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
+    const retryAttempt=this.db.prepare('SELECT id FROM faro_attempts WHERE retry_of=?').get(id) as {id:string}|undefined;
+    const retryRole=candidate?null:this.member(userId,this.recruitment.offers.get(process.offer_id).organizationId).role;
+    return { id, attemptNumber:row.attempt_number,retryOf:row.retry_of,retryReason:row.retry_reason,retryAuthorizedAt:row.retry_authorized_at,retryAttemptId:retryAttempt?.id??null,canRetry:retryRole!==null&&retryRole!=='HIRING_MANAGER'&&row.state==='TECHNICAL_ISSUE'&&this.incident(id)?.resolution==='ISSUE_CONFIRMED'&&process.status==='ACTIVE'&&process.stage==='ACCEPTED_TO_NEXT_STAGE'&&!retryAttempt&&!this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id), incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
       reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
       answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };

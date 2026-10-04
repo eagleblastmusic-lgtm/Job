@@ -43,6 +43,11 @@ try {
   const started=assessments.start(gone.id,attempt.id);assessments.save(gone.id,attempt.id,{expectedVersion:started.revision,answers:{'task-1':1}},false);
   const attemptView=assessments.overview(gone.id,attempt.id);
   assessments.reportIncident(gone.id,attempt.id,{expectedVersion:attemptView.revision,processVersion:attemptView.processVersion,idempotencyKey:'backup-incident',category:'CONNECTION',statement:'Syntetyczny problem połączenia przy zapisie.',confirmed:true});
+  const reported=assessments.overview(employer.id,attempt.id);
+  assessments.resolveIncident(employer.id,attempt.id,{expectedVersion:reported.revision,processVersion:reported.processVersion,incidentVersion:1,idempotencyKey:'backup-incident-resolve',resolution:'ISSUE_CONFIRMED',reason:'Potwierdzono syntetyczny problem połączenia.',confirmed:true});
+  const resolved=assessments.overview(employer.id,attempt.id);
+  const retry=assessments.retry(employer.id,attempt.id,{expectedVersion:resolved.revision,processVersion:resolved.processVersion,idempotencyKey:'backup-retry',deadline:new Date(Date.now()+172800000).toISOString(),reason:'Osobne zaproszenie po potwierdzonym problemie.',confirmed:true});
+  assert.equal(retry.retryOf,attempt.id);
   const interviews=new InterviewService(f.app.db);
   const slot=interviews.propose(employer.id,surviving.id,{expectedVersion:2,idempotencyKey:'backup-slot',confirmed:true,startsAt:new Date(Date.now()+2*86400000).toISOString(),endsAt:new Date(Date.now()+2*86400000+3600000).toISOString(),confirmBy:new Date(Date.now()+86400000).toISOString(),timezone:'Europe/Warsaw',location:'Rozmowa online',meetingUrl:'https://example.test/meeting'});
   const before=new ProfileService(f.app.db).projection(kept.id),firstClock=r.row(surviving.id).first_response_at;
@@ -76,6 +81,7 @@ try {
     const db=restored.db,pr=new ProfileService(restored),rec=new RecruitmentService(restored);
     for(const u of [gone,employer])assert.equal(db.prepare('SELECT id FROM users WHERE id=?').get(u.id),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(attempt.id),undefined);
+    assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(retry.id),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_attempt_incidents WHERE attempt_id=?').get(attempt.id),undefined);
     assert.equal(db.prepare('SELECT process_id FROM faro_contact_grants WHERE process_id=?').get(removed.id),undefined);
     assert.deepEqual(pr.projection(kept.id),before);assert.equal(pr.member(successor.id,org.id).role,'OWNER');

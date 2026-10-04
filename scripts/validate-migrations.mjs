@@ -11,15 +11,18 @@ db.exec('PRAGMA foreign_keys = ON; CREATE TABLE IF NOT EXISTS schema_migrations 
 for (const file of files) {
   const version = file.slice(0, -4);
   const sql = readFileSync(resolve(directory, file), 'utf8');
+  const rebuild=/^-- rebuild-with-foreign-key-check\r?\n/.test(sql);
+  if(rebuild)db.exec('PRAGMA foreign_keys = OFF;');
   db.exec('BEGIN IMMEDIATE;');
   try {
     db.exec(sql);
+    if(rebuild&&db.prepare('PRAGMA foreign_key_check').all().length)throw new Error('Foreign key check failed after table rebuild.');
     db.prepare('INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)').run(version);
     db.exec('COMMIT;');
   } catch (error) {
     db.exec('ROLLBACK;');
     throw new Error(`Migration ${file} failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  } finally {if(rebuild)db.exec('PRAGMA foreign_keys = ON;');}
 }
 
 const applied = Number(db.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get().count);
