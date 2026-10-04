@@ -278,3 +278,18 @@ RISK / DEFERRED: original full legacy CI has known OLX/LinkedIn fixture failures
 ROLLBACK: revert additive workflow/scripts; historical pipeline remains intact.
 STATUS: DONE for local aggregate verification and CI definition; remote verification pending, overall CP11 PARTIAL.
 NEXT CHECKPOINT: publish reviewable dependent drafts and continue remaining invariant/security/domain gaps.
+
+## CP07-C — Independent verification and moderation (2026-10-04)
+ID / TITLE: CP07-C, preserve conflicts after membership revocation.
+GOAL / PURPOSE / CURRENT GAP: platform-admin members could verify their own organization; revoked staff became eligible to read/review private moderation evidence; generic verify could clear restrictions.
+SCOPE / IMPLEMENTATION / FILES: FaroStore affiliation helper, profileService transactional verification, trustService involved guard, profile API counterexample and privacy/API/status docs.
+DB CHANGE / MIGRATIONS / FRONTEND CHANGE: none; historical membership already retained.
+API CHANGE: verification conflict/restriction errors; former affiliated admins cannot acquire moderator view or review authorization by revoking membership.
+DEPENDENCIES: CP02 membership, CP07 private cases and CP11-B recovery preserving current restrictions.
+TESTS / TESTED: build/typecheck/lint and 12 profile/assessment-trust/interview scenarios PASS. New API counterexample checks active owner/staff and revoked staff, no private case read, no state mutation on denial, independent review success and restricted verification refusal.
+ACCEPTANCE CRITERIA: reviewer has no current/historical affiliation; conflicted caller never receives third-party evidence; verification cannot lift moderation restrictions; authorization/update/audit atomic.
+LEGAL STATUS: local safe foundation; staffed moderation, approved conflict/retention policy and proportional restoration remain gates.
+RISK / DEFERRED: historical affiliation conservatively remains a conflict while membership record is retained; external undisclosed relationships cannot be inferred. Dedicated restriction restoration is not invented here.
+ROLLBACK: retain stricter conflict/restriction guards; revert feature entry points if necessary without exposing private evidence.
+STATUS: DONE for CP07-C; overall CP07 PARTIAL.
+NEXT CHECKPOINT: mobile checkbox hit-target failure discovered by actual Ubuntu CI.

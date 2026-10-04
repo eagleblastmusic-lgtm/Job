@@ -133,3 +133,15 @@ Each checkpoint is a separate review/revert unit. Initial plan commit must stay 
 - RISK: Premature launch or invented evidence
 - MERGE GATE: Written gates resolved; staffed moderation and real supply; no unauthorized outreach; review privacy boundary; required project checks; legal activation separate.
 - STATUS: NOT OPENED; split from checkpoint commits when ready for remote review.
+
+## Actual dependent draft stack (2026-10-04)
+Initial planned PR IDs above remain the intended capability sequence, not a claim of completion. Actual checkpoint slices preserve original commits without rewriting main or the user's login-editor branch:
+
+| Slice | Draft | Branch | Base | Commit | Migration | Merge gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| Original plan and immutable source | [#39](https://github.com/eagleblastmusic-lgtm/Job/pull/39) | codex/faro-00-plan | main | 8b2524a | none | source/coverage review |
+| Runtime retirement and free-first | [#40](https://github.com/eagleblastmusic-lgtm/Job/pull/40) | codex/faro-01-runtime | previous | a18b25d | none | auth/retirement and full CI scope review |
+| Organization and confirmed skills | [#41](https://github.com/eagleblastmusic-lgtm/Job/pull/41) | codex/faro-02-profile | previous | 20263a6 | 0020 | tenant/PII/confirmation review |
+| Versioned offers and interest | [#42](https://github.com/eagleblastmusic-lgtm/Job/pull/42) | codex/faro-03-recruitment | previous | de1d3ec | 0021 | concurrency/clock/version review; later hardening required before activation |
+
+All are draft and unmerged. Each compares only its checkpoint with the previous branch. Later checkpoint commits remain on codex/faro-canonical for integration CI; no giant implementation PR was opened. Original historical CI failures are disclosed in each body. Later phone/publication/preview fixes do not retroactively certify intermediate snapshots. Revert code/runtime changes together; keep initial plan and additive data history. Main remains ae4af4e.

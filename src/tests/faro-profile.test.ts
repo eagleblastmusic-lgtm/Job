@@ -48,3 +48,33 @@ test('organization verification and membership are server scoped, invites expire
     await f.request(`/api/faro/organizations/${org.id}/members/${owner.id}`, owner.cookie, 'DELETE', {}, 409);
   } finally { await f.close(); }
 });
+
+test('organization verification and private moderation require independence even after affiliation is revoked; verification cannot bypass restrictions',async()=>{
+  const f=await faroFixture();try {
+    const owner=await f.user('Owner'),former=await f.user('Former'),admin=await f.user('Independent');
+    const profiles=new ProfileService(f.app.db),org=profiles.organization(owner.id,{name:'Niezależnie weryfikowana firma'});
+    const invite=profiles.invite(owner.id,org.id,{email:former.email,role:'ADMIN'});profiles.acceptInvite(former.id,former.email,invite.token);
+    for(const u of [owner,former,admin])f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(u.id);
+    const url=`/api/faro/organizations/${org.id}/verify`,note='Sprawdzone prawo reprezentacji firmy';
+    await f.request(url,owner.cookie,'POST',{note},409);await f.request(url,former.cookie,'POST',{note},409);
+    profiles.revokeMember(owner.id,org.id,former.id);
+    await f.request(url,former.cookie,'POST',{note},409);
+    assert.equal((profiles.organizations(owner.id)[0] as {verification:string}).verification,'PENDING');
+    await f.request(url,admin.cookie,'POST',{note});
+    f.app.db.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(org.id);
+    await f.request(url,admin.cookie,'POST',{note},409);
+    assert.equal((profiles.organizations(owner.id)[0] as {verification:string}).verification,'RESTRICTED');
+    const caseId='independence-case';
+    f.app.db.db.prepare("INSERT INTO faro_cases(id,organization_id,kind,statement,created_at) VALUES(?,?,'STALE_OFFER',?,?)").run(caseId,org.id,'PRIVATE_MODERATION_EVIDENCE',new Date().toISOString());
+    const formerCases=await f.request<{cases:Array<{id:string}>}>('/api/faro/cases',former.cookie);assert.equal(formerCases.cases.length,0);
+    const ownerCases=await f.request<{cases:Array<{canModerate:boolean;statement:unknown}>}>('/api/faro/cases',owner.cookie);
+    assert.equal(ownerCases.cases[0]!.canModerate,false);assert.equal(ownerCases.cases[0]!.statement,null);
+    const reviewUrl=`/api/faro/cases/${caseId}/review`,review={state:'EVIDENCE_REVIEW',decision:'Niezależny przegląd sygnału',reviewAt:new Date().toISOString(),expectedVersion:1,idempotencyKey:'conflict-review'};
+    await f.request(reviewUrl,former.cookie,'POST',review,409);await f.request(reviewUrl,owner.cookie,'POST',review,409);
+    assert.equal((f.app.db.db.prepare('SELECT revision FROM faro_cases WHERE id=?').get(caseId) as {revision:number}).revision,1);
+    const independent=await f.request<{cases:Array<{canModerate:boolean;statement:unknown}>}>('/api/faro/cases',admin.cookie);
+    assert.equal(independent.cases[0]!.canModerate,true);assert.equal(independent.cases[0]!.statement,'PRIVATE_MODERATION_EVIDENCE');
+    await f.request(reviewUrl,admin.cookie,'POST',review);
+    assert.equal((f.app.db.db.prepare('SELECT revision FROM faro_cases WHERE id=?').get(caseId) as {revision:number}).revision,2);
+  }finally{await f.close();}
+});

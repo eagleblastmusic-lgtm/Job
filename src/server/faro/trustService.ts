@@ -32,7 +32,7 @@ export class TrustService extends FaroStore {
     return p.candidate_id===userId?'CANDIDATE':'EMPLOYER';
   }
   involved(userId:string,row:CaseRow) {
-    return row.reporter_id===userId||Boolean(this.db.prepare('SELECT organization_id FROM faro_members WHERE organization_id=? AND user_id=? AND active=1').get(row.organization_id,userId))||Boolean(row.process_id&&new RecruitmentService(this.database,this.clock).row(row.process_id).candidate_id===userId);
+    return row.reporter_id===userId||this.affiliated(userId,row.organization_id)||Boolean(row.process_id&&new RecruitmentService(this.database,this.clock).row(row.process_id).candidate_id===userId);
   }
   list(userId: string) {
     const admin=Boolean(this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId));

@@ -119,10 +119,16 @@ export class ProfileService extends FaroStore {
     }); return { id, name, verification: 'PENDING' };
   }
   verify(adminId: string, orgId: string, note: string) {
-    const admin = this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(adminId);
-    if (!admin) throw new HttpError(403, 'Wymagany moderator.');
-    if (!this.db.prepare("UPDATE faro_organizations SET verification='VERIFIED',verified_at=?,verification_note=? WHERE id=?").run(this.now(), text(note, 1000, 10), orgId).changes) throw new HttpError(404, 'Nie znaleziono organizacji.');
-    this.audit(adminId, 'ORGANIZATION_VERIFIED', orgId);
+    return this.transaction(()=>{
+      const admin = this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(adminId);
+      if (!admin) throw new HttpError(403, 'Wymagany moderator.');
+      const org=this.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(orgId) as {verification:string}|undefined;
+      if(!org)throw new HttpError(404,'Nie znaleziono organizacji.');
+      if(this.affiliated(adminId,orgId))throw new HttpError(409,'Organizację musi zweryfikować moderator bez powiązania z nią.','VERIFICATION_CONFLICT');
+      if(org.verification==='RESTRICTED')throw new HttpError(409,'Ograniczenie wymaga odrębnego rozstrzygnięcia moderacyjnego.','RESTRICTION_REVIEW_REQUIRED');
+      this.db.prepare("UPDATE faro_organizations SET verification='VERIFIED',verified_at=?,verification_note=? WHERE id=?").run(this.now(), text(note, 1000, 10), orgId);
+      this.audit(adminId, 'ORGANIZATION_VERIFIED', orgId);
+    });
   }
   invite(userId: string, orgId: string, body: Record<string, unknown>) {
     this.member(userId, orgId, ['OWNER','ADMIN']);

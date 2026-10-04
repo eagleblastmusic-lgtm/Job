@@ -15,6 +15,10 @@ export class FaroStore {
     if (!row || !roles.includes(row.role)) throw new HttpError(404, 'Nie znaleziono zasobu.', 'NOT_FOUND');
     return row;
   }
+  affiliated(userId:string,orgId:string) {
+    // Revocation removes access, not the conflict of interest from prior affiliation.
+    return Boolean(this.db.prepare('SELECT user_id FROM faro_members WHERE user_id=? AND organization_id=?').get(userId,orgId));
+  }
   audit(actor: string | null, action: string, entityId: string) {
     this.db.prepare('INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), actor, action, 'faro', entityId, '{}', this.now());
   }

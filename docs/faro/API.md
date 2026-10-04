@@ -67,3 +67,5 @@ CP11-B adds no public endpoint. RecoveryService and restore-faro.mjs operate onl
 CP06-H: GET /processes/:id/phone-preview is candidate-only, requires ACTIVE/OFFERED and a saved private number, returns phone and a consistency confirmationToken. POST /processes/:id/phone-grant requires phoneConfirmed=true and the current process/number-bound token; absent confirmation 400, stale token 409, wrong actor 404. It rechecks inside the transaction. DELETE still revokes without a token. All Canonical responses remain no-store; the token is not an authorization credential.
 
 CP11-C: malformed raw request URLs are caught at the Canonical runtime boundary and return 400 INVALID_URL with no-store/security headers. Subsequent health/auth requests remain available; internal parse exceptions are not returned.
+
+CP07-C: POST organization verify runs authorization/state/update/audit transactionally. Own or formerly affiliated moderators get 409 VERIFICATION_CONFLICT; RESTRICTED organizations get 409 RESTRICTION_REVIEW_REQUIRED. Case review rejects historical affiliation with MODERATION_CONFLICT. Role ADMIN alone never overrides these guards.
