@@ -1,6 +1,7 @@
 import type { Skill, Projection, Salary, Economics } from './faroTypes.js';
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export const labels: Record<string, string> = {
+  KEY_ERROR:'Błąd klucza odpowiedzi',AMBIGUOUS_TASK:'Niejednoznaczne zadanie',TECHNICAL_INCIDENT:'Potwierdzony problem techniczny',ASSESSMENT_RESULT_INVALIDATED:'Oznaczono wynik jako nieważny',
   NO_SHOW_CASE:'Nieobecność do wyjaśnienia',INTERVIEW_DISCREPANCY:'Rozbieżność po rozmowie',CANDIDATE:'Kandydat',EMPLOYER:'Pracodawca',
   PROCESS_VIOLATION_CONFIRMED:'Potwierdzone naruszenie procesu',INSUFFICIENT_EVIDENCE:'Za mało dowodów',NO_VIOLATION_CONFIRMED:'Nie potwierdzono naruszenia',CASE_RESOLVED:'Sprawa rozstrzygnięta',
   REQUIREMENT:'Kompetencja z oferty',AVAILABILITY:'Dostępność',DECLARE_SKILL:'Deklaruję kompetencję',NOT_YET:'Jeszcze tego nie potrafię',

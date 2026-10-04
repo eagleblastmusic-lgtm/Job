@@ -44,6 +44,8 @@ export interface Process {
   contactGrant: { granted_at: string; revoked_at: string | null } | null;
 }
 export interface Attempt {
+  resultValidity:'VALID'|'INVALIDATED'|null;
+  resultHistory:Array<{revision:number;validity:'VALID'|'INVALIDATED';reasonCode:string|null;reason:string|null;createdAt:string|null;result:{earned:number;possible:number}}>;
   viewer:'CANDIDATE'|'EMPLOYER';rubricVersion:string;
   reviewTasks:Array<{id:string;prompt:string;options:string[];points:number;correctOption:number;chosenOption:number|null}>;
   processVersion:number;

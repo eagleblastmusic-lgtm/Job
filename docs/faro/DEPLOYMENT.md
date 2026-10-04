@@ -15,3 +15,5 @@ CP11-B proves local DB-only recovery against an older snapshot and a current aut
 CP11-D adds separate Canonical CI without replacing or making the original historical CI optional. Branch protection is not modified. Current evidence is local Node24 only; CI Node22/24 and Docker results require actual remote verification. Production API and scheduler activation gates remain closed.
 
 CP11-E adds isolated image acceptance to faro.yml: build existing Dockerfile (npm test inside build), start ephemeral local production container, synthetic free-first signup and secure session, retired routes410, Canonical503 release gate. No live deployment. Docker unavailable locally; await actual Ubuntu result before certifying image.
+
+CP11-E image acceptance completed on Ubuntu run37189804326 at9889288: image builds/tests and isolated production boundary passes. No deployment performed. CP10-F additive migration0028 needs backup/validation; keep correction history through rollback and recovery, do not drop table after invalidations. Production gates remain closed.

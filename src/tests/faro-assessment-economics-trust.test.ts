@@ -213,3 +213,66 @@ test('human assessment result review is revision guarded and idempotent; termina
     assert.equal(service.row(second.id).state,'SCORED_PENDING_REVIEW');assert.equal(service.overview(f.candidate.id,second.id).result,null);
   }finally{await f.close();}
 });
+
+
+test('invalid result retains original evidence, informs both roles, rejects stale/unauthorized retries and exports/erases own history',async()=>{
+  const f=await assessmentSetup();try {
+    const s=new AssessmentService(f.app.db),r=s.recruitment;
+    const d=s.create(f.employer.id,f.offer.id,{title:'Błąd testu',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'original-rubric',tasks:[{prompt:'Wybierz odpowiedź',options:['A','B'],answer:1,points:2}]});
+    s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const a=s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'invalid-assign'});
+    const started=s.start(f.candidate.id,a.id);s.save(f.candidate.id,a.id,{expectedVersion:started.revision,answers:{'task-1':0}},true);
+    const url='/api/faro/attempts/'+a.id+'/invalidate-result';
+    const command=()=>({expectedVersion:s.row(a.id).revision,processVersion:r.row(f.interest.id).revision,reasonCode:'KEY_ERROR',reason:'Wykryto błąd klucza zadania; wynik nie jest podstawą decyzji.',confirmed:true,idempotencyKey:'invalid-once'});
+    await f.request(url,f.employer.cookie,'POST',command(),409);
+    s.finalize(f.employer.id,a.id,{expectedVersion:s.row(a.id).revision,processVersion:r.row(f.interest.id).revision,confirmed:true,note:'Pierwotny przegląd według rubryki',idempotencyKey:'invalid-finalize'});
+    r.change(f.candidate.id,f.interest.id,{command:'WITHDRAW',expectedVersion:r.row(f.interest.id).revision,idempotencyKey:'invalid-withdraw'});
+    const old=s.row(a.id),process=r.row(f.interest.id),body=command(),foreign=await f.user('InvalidForeign');
+    assert.equal(process.status,'WITHDRAWN');
+    await f.request(url,f.candidate.cookie,'POST',body,404);await f.request(url,f.admin.cookie,'POST',body,404);await f.request(url,foreign.cookie,'POST',body,404);
+    await f.request(url,f.employer.cookie,'POST',{...body,confirmed:false},400);
+    await f.request(url,f.employer.cookie,'POST',{...body,reason:''},400);
+    await f.request(url,f.employer.cookie,'POST',{...body,reasonCode:'LOW_SCORE'},400);
+    await f.request(url,f.employer.cookie,'POST',{...body,expectedVersion:old.revision-1},409);
+    await f.request(url,f.employer.cookie,'POST',{...body,processVersion:process.revision-1},409);
+    assert.equal(s.resultHistory(a.id).length,1);assert.deepEqual(s.row(a.id),old);
+    const response=await f.request<{result:null;resultValidity:string;resultHistory:Array<{validity:string;result:{earned:number};reason:string}>}>(url,f.employer.cookie,'POST',body);
+    assert.equal(response.result,null);assert.equal(response.resultValidity,'INVALIDATED');assert.equal(response.resultHistory.length,2);
+    assert.equal(response.resultHistory[0]!.validity,'VALID');assert.equal(response.resultHistory[0]!.result.earned,0);
+    assert.equal(response.resultHistory[1]!.reason,body.reason);assert.equal(s.row(a.id).result,old.result);assert.equal(s.row(a.id).answers,old.answers);
+    assert.deepEqual(r.row(f.interest.id),process); // Both clocks, stage and recruitment decision stay untouched.
+    assert.deepEqual(await f.request(url,f.employer.cookie,'POST',body),response);
+    await f.request(url,f.employer.cookie,'POST',{...body,reason:'Zmiana przy tym samym kluczu'},409);
+    await f.request(url,f.employer.cookie,'POST',{...command(),idempotencyKey:'invalid-twice'},409);
+    const candidate=s.overview(f.candidate.id,a.id);assert.equal(candidate.result,null);assert.deepEqual(candidate.resultHistory,response.resultHistory);assert.equal(candidate.reviewTasks.length,0);
+    assert.doesNotMatch(JSON.stringify(candidate),/correctOption|reviewer_id|password_hash/);
+    const events=f.app.db.db.prepare("SELECT id FROM faro_events WHERE process_id=? AND kind='ASSESSMENT_RESULT_INVALIDATED'").all(process.id);assert.equal(events.length,1);
+    const recipients=f.app.db.db.prepare('SELECT recipient_id FROM faro_outbox WHERE dedupe_key=?').all(String(events[0]!.id));assert.deepEqual(new Set(recipients.map(x=>x.recipient_id)),new Set([f.candidate.id,f.employer.id]));
+    const exported=await f.request<{faro:{faro_result_history:unknown[]}}>('/api/export',f.candidate.cookie);assert.equal(exported.faro.faro_result_history.length,2);
+    const otherExport=await f.request<{faro:{faro_result_history:unknown[]}}>('/api/export',foreign.cookie);assert.equal(otherExport.faro.faro_result_history.length,0);
+    // Revocation must deny even an otherwise idempotent replay.
+    f.app.db.db.prepare('DELETE FROM faro_assignments WHERE offer_id=? AND user_id=?').run(f.offer.id,f.employer.id);
+    await f.request(url,f.employer.cookie,'POST',body,404);
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_result_history WHERE attempt_id=?').get(a.id)!.n,0);
+    assert.equal(f.app.db.db.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{await f.close();}
+});
+
+
+test('result-history migration preserves legacy result and actual review timestamp without inventing missing dates',async()=>{
+  const {DatabaseSync}=await import('node:sqlite'),{readFileSync}=await import('node:fs');
+  const db=new DatabaseSync(':memory:');try {
+    db.exec('PRAGMA foreign_keys=ON; CREATE TABLE faro_attempts(id TEXT PRIMARY KEY,state TEXT,result TEXT,reviewed_at TEXT,deadline TEXT);');
+    const result=JSON.stringify({earned:0,possible:2,review:'FINALIZED',reviewNote:'Zachowany przegląd'});
+    db.prepare('INSERT INTO faro_attempts VALUES(?,?,?,?,?)').run('legacy','FINALIZED',result,'2026-09-17T10:00:00.000Z','2026-09-18T10:00:00.000Z');
+    db.prepare('INSERT INTO faro_attempts VALUES(?,?,?,?,?)').run('unknown-date','FINALIZED',result,null,'2026-09-18T10:00:00.000Z');
+    db.prepare('INSERT INTO faro_attempts VALUES(?,?,?,?,?)').run('pending','SCORED_PENDING_REVIEW',result,null,'2026-09-18T10:00:00.000Z');
+    db.exec(readFileSync('migrations/0028_faro_result_validity.sql','utf8'));
+    const rows=db.prepare('SELECT * FROM faro_result_history ORDER BY attempt_id').all();assert.equal(rows.length,2);
+    assert.equal(rows[0]!.result,result);assert.equal(rows[0]!.created_at,'2026-09-17T10:00:00.000Z');assert.equal(rows[1]!.created_at,null);
+    assert.equal(rows[0]!.validity,'VALID');assert.equal(rows[0]!.reason,null);
+    db.prepare('DELETE FROM faro_attempts WHERE id=?').run('legacy');assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_result_history').get()!.n,1);
+    assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{db.close();}
+});

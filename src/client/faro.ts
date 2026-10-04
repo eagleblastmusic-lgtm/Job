@@ -278,6 +278,7 @@ root.addEventListener('submit', event => {
         const answers:Record<string,number>={}; for(const task of currentAttempt?.tasks ?? []) if(f.has(task.id)) answers[task.id]=number(f,task.id);
         const submit=value(f,'operation')==='Prześlij do oceny'; await api(`/attempts/${id}/${submit?'submit':'answers'}`,submit?'POST':'PUT',{answers,expectedVersion:currentAttempt?.revision});
       } else if (action === 'attempt-review') await api(`/attempts/${id}/review`,'POST',{note:value(f,'note'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});
+      if(action==='attempt-invalidate')await api(`/attempts/${id}/invalidate-result`,'POST',{reasonCode:value(f,'reasonCode'),reason:value(f,'reason'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});
       if (mine !== epoch) return;
       if(destination) navigate(destination); else { await render(); notify('Zapisano.'); }
     } catch(e) { if(mine === epoch && (e as Error).name !== 'AbortError') { const message=el.querySelector('.f-form-message'); if(message) message.textContent=(e as Error).message; else notify((e as Error).message,true); } }

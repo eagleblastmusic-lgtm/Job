@@ -313,6 +313,18 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await expect(page.getByText('Wynik zatwierdzony',{exact:true})).toBeVisible();
     const final=await f.request<{result:{earned:number;review:string}}>(`/api/faro/attempts/${id}`,candidate.cookie);
     expect(final.result.earned).toBe(1);expect(final.result.review).toBe('FINALIZED');
+    const correction=page.locator('[data-form=attempt-invalidate]');
+    await correction.locator('[name=reasonCode]').selectOption('AMBIGUOUS_TASK');
+    await correction.locator('[name=reason]').fill('Zadanie było niejednoznaczne; wynik nie może służyć decyzji.');
+    await correction.locator('[name=confirmed]').check();
+    await correction.getByRole('button',{name:'Oznacz wynik jako nieważny'}).click();
+    await expect(page.getByText('Wynik nieważny',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);await page.goto(`${f.base}/#attempts/${id}`);
+    await expect(page.getByText(/Historyczne punkty nie są aktualną oceną/)).toBeVisible();
+    await page.getByText('Historia ważności wyniku',{exact:true}).click();
+    await expect(page.getByText('Zadanie było niejednoznaczne; wynik nie może służyć decyzji.',{exact:true})).toBeVisible();
+    await expect(page.locator('[data-form=attempt-invalidate]')).toHaveCount(0);
+    await expect(page.getByRole('heading',{name:'Wynik w tej rekrutacji'})).toHaveCount(0);
   }finally{await f.close();}
 });
 

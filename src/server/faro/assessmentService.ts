@@ -108,15 +108,19 @@ export class AssessmentService extends FaroStore {
     const row = this.db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(id) as unknown as AttemptRow | undefined;
     if (!row) throw new HttpError(404, 'Nie znaleziono próby.'); return row;
   }
+  resultHistory(id:string) {
+    return this.db.prepare('SELECT revision,validity,result,reason_code reasonCode,reason,created_at createdAt FROM faro_result_history WHERE attempt_id=? ORDER BY revision').all(id).map(row=>({revision:Number(row.revision),validity:row.validity as 'VALID'|'INVALIDATED',reasonCode:row.reasonCode as string|null,reason:row.reason as string|null,createdAt:row.createdAt as string|null,result:JSON.parse(row.result as string) as Record<string,unknown>}));
+  }
   overview(userId: string, id: string) {
     const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
     const candidate = process.candidate_id === userId;
+    const history=row.state==='FINALIZED'?this.resultHistory(id):[];
     const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
     const savedAnswers=JSON.parse(row.answers) as Record<string,number>;
-    return { id, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
+    return { id, resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
       reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
-      answers: candidate ? savedAnswers : {}, result: row.result && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
+      answers: candidate ? savedAnswers : {}, result: row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
   }
   attempts(userId: string, processId?: string) {
     if (processId) this.recruitment.authorize(userId, processId);
@@ -181,8 +185,25 @@ export class AssessmentService extends FaroStore {
       if(row.state!=='SCORED_PENDING_REVIEW'||!row.result||body.confirmed!==true)throw new HttpError(409,'Wynik wymaga świadomego review.');
       const note=text(body.note,1000,10),result={...JSON.parse(row.result) as Record<string,unknown>,review:'FINALIZED',reviewNote:note};
       this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result),userId,this.now(),id);
+      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,created_at) VALUES(?,1,'VALID',?,?)").run(id,JSON.stringify(result),this.now());
       this.audit(userId,'ASSESSMENT_RESULT_REVIEWED',id);
       this.recruitment.event(process,userId,'ASSESSMENT_FINALIZED',{attemptId:id});
+      return this.overview(userId,id);
+    });
+  }
+  invalidateResult(userId:string,id:string,body:Record<string,unknown>) {
+    this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);
+    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_INVALIDATE'},()=>{
+      const row=this.row(id),process=this.recruitment.row(row.process_id);
+      this.recruitment.offers.assigned(userId,process.offer_id);
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
+      const previous=this.resultHistory(id).at(-1);
+      if(row.state!=='FINALIZED'||!previous||previous.validity!=='VALID')throw new HttpError(409,'Tylko aktualny zatwierdzony wynik można oznaczyć jako nieważny.','RESULT_NOT_VALID');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wycofanie ważności wyniku.','CONFIRMATION_REQUIRED');
+      const reasonCode=choice(body.reasonCode,['KEY_ERROR','AMBIGUOUS_TASK','TECHNICAL_INCIDENT'] as const),reason=text(body.reason,1000,10);
+      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'INVALIDATED',?,?,?,?)").run(id,Number(previous.revision)+1,row.result!,reasonCode,reason,this.now());
+      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
+      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_INVALIDATED',{attemptId:id,reasonCode});
       return this.overview(userId,id);
     });
   }
