@@ -44,6 +44,7 @@ export interface Process {
   contactGrant: { granted_at: string; revoked_at: string | null } | null;
 }
 export interface Attempt {
+  incident:{id:string;category:string;statement:string;reportedAt:string;observedState:string;observedRevision:number;originalDeadline:string;originalStartedAt:string|null;originalExpiresAt:string|null;state:string;revision:number;resolution:string|null;reason:string|null;resolvedAt:string|null}|null;
   resultValidity:'VALID'|'INVALIDATED'|null;
   resultHistory:Array<{revision:number;validity:'VALID'|'INVALIDATED';reasonCode:string|null;reason:string|null;createdAt:string|null;result:{earned:number;possible:number}}>;
   viewer:'CANDIDATE'|'EMPLOYER';rubricVersion:string;

@@ -41,6 +41,8 @@ try {
   assessments.approve(employer.id,definition.id,{version:1,action:'REVIEW'});assessments.approve(employer.id,definition.id,{version:1,action:'APPROVE',confirmed:true});
   const attempt=assessments.assign(employer.id,removed.id,{assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'backup-assign'});
   const started=assessments.start(gone.id,attempt.id);assessments.save(gone.id,attempt.id,{expectedVersion:started.revision,answers:{'task-1':1}},false);
+  const attemptView=assessments.overview(gone.id,attempt.id);
+  assessments.reportIncident(gone.id,attempt.id,{expectedVersion:attemptView.revision,processVersion:attemptView.processVersion,idempotencyKey:'backup-incident',category:'CONNECTION',statement:'Syntetyczny problem połączenia przy zapisie.',confirmed:true});
   const interviews=new InterviewService(f.app.db);
   const slot=interviews.propose(employer.id,surviving.id,{expectedVersion:2,idempotencyKey:'backup-slot',confirmed:true,startsAt:new Date(Date.now()+2*86400000).toISOString(),endsAt:new Date(Date.now()+2*86400000+3600000).toISOString(),confirmBy:new Date(Date.now()+86400000).toISOString(),timezone:'Europe/Warsaw',location:'Rozmowa online',meetingUrl:'https://example.test/meeting'});
   const before=new ProfileService(f.app.db).projection(kept.id),firstClock=r.row(surviving.id).first_response_at;
@@ -71,6 +73,7 @@ try {
     const db=restored.db,pr=new ProfileService(restored),rec=new RecruitmentService(restored);
     for(const u of [gone,employer])assert.equal(db.prepare('SELECT id FROM users WHERE id=?').get(u.id),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(attempt.id),undefined);
+    assert.equal(db.prepare('SELECT id FROM faro_attempt_incidents WHERE attempt_id=?').get(attempt.id),undefined);
     assert.equal(db.prepare('SELECT process_id FROM faro_contact_grants WHERE process_id=?').get(removed.id),undefined);
     assert.deepEqual(pr.projection(kept.id),before);assert.equal(pr.member(successor.id,org.id).role,'OWNER');
     assert.equal(rec.row(surviving.id).first_response_at,firstClock);assert.equal(rec.row(surviving.id).status,'ACTIVE');

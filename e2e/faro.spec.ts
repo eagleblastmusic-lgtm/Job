@@ -299,7 +299,7 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await page.goto(`${f.base}/#attempts/${id}`);
     await expect(page.getByText('Liczba zadań',{exact:true})).toBeVisible();
     await expect(page.getByText(/Odpowiedzi robocze nie są pokazywane firmie/)).toBeVisible();
-    await expect(page.getByRole('link',{name:'formularz problemu w procesie'})).toBeVisible();
+    await expect(page.getByText('Zgłoś problem techniczny tej próby',{exact:true})).toBeVisible();
     await expect(page.getByText('Co robisz najpierw?',{exact:true})).toHaveCount(0);
     await page.getByRole('button',{name:'Rozpocznij assessment'}).click();
     await page.getByLabel('Słucham klienta',{exact:true}).check();
