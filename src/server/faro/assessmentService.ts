@@ -111,7 +111,7 @@ export class AssessmentService extends FaroStore {
   overview(userId: string, id: string) {
     const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
     const candidate = process.candidate_id === userId;
-    return { id, processId: row.process_id, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
+    return { id, processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
       answers: candidate ? JSON.parse(row.answers) as Record<string, number> : {}, result: row.result && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
   }
@@ -168,13 +168,20 @@ export class AssessmentService extends FaroStore {
     });
   }
   finalize(userId: string, id: string, body: Record<string, unknown>) {
-    const row = this.row(id), process = this.recruitment.row(row.process_id);
-    new OfferService(this.database, this.clock).assigned(userId, process.offer_id);
-    if (row.state !== 'SCORED_PENDING_REVIEW' || !row.result || body.confirmed !== true) throw new HttpError(409, 'Wynik wymaga świadomego review.');
-    const note = text(body.note, 1000, 10), result = { ...JSON.parse(row.result) as Record<string, unknown>, review: 'FINALIZED', reviewNote: note };
-    this.transaction(() => {
-      this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result), userId, this.now(), id);
-      this.recruitment.event(process, userId, 'ASSESSMENT_FINALIZED', { attemptId: id });
-    }); return this.overview(userId, id);
+    const initial=this.row(id);
+    this.recruitment.offers.assigned(userId,this.recruitment.row(initial.process_id).offer_id);
+    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},()=>{
+      const row=this.row(id),process=this.recruitment.row(row.process_id);
+      this.recruitment.offers.assigned(userId,process.offer_id);
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się. Odśwież wynik.','VERSION_CONFLICT');
+      if(TERMINAL.includes(process.status))throw new HttpError(409,'Proces został zakończony.','PROCESS_TERMINAL');
+      if(row.state!=='SCORED_PENDING_REVIEW'||!row.result||body.confirmed!==true)throw new HttpError(409,'Wynik wymaga świadomego review.');
+      const note=text(body.note,1000,10),result={...JSON.parse(row.result) as Record<string,unknown>,review:'FINALIZED',reviewNote:note};
+      this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result),userId,this.now(),id);
+      this.audit(userId,'ASSESSMENT_RESULT_REVIEWED',id);
+      this.recruitment.event(process,userId,'ASSESSMENT_FINALIZED',{attemptId:id});
+      return this.overview(userId,id);
+    });
   }
+
 }

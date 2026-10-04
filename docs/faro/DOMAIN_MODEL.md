@@ -23,3 +23,5 @@ Interview is separate from InterestStatus and CurrentStage: PROPOSED → CONFIRM
 Private profile preferences now hold explicit work model/contract/night/weekend boundaries with a profile revision. Matching combines deterministic requirement explanations with separate user-selected condition states; these are not a global score and never imply a verified skill. Only published structured offer fields enter condition evaluation.
 
 ContactGrant remains process-scoped and candidate-controlled. The exact private number is confirmed at grant time; any subsequent profile number change revokes all grants in the same transaction. Stage progression never creates a grant.
+
+Assessment result finalization is a human, revision-guarded command. The pinned objective breakdown/rubric remains unchanged; a conscious review adds note/reviewer/time and one result-review audit/event. It does not change first-response clock, global ranking or an employment decision. Result correction/retry policy remains a separate open requirement; finalized results cannot be silently overwritten.

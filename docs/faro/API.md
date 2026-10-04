@@ -69,3 +69,5 @@ CP06-H: GET /processes/:id/phone-preview is candidate-only, requires ACTIVE/OFFE
 CP11-C: malformed raw request URLs are caught at the Canonical runtime boundary and return 400 INVALID_URL with no-store/security headers. Subsequent health/auth requests remain available; internal parse exceptions are not returned.
 
 CP07-C: POST organization verify runs authorization/state/update/audit transactionally. Own or formerly affiliated moderators get 409 VERIFICATION_CONFLICT; RESTRICTED organizations get 409 RESTRICTION_REVIEW_REQUIRED. Case review rejects historical affiliation with MODERATION_CONFLICT. Role ADMIN alone never overrides these guards.
+
+CP10-D: attempt overview adds processVersion. POST /attempts/:id/review requires expectedVersion (attempt), processVersion, idempotencyKey, confirmed=true and review note. Authorization precedes replay lookup and is rechecked inside the command transaction. Stale attempt/process409; terminal process409; duplicate identical key returns original result with no duplicate audit/event; changed payload under key409. Candidate and unassigned admin remain404.

@@ -368,3 +368,21 @@ RISK: native controls vary by OS; remote Linux evidence required. Shared workspa
 ROLLBACK: revert scoped CSS/test together; do not accept the known obstructed checkbox.
 STATUS: local fix DONE; remote acceptance pending, overall CP08 PARTIAL.
 NEXT CHECKPOINT: remote browser acceptance and assessment final review concurrency.
+
+## CP10-D — Transactional and idempotent human result review (2026-10-04)
+ID / TITLE: CP10-D, protect result finalization against stale reviews/retries.
+GOAL / PURPOSE / CURRENT GAP: finalize read state before its transaction and lacked version/idempotency guards; concurrent review could silently overwrite/duplicate events.
+SCOPE / IMPLEMENTATION / FILES: assessmentService.ts overview and commandOnce finalization, client faro.ts/types, assessment API test, documentation.
+DB CHANGE / MIGRATIONS: none; existing revisions/idempotency/audit reused.
+API CHANGE: result review requires current attempt and process versions and idempotency key; rechecks assigned employer and active process inside transaction. Overview exposes processVersion only, no extra identity.
+FRONTEND CHANGE: existing conscious-review form sends current versions/key; no redesign/login change.
+DEPENDENCIES: CP10-B/C pinned attempt, CP06 transaction/revision/idempotency, CP08 review form.
+TESTS / TESTED: build/typecheck/lint and6 assessment/economics/trust scenarios PASS; actual review browser journey PASS mobile/desktop (2). New API scenario checks wrong actors, missing conscious confirmation, stale attempt/process, exact replay, changed payload conflict, one audit/event, unchanged first clock and terminal denial.
+ACCEPTANCE CRITERIA: no stale result publication/overwrite; unauthorized or terminal attempt review has no side effects; exact replay returns same result; explicit human review stays required; no auto-hire/reject/ranking.
+LEGAL STATUS: local synthetic assessment foundation; production scoring/AI/legal validation remain gated.
+RISK / DEFERRED: immutable result correction, accommodation/retry and complex/manual task engine remain open. Pending historical score after withdrawal stays private/unfinalized rather than becoming a new decision.
+ROLLBACK: revert API/client together while retaining transactional stale/result guards and immutable event history.
+STATUS: DONE for CP10-D; overall CP10 PARTIAL.
+NEXT CHECKPOINT: final CI for this checkpoint and remaining trust/assessment/domain engineering.
+
+CP08-B remote acceptance is now DONE for the bounded fix (run37187096431 at d824acf). Overall workspace/release plan remains PARTIAL; four dependent draft PR39–42 are unmerged, original historical CI and production/legal gates unresolved.

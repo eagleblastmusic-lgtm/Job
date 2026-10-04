@@ -65,7 +65,7 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.ok(definition.recruitment.row(f.interest.id).stage_due_at);
     const employerPending = await f.request<{ result: { earned: number; possible: number; unanswered: number; review: string } }>(`/api/faro/attempts/${attempt.id}`, f.employer.cookie);
     assert.equal(employerPending.result.earned, 2); assert.equal(employerPending.result.possible, 2); assert.equal(employerPending.result.unanswered, 0); assert.equal(employerPending.result.review, 'PENDING');
-    await f.request(`/api/faro/attempts/${attempt.id}/review`, f.employer.cookie, 'POST', { confirmed: true, note: 'Sprawdzono według rubric-1' });
+    await f.request(`/api/faro/attempts/${attempt.id}/review`, f.employer.cookie, 'POST', { confirmed: true, note: 'Sprawdzono według rubric-1',expectedVersion:definition.row(attempt.id).revision,processVersion:definition.recruitment.row(f.interest.id).revision,idempotencyKey:'human-final-review' });
     const final = await f.request<{ state: string; result: { review: string } }>(`/api/faro/attempts/${attempt.id}`, f.employer.cookie);
     assert.equal(final.state, 'FINALIZED'); assert.equal(final.result.review, 'FINALIZED');
     const old = definition.row(attempt.id);
@@ -176,4 +176,36 @@ test('trust report and stale-offer worker create reviewable signals, proportiona
     const staleAgain = f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_cases WHERE kind='STALE_OFFER' AND organization_id=?").get(f.org.id) as { n: number };
     assert.equal(staleAgain.n, 1);
   } finally { await f.close(); }
+});
+
+test('human assessment result review is revision guarded and idempotent; terminal or unauthorized review has no effects',async()=>{
+  const f=await assessmentSetup();try {
+    const service=new AssessmentService(f.app.db),r=service.recruitment;
+    const attempt=()=>{
+      const d=service.create(f.employer.id,f.offer.id,{title:'Świadomy przegląd wyniku',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'review-1',tasks:[{prompt:'Wybierz odpowiedź',options:['A','B'],answer:1,points:2}]});
+      service.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});service.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+      const a=service.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:r.row(f.interest.id).revision,idempotencyKey:'assign-'+d.id});
+      const started=service.start(f.candidate.id,a.id);service.save(f.candidate.id,a.id,{expectedVersion:started.revision,answers:{'task-1':1}},true);return a;
+    };
+    const a=attempt(),first=r.row(f.interest.id).first_response_at;
+    const url=`/api/faro/attempts/${a.id}/review`,body={confirmed:true,note:'Sprawdzono zgodnie z rubryką review-1',expectedVersion:service.row(a.id).revision,processVersion:r.row(f.interest.id).revision,idempotencyKey:'finalize-once'};
+    await f.request(url,f.candidate.cookie,'POST',body,404);await f.request(url,f.admin.cookie,'POST',body,404);
+    await f.request(url,f.employer.cookie,'POST',{...body,confirmed:false},409);
+    await f.request(url,f.employer.cookie,'POST',{...body,expectedVersion:body.expectedVersion-1},409);
+    r.change(f.employer.id,f.interest.id,{command:'ADVANCE',expectedVersion:body.processVersion,idempotencyKey:'review-concurrent-stage',nextAction:'Uzgodnienie kolejnego kroku',dueAt:new Date(Date.now()+86400000).toISOString()});
+    await f.request(url,f.employer.cookie,'POST',body,409);
+    assert.equal(service.row(a.id).state,'SCORED_PENDING_REVIEW');assert.equal(service.overview(f.candidate.id,a.id).result,null);
+    const current={...body,processVersion:r.row(f.interest.id).revision};
+    const result=await f.request<{state:string;revision:number}>(url,f.employer.cookie,'POST',current);
+    assert.equal(result.state,'FINALIZED');assert.equal(result.revision,body.expectedVersion+1);
+    assert.deepEqual(await f.request(url,f.employer.cookie,'POST',current),result);
+    await f.request(url,f.employer.cookie,'POST',{...current,note:'Zmiana wyniku pod tym samym kluczem'},409);
+    await f.request(url,f.employer.cookie,'POST',{...current,idempotencyKey:'second-review'},409);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ASSESSMENT_FINALIZED'").get(f.interest.id)!.n,1);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE entity_id=? AND action='ASSESSMENT_RESULT_REVIEWED'").get(a.id)!.n,1);
+    assert.equal(r.row(f.interest.id).first_response_at,first);
+    const second=attempt();r.change(f.candidate.id,f.interest.id,{command:'WITHDRAW',expectedVersion:r.row(f.interest.id).revision,idempotencyKey:'withdraw-before-review'});
+    await f.request(`/api/faro/attempts/${second.id}/review`,f.employer.cookie,'POST',{...body,expectedVersion:service.row(second.id).revision,processVersion:r.row(f.interest.id).revision,idempotencyKey:'review-after-withdraw'},409);
+    assert.equal(service.row(second.id).state,'SCORED_PENDING_REVIEW');assert.equal(service.overview(f.candidate.id,second.id).result,null);
+  }finally{await f.close();}
 });
