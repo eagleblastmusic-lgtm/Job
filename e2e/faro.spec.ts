@@ -91,7 +91,10 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.locator('[data-form=process-command] [name=command]').selectOption('ADVANCE');
     await page.locator('[name=nextAction]').fill('Rozmowa o praktyce obsługi klienta');
     await page.locator('[name=dueAt]').fill('2099-01-01T12:00');
-    await page.locator('[data-form=process-command] [name=confirmed]').check();
+    const confirmation=page.locator('[data-form=process-command] [name=confirmed]');
+    const target=await confirmation.boundingBox();expect(target!.width).toBeGreaterThanOrEqual(24);expect(target!.height).toBeGreaterThanOrEqual(24);
+    expect(await confirmation.evaluate(el=>getComputedStyle(el).padding)).toBe('0px');
+    await confirmation.check();
     await page.getByRole('button',{name:'Zapisz działanie'}).click();
     await expect(page.locator('.f-detail').getByText('W toku',{exact:true})).toBeVisible();
     const p=await f.request<{stage:string;contactGrant:unknown}>(`/api/faro/processes/${processId}`,candidate.cookie);

@@ -353,3 +353,18 @@ RISK / DEFERRED: historical affiliation conservatively remains a conflict while 
 ROLLBACK: retain stricter conflict/restriction guards; revert feature entry points if necessary without exposing private evidence.
 STATUS: DONE for CP07-C; overall CP07 PARTIAL.
 NEXT CHECKPOINT: mobile checkbox hit-target failure discovered by actual Ubuntu CI.
+
+## CP08-B — Workspace checkbox geometry and mobile scroll clearance (2026-10-04)
+ID / TITLE: CP08-B, fix actual Ubuntu browser failure.
+GOAL / PURPOSE / CURRENT GAP: legacy/native checkbox dimensions conflicted with generic workspace input padding; normal320px click hit fieldset/navigation; fieldsets inherited a pale legacy surface.
+SCOPE / IMPLEMENTATION / FILES: public/faro.css scoped to workspace only, e2e/faro.spec.ts pointer geometry assertion and operational status.
+DB CHANGE / MIGRATIONS / API CHANGE: none.
+FRONTEND CHANGE: native24px checkbox/radio with zero padding, mobile100px scroll margin; transparent workspace fieldsets keep dark parent surface. Login CSS/markup unchanged.
+DEPENDENCIES: CP08 shell, CP11-D actual remote browser evidence.
+TESTS / TESTED: build/typecheck/lint and affected workflow PASS mobile/desktop locally; visual screenshot inspected. Test uses ordinary click, asserts actual geometry/padding; Ubuntu rerun pending.
+ACCEPTANCE CRITERIA: normal touch/pointer confirmation at320px is reachable above nav; no forced click/skip/timeout masking; original auth visuals retained; dark form surface and no horizontal overflow.
+LEGAL STATUS: accessibility/runtime fix, production gates unchanged.
+RISK: native controls vary by OS; remote Linux evidence required. Shared workspace CSS affects all forms; complete remote browser suite will rerun.
+ROLLBACK: revert scoped CSS/test together; do not accept the known obstructed checkbox.
+STATUS: local fix DONE; remote acceptance pending, overall CP08 PARTIAL.
+NEXT CHECKPOINT: remote browser acceptance and assessment final review concurrency.
