@@ -76,7 +76,11 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     const url = new URL(req.url ?? path, config.appOrigin);
     const reliability=path.match(/^\/api\/faro\/organizations\/([^/]+)\/reliability$/);
     if(reliability&&method==='GET')return ok(trust.reliability(user.id,reliability[1]!,url.searchParams.get('from')??'',url.searchParams.get('to')??''));
-    if (path === '/api/faro/offers' && method === 'GET') return ok({ offers: offers.list(user.id, url.searchParams.get('organizationId') ?? undefined) });
+    if (path === '/api/faro/offers' && method === 'GET') {
+      const includeUnknown=url.searchParams.get('includeUnknown')??'false';
+      if(!['true','false'].includes(includeUnknown))throw new HttpError(400,'Wybierz jawnie sposób pokazywania nieznanych warunków.');
+      return ok({ offers: offers.list(user.id, url.searchParams.get('organizationId') ?? undefined,includeUnknown==='true') });
+    }
     const orgOffers = path.match(/^\/api\/faro\/organizations\/([^/]+)\/offers$/);
     if (orgOffers && method === 'POST') return ok(offers.create(user.id, orgOffers[1]!, body), 201);
     const offerPath = path.match(/^\/api\/faro\/offers\/([^/]+)$/);
