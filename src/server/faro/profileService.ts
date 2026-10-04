@@ -23,6 +23,8 @@ export class ProfileService extends FaroStore {
       if(integer(body.expectedVersion,1)!==current.version)throw new HttpError(409,'Odśwież profil.','VERSION_CONFLICT');
       // Older callers omitting this field do not silently erase an existing private minimum.
       const salaryRaw=raw.salaryMinimum===undefined?this.constraints(userId).salaryMinimum:raw.salaryMinimum;
+      const commuteRaw=raw.maxCommuteMinutes===undefined?this.constraints(userId).maxCommuteMinutes:raw.maxCommuteMinutes;
+      constraints.maxCommuteMinutes=commuteRaw===null||commuteRaw===undefined?null:integer(commuteRaw,0,1440);
       if(salaryRaw===null||salaryRaw===undefined)constraints.salaryMinimum=null;
       else {
         const s=object(salaryRaw);

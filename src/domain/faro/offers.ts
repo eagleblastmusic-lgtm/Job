@@ -13,9 +13,11 @@ export interface SalaryMinimum {
 export interface CandidateConstraints {
   active:boolean;workModels:Array<OfferData['workModel']>;contracts:Array<SalaryOption['contract']>;noNights:boolean;noWeekends:boolean;
   salaryMinimum?:SalaryMinimum|null;
+  maxCommuteMinutes?:number|null;
 }
-export const DEFAULT_CONSTRAINTS:CandidateConstraints={active:false,workModels:[],contracts:[],noNights:false,noWeekends:false,salaryMinimum:null};
-export function explainConditions(offer:OfferData,c:CandidateConstraints) {
+export const DEFAULT_CONSTRAINTS:CandidateConstraints={active:false,workModels:[],contracts:[],noNights:false,noWeekends:false,salaryMinimum:null,maxCommuteMinutes:null};
+export interface CommuteEstimate {minutes:number|null;source:string;observedAt:string;asOf:string;currentVersion:boolean;basis:string;}
+export function explainConditions(offer:OfferData,c:CandidateConstraints,commute?:CommuteEstimate) {
   const result:Array<{field:string;state:'SATISFIED'|'KNOWN_NOT_MET'|'UNKNOWN'}>=[];
   if(!c.active)return result;
   if(c.workModels.length)result.push({field:'workModel',state:c.workModels.includes(offer.workModel)?'SATISFIED':'KNOWN_NOT_MET'});
@@ -29,6 +31,10 @@ export function explainConditions(offer:OfferData,c:CandidateConstraints) {
     result.push({field:'salary',state});
   }
   for(const [field,enabled,value] of [['nights',c.noNights,offer.nights],['weekends',c.noWeekends,offer.weekends]] as const)if(enabled)result.push({field,state:value===null?'UNKNOWN':value?'KNOWN_NOT_MET':'SATISFIED'});
+  if(c.maxCommuteMinutes!==null&&c.maxCommuteMinutes!==undefined) {
+    const comparable=commute&&commute.currentVersion&&commute.basis==='ROUND_TRIP_MINUTES_PER_WORK_DAY'&&commute.minutes!==null&&Number.isSafeInteger(commute.minutes)&&commute.minutes>=0&&!!commute.source.trim()&&Number.isFinite(Date.parse(commute.observedAt))&&Date.parse(commute.observedAt)<=Date.parse(commute.asOf);
+    result.push({field:'commute',state:!comparable?'UNKNOWN':commute.minutes!<=c.maxCommuteMinutes?'SATISFIED':'KNOWN_NOT_MET'});
+  }
   return result;
 }
 export interface OfferData {

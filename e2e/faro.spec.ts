@@ -47,11 +47,16 @@ test('Faro real candidate and employer process, private watch, economics and res
     await expect(page.locator('[data-form=constraints] [name=active]')).toBeChecked();
     await page.reload();
     await expect(page.locator('[data-form=constraints] [name=salaryMinimum]')).toHaveValue('5500');
+    await page.locator('[data-form=constraints] [name=commuteEnabled]').check();await page.locator('[data-form=constraints] [name=maxCommuteMinutes]').fill('45');
+    await page.getByRole('button',{name:'Zapisz prywatne granice'}).click();await expect(page.locator('#f-status')).toHaveText('Zapisano.');await page.reload();await expect(page.locator('[data-form=constraints] [name=maxCommuteMinutes]')).toHaveValue('45');
     await page.getByRole('link', { name: 'Możliwości', exact: true }).click();
+    await expect(page.locator('.f-offer-card')).toHaveCount(0);
+    await page.getByLabel('Pokaż też oferty z nieznanymi warunkami').check();await page.getByRole('button',{name:'Filtruj',exact:true}).click();await expect(page.getByText('Warunki częściowo nieznane',{exact:true})).toBeVisible();
     await page.locator(`.f-offer-card[href="#offers/${draft.id}"]`).click();
     await expect(page.getByRole('heading', { name: 'Droga do tej pracy' })).toBeVisible();
     await expect(page.getByText('Bez nocy: warunek spełniony',{exact:true})).toBeVisible();
     await expect(page.getByText('Minimum wynagrodzenia: warunek spełniony',{exact:true})).toBeVisible();
+    await expect(page.getByText('Maksymalny dojazd: brak informacji — nie wiemy',{exact:true})).toBeVisible();
     await expect(page.getByText('Wymagane · deklarujesz wymagany poziom', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Obserwuj prywatnie' }).click();
     await expect(page.getByRole('button', { name: 'Przestań obserwować' })).toBeVisible();
@@ -75,6 +80,8 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.getByRole('button',{name:'Zapisz prywatny szacunek'}).click();
     await expect(page.getByRole('heading',{name:'Wynik scenariusza'})).toBeVisible();
     await page.goto(`${f.base}/#offers/${draft.id}`);
+    await expect(page.getByText('Maksymalny dojazd: warunek spełniony',{exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'Możliwości',exact:true}).click();await page.getByLabel('Pokaż też oferty z nieznanymi warunkami').uncheck();await page.getByRole('button',{name:'Filtruj',exact:true}).click();await expect(page.locator('.f-offer-card')).toHaveCount(1);await page.goto(`${f.base}/#offers/${draft.id}`);
     await page.getByRole('button',{name:'Dodaj do porównania'}).click();
     await page.getByRole('link',{name:'Porównanie',exact:true}).click();
     await expect(page.getByRole('table')).toBeVisible();

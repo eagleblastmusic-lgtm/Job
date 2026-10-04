@@ -7,6 +7,7 @@ import { RecruitmentService } from '../server/faro/recruitmentService.js';
 import { explainOffer, explainConditions, DEFAULT_CONSTRAINTS, sortOffers } from '../domain/faro/offers.js';
 import { parseOffer } from '../server/faro/offerService.js';
 import { TrustService } from '../server/faro/trustService.js';
+import { EconomicsService } from '../server/faro/economicsService.js';
 
 async function setup() {
   const f = await faroFixture(), employer = await f.user('Firma'), candidate = await f.user('Jan'), outsider = await f.user('Obcy');
@@ -19,6 +20,43 @@ async function setup() {
   const offer = await f.request<OfferRecord>(`/api/faro/offers/${draft.id}/lifecycle`, employer.cookie, 'POST', { action: 'PUBLISH', expectedVersion: 2, confirmed: true });
   return { ...f, employer, candidate, outsider, org, offer };
 }
+
+test('commute bound uses only current sourced daily round-trip minutes; missing, incompatible, future or stale evidence stays unknown',()=>{
+  const data=parseOffer(offerInput('recruiter')),constraints={...DEFAULT_CONSTRAINTS,active:true,maxCommuteMinutes:45};
+  const evidence={minutes:45,source:'Własny pomiar',observedAt:'2026-10-01T12:00:00Z',asOf:'2026-10-04T12:00:00Z',currentVersion:true,basis:'ROUND_TRIP_MINUTES_PER_WORK_DAY'};
+  const state=(e:typeof evidence|undefined=evidence)=>explainConditions(data,constraints,e).find(row=>row.field==='commute')!.state;
+  assert.equal(state(),'SATISFIED');assert.equal(state({...evidence,minutes:46}),'KNOWN_NOT_MET');
+  assert.equal(explainConditions(data,constraints).find(r=>r.field==='commute')!.state,'UNKNOWN');
+  for(const change of [{minutes:-1},{minutes:1.5},{source:''},{currentVersion:false},{basis:'ONE_WAY'},{observedAt:'2026-10-05T00:00:00Z'}])assert.equal(state({...evidence,...change}),'UNKNOWN');
+  assert.equal(explainConditions(data,{...constraints,maxCommuteMinutes:0},{...evidence,minutes:0}).find(r=>r.field==='commute')!.state,'SATISFIED');
+});
+
+test('private commute bounds persist; explicit unknown listing never admits known failures and old estimates cannot pass a new offer version',async()=>{
+  const f=await setup();try {
+    const profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),economics=new EconomicsService(f.app.db),r=new RecruitmentService(f.app.db);
+    const projection=profiles.projection(f.candidate.id);
+    const process=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'commute-interest'});
+    const original={...r.row(process.id)};
+    const update=async(maxCommuteMinutes:unknown,status=200)=>f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:profiles.profile(f.candidate.id).version,constraints:{...DEFAULT_CONSTRAINTS,active:true,maxCommuteMinutes}},status);
+    await update(45);assert.deepEqual(offers.list(f.candidate.id),[]);
+    const unknown=await f.request<{offers:Array<{id:string;hasUnknownConditions:boolean}>}>('/api/faro/offers?includeUnknown=true',f.candidate.cookie);assert.equal(unknown.offers[0]!.id,f.offer.id);assert.equal(unknown.offers[0]!.hasUnknownConditions,true);
+    await f.request('/api/faro/offers?includeUnknown=1',f.candidate.cookie,'GET',undefined,400);
+    const scenario={salaryOptionIndex:0,netMin:null,netMax:null,commuteCost:null,commuteMinutes:45,transport:'CAR',source:'Prywatny pomiar trasy — nie ujawniaj',observedAt:new Date(Date.now()-1000).toISOString(),assumptions:'Prywatna trasa codzienna — bez udostępniania firmie.'};
+    economics.save(f.candidate.id,f.offer.id,scenario);assert.equal(offers.list(f.candidate.id).length,1);assert.equal(offers.detail(f.candidate.id,f.offer.id).conditionExplanation.find(c=>c.field==='commute')!.state,'SATISFIED');
+    economics.save(f.candidate.id,f.offer.id,{...scenario,commuteMinutes:46});assert.deepEqual(offers.list(f.candidate.id,undefined,true),[]);
+    economics.save(f.candidate.id,f.offer.id,{...scenario,observedAt:new Date(Date.now()+86400000).toISOString()});assert.equal(offers.list(f.candidate.id).length,0);assert.equal(offers.list(f.candidate.id,undefined,true).length,1);
+    economics.save(f.candidate.id,f.offer.id,scenario);
+    const current=offers.get(f.offer.id);offers.edit(f.employer.id,f.offer.id,{expectedVersion:current.revision,data:{...current.data,location:'Nowe miejsce wymagające sprawdzenia trasy'}});
+    const draft=offers.get(f.offer.id);offers.lifecycle(f.employer.id,f.offer.id,{action:'REVIEW',expectedVersion:draft.revision});offers.lifecycle(f.employer.id,f.offer.id,{action:'PUBLISH',expectedVersion:offers.get(f.offer.id).revision,confirmed:true});
+    assert.equal(offers.detail(f.candidate.id,f.offer.id).conditionExplanation.find(c=>c.field==='commute')!.state,'UNKNOWN');assert.equal(offers.list(f.candidate.id).length,0);
+    assert.doesNotMatch(JSON.stringify(offers.list(f.candidate.id,undefined,true)),/Prywatny pomiar|Prywatna trasa/);assert.deepEqual(offers.detail(f.employer.id,f.offer.id).conditionExplanation,[]);
+    assert.equal(offers.list(f.employer.id,f.org.id).length,1);assert.equal(profiles.constraints(f.outsider.id).maxCommuteMinutes,null);assert.deepEqual(profiles.projection(f.candidate.id),projection);assert.deepEqual({...r.row(process.id)},original);
+    const omit={...DEFAULT_CONSTRAINTS,active:true};delete omit.maxCommuteMinutes;
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:profiles.profile(f.candidate.id).version,constraints:omit});assert.equal(profiles.constraints(f.candidate.id).maxCommuteMinutes,45);
+    for(const invalid of [-1,1.5,1441,'45'])await update(invalid,400);
+    await update(null);assert.equal(offers.list(f.candidate.id).length,1);
+  }finally{await f.close();}
+});
 
 test('salary minimum compares range floors and identical units without net/FTE conversion or unrelated contract alternatives',()=>{
   const offer=parseOffer(offerInput('recruiter'));

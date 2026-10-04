@@ -6,6 +6,7 @@ const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector
 const root = $('#appView');
 let user: User | null = null, skills: Skill[] = [], organizations: Organization[] = [];
 let role: 'candidate' | 'employer' = 'candidate', orgId = '', filter = '', modelFilter = '';
+let includeUnknown=false;
 let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setInterval> | undefined;
 let offers: Offer[] = [], currentOffer: Offer | null = null, currentProcess: Process | null = null, currentAttempt: Attempt | null = null;
 const compared = new Set<string>();
@@ -36,7 +37,7 @@ function notify(text: string, error = false) {
   const status = $('#f-status');
   if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
 }
-function loggedOut() {
+function loggedOut() { includeUnknown=false;
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
   user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear(); watchAlerts.clear();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[]; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
@@ -60,7 +61,7 @@ function split(list: string, detail: string, selected: boolean, back: string) {
   return `<div class="f-split ${selected ? 'f-selected' : ''}"><aside class="f-list" aria-label="Lista">${list}</aside><section class="f-detail" aria-label="Szczegóły">${selected ? `<a class="f-back" href="#${esc(back)}">← Wróć do listy</a>` : ''}${detail}</section></div>`;
 }
 function card(o: Offer, base: string, selected: string) {
-  return `<a class="f-offer-card ${selected === o.id ? 'f-active' : ''}" href="#${base}/${o.id}" ${selected === o.id ? 'aria-current="true"' : ''}><span class="f-company-mark" aria-hidden="true">${esc(o.company.slice(0,1))}</span><div><p class="f-muted">${esc(o.company)}</p><h2>${esc(o.data.role)}</h2><p class="f-card-money">${esc(salary(o.data.salary[0]!))}</p><div class="f-chips">${chip(label(o.data.workModel))}${chip(o.data.location)}${role === 'employer' ? chip(label(o.status)) : ''}</div></div><span aria-hidden="true">↗</span></a>`;
+  return `<a class="f-offer-card ${selected === o.id ? 'f-active' : ''}" href="#${base}/${o.id}" ${selected === o.id ? 'aria-current="true"' : ''}><span class="f-company-mark" aria-hidden="true">${esc(o.company.slice(0,1))}</span><div><p class="f-muted">${esc(o.company)}</p><h2>${esc(o.data.role)}</h2><p class="f-card-money">${esc(salary(o.data.salary[0]!))}</p><div class="f-chips">${chip(label(o.data.workModel))}${o.hasUnknownConditions?chip('Warunki częściowo nieznane'):''}${chip(o.data.location)}${role === 'employer' ? chip(label(o.status)) : ''}</div></div><span aria-hidden="true">↗</span></a>`;
 }
 async function render() {
   if (!user) return;
@@ -77,14 +78,14 @@ async function render() {
       const employer = page === 'employer';
       if (employer && !orgId) html = empty('Załóż swoją organizację', 'Najpierw utwórz organizację, potem przygotuj transparentną ofertę.') + '<a class="f-button f-primary" href="#organization">Przejdź do organizacji</a>';
       else {
-        const [list, watches] = await Promise.all([api<{offers:Offer[]}>(page === 'watches' ? '/watches' : `/offers${employer ? `?organizationId=${encodeURIComponent(orgId)}` : ''}`), api<{offers:Offer[]}>('/watches')]);
+        const [list, watches] = await Promise.all([api<{offers:Offer[]}>(page === 'watches' ? '/watches' : `/offers${employer ? `?organizationId=${encodeURIComponent(orgId)}` : includeUnknown?'?includeUnknown=true':''}`), api<{offers:Offer[]}>('/watches')]);
         offers = list.offers; watchIds = new Set(watches.offers.map(o => o.id)); watchAlerts=new Map(watches.offers.map(o=>[o.id,o.watchAlerts!==false]));
         const chosen = id ? await api<Offer>(`/offers/${encodeURIComponent(id)}`) : null;
         if (mine !== epoch) return;
         currentOffer = chosen;
         const filtered = offers.filter(o => `${o.data.role} ${o.company} ${o.data.location}`.toLocaleLowerCase('pl').includes(filter.toLocaleLowerCase('pl')) && (!modelFilter || o.data.workModel === modelFilter));
         html = `<div class="f-page-heading"><p class="f-kicker">${employer ? 'PRZESTRZEŃ PRACODAWCY' : 'MOŻLIWOŚCI · CAŁA POLSKA'}</p><h1>${employer ? 'Dobra rekrutacja zaczyna się od jasnych warunków.' : 'Zobacz, dokąd prowadzą Twoje umiejętności.'}</h1><p>${employer ? 'Oferty, ludzie i kolejne kroki w jednym miejscu.' : 'Jawne wynagrodzenie. Konkretne kompetencje. Miejsce na naukę.'}</p>${employer ? `<a class="f-button f-primary" href="#offer-create">Utwórz ofertę</a>` : '<a href="#profile">Ustaw prywatne granice warunków pracy</a>'}</div>
-        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label><button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id),watchAlerts.get(chosen.id)!==false) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
+        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label>${!employer&&page==='offers'?check('includeUnknown','Pokaż też oferty z nieznanymi warunkami',includeUnknown):''}<button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id),watchAlerts.get(chosen.id)!==false) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
       }
     } else if (page === 'profile') html = profileView(await api<Profile>('/profile'), skills);
     else if (page === 'offer-create' || page === 'offer-edit') {
@@ -245,9 +246,9 @@ root.addEventListener('submit', event => {
   void (async () => {
     try {
       let destination = '';
-      if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model'); }
+      if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model');includeUnknown=f.has('includeUnknown'); }
       else if (action === 'profile') await api('/profile','PUT',{firstName:value(f,'firstName'),phone:value(f,'phone'),expectedVersion:number(f,'version'),availability:{kind:value(f,'availability'),value:value(f,'availabilityValue')}});
-      else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends'),salaryMinimum:f.has('salaryEnabled')?{amount:Math.round(number(f,'salaryMinimum')*100),currency:'PLN',basis:value(f,'salaryBasis'),period:value(f,'salaryPeriod'),hoursPerPeriod:number(f,'salaryHours'),ftePercent:number(f,'salaryFte')}:null}});
+      else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends'),maxCommuteMinutes:f.has('commuteEnabled')?number(f,'maxCommuteMinutes'):null,salaryMinimum:f.has('salaryEnabled')?{amount:Math.round(number(f,'salaryMinimum')*100),currency:'PLN',basis:value(f,'salaryBasis'),period:value(f,'salaryPeriod'),hoursPerPeriod:number(f,'salaryHours'),ftePercent:number(f,'salaryFte')}:null}});
       else if(action==='phone-grant') {await api(`/processes/${id}/phone-grant`,'POST',{phoneConfirmed:f.has('phoneConfirmed'),confirmationToken:f.get('confirmationToken')});el.closest('dialog')?.close();}
       else if (action === 'claim') await api('/claims','POST',claim(f));
       else if (action === 'learning') await api('/learning','POST',{skillId:value(f,'skillId'),mode:value(f,'mode'),practice:practice(f)});
