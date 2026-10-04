@@ -9,6 +9,7 @@ interface Task { id: string; prompt: string; options: string[]; answer: number; 
 interface Definition { title: string; type: 'QUIZ'; tasks: Task[]; timeLimitMinutes: number; expectedMinutes: number; rubricVersion: string; scoringMode: 'OBJECTIVE'; }
 interface DefinitionRow { id: string; version: number; offer_id: string; state: 'DRAFT' | 'IN_REVIEW' | 'APPROVED'; content: string; origin: string; }
 interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; }
+interface IncidentRow { id:string; category:string; statement:string; reportedAt:string; observedState:string; observedRevision:number; originalDeadline:string; originalStartedAt:string|null; originalExpiresAt:string|null; state:string; revision:number; resolution:string|null; reason:string|null; resolvedAt:string|null; }
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
   definition(id: string, version: number) {
@@ -111,16 +112,70 @@ export class AssessmentService extends FaroStore {
   resultHistory(id:string) {
     return this.db.prepare('SELECT revision,validity,result,reason_code reasonCode,reason,created_at createdAt FROM faro_result_history WHERE attempt_id=? ORDER BY revision').all(id).map(row=>({revision:Number(row.revision),validity:row.validity as 'VALID'|'INVALIDATED',reasonCode:row.reasonCode as string|null,reason:row.reason as string|null,createdAt:row.createdAt as string|null,result:JSON.parse(row.result as string) as Record<string,unknown>}));
   }
+  incident(id:string) {
+    return this.db.prepare('SELECT id,category,statement,reported_at reportedAt,observed_state observedState,observed_revision observedRevision,original_deadline originalDeadline,original_started_at originalStartedAt,original_expires_at originalExpiresAt,state,revision,resolution,reason,resolved_at resolvedAt FROM faro_attempt_incidents WHERE attempt_id=?').get(id) as unknown as IncidentRow|undefined;
+  }
+  reportIncident(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{
+      const row=this.row(id),process=this.recruitment.row(row.process_id);
+      if(process.candidate_id!==userId)throw new HttpError(404,'Nie znaleziono próby.');
+      return {row,process};
+    };
+    authorize();
+    const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_INCIDENT_REPORT'},()=>{
+      const {row,process}=authorize();
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
+      if(!['INVITED','STARTED','EXPIRED','SCORED_PENDING_REVIEW'].includes(row.state)||this.incident(id))throw new HttpError(409,'Ta próba nie przyjmuje nowego zgłoszenia technicznego.','INCIDENT_NOT_AVAILABLE');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź zakres udostępnienia zgłoszenia.','CONFIRMATION_REQUIRED');
+      const category=choice(body.category,['ACCESS','CONNECTION','ANSWER_SAVE','OTHER_TECHNICAL'] as const),statement=text(body.statement,1000,10);
+      this.db.prepare('INSERT INTO faro_attempt_incidents(id,attempt_id,reporter_id,category,statement,reported_at,observed_state,observed_revision,original_deadline,original_started_at,original_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(randomUUID(),id,userId,category,statement,this.now(),row.state,row.revision,row.deadline,row.started_at,row.expires_at);
+      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
+      // An allegation does not pause/reset time, erase answers or make a negative fact.
+      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_REPORTED',{attemptId:id,category});
+      return {id};
+    });
+    return this.overview(userId,acknowledgement.id);
+  }
+  resolveIncident(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>{
+      const row=this.row(id),process=this.recruitment.row(row.process_id);
+      if(process.candidate_id===userId)throw new HttpError(404,'Nie znaleziono przeglądu.');
+      const offer=this.recruitment.offers.assigned(userId,process.offer_id);
+      this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER','HIRING_MANAGER']);
+      return {row,process};
+    };
+    authorize();
+    const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_INCIDENT_RESOLVE'},()=>{
+      const {row,process}=authorize(),incident=this.incident(id);
+      if(!incident)throw new HttpError(404,'Nie znaleziono zgłoszenia.');
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision||integer(body.incidentVersion,1)!==incident.revision)throw new HttpError(409,'Próba, proces lub zgłoszenie zmieniły się.','VERSION_CONFLICT');
+      if(incident.state!=='OPEN')throw new HttpError(409,'Zgłoszenie ma już rozstrzygnięcie.','INCIDENT_RESOLVED');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ręczny przegląd zgłoszenia.','CONFIRMATION_REQUIRED');
+      const resolution=choice(body.resolution,['ISSUE_CONFIRMED','NOT_ESTABLISHED'] as const),reason=text(body.reason,1000,10);
+      const neutralize=resolution==='ISSUE_CONFIRMED'&&['INVITED','STARTED','EXPIRED','SCORED_PENDING_REVIEW'].includes(row.state);
+      this.db.prepare("UPDATE faro_attempt_incidents SET state='RESOLVED',revision=2,resolution=?,reason=?,resolved_at=?,reviewer_id=? WHERE attempt_id=?").run(resolution,reason,this.now(),userId,id);
+      this.db.prepare('UPDATE faro_attempts SET state=?,revision=revision+1 WHERE id=?').run(neutralize?'TECHNICAL_ISSUE':row.state,id);
+      const anotherActive=this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND id<>? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id,id);
+      if(neutralize&&!TERMINAL.includes(process.status)&&!anotherActive&&['ASSESSMENT_REQUESTED','ASSESSMENT_COMPLETED'].includes(process.stage)) {
+        const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
+        this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?").run(new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString(),'Problem techniczny potwierdzony. Ustal ręcznie dalszy krok; brak automatycznej oceny lub odmowy.',process.id);
+      }
+      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_RESOLVED',{attemptId:id,resolution});
+      // Do not retain the candidate statement in another user's command replay cache after erasure.
+      return {id};
+    });
+    return this.overview(userId,acknowledgement.id);
+  }
   overview(userId: string, id: string) {
     const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
     const candidate = process.candidate_id === userId;
     const history=row.state==='FINALIZED'?this.resultHistory(id):[];
     const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
     const savedAnswers=JSON.parse(row.answers) as Record<string,number>;
-    return { id, resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
+    return { id, incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
       reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
-      answers: candidate ? savedAnswers : {}, result: row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
+      answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
   }
   attempts(userId: string, processId?: string) {
     if (processId) this.recruitment.authorize(userId, processId);
@@ -182,6 +237,7 @@ export class AssessmentService extends FaroStore {
       this.recruitment.offers.assigned(userId,process.offer_id);
       if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się. Odśwież wynik.','VERSION_CONFLICT');
       if(TERMINAL.includes(process.status))throw new HttpError(409,'Proces został zakończony.','PROCESS_TERMINAL');
+      if(this.incident(id)?.state==='OPEN')throw new HttpError(409,'Najpierw rozpatrz zgłoszenie techniczne.','INCIDENT_REVIEW_REQUIRED');
       if(row.state!=='SCORED_PENDING_REVIEW'||!row.result||body.confirmed!==true)throw new HttpError(409,'Wynik wymaga świadomego review.');
       const note=text(body.note,1000,10),result={...JSON.parse(row.result) as Record<string,unknown>,review:'FINALIZED',reviewNote:note};
       this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result),userId,this.now(),id);

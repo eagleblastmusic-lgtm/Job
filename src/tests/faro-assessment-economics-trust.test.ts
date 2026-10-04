@@ -20,6 +20,109 @@ async function assessmentSetup() {
   return { ...f, employer, candidate, admin, org, offer, interest };
 }
 
+test('attempt technical report and human confirmation preserve evidence and clocks, reject stale/scoped retries and erase derivatives',async()=>{
+  const f=await assessmentSetup();try {
+    const unchanged=(actual:ReturnType<AssessmentService['overview']>,expected:ReturnType<AssessmentService['overview']>)=>{
+      assert.ok(Date.parse(actual.serverNow)>=Date.parse(expected.serverNow));
+      assert.deepEqual({...actual,serverNow:expected.serverNow},expected);
+    };
+    const service=new AssessmentService(f.app.db);
+    const d=service.create(f.employer.id,f.offer.id,{title:'Próba techniczna',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'incident-r1',tasks:[{prompt:'Pytanie',options:['A','B'],answer:1,points:2}]});
+    service.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});service.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const attempt=service.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'incident-assign'});
+    const started=service.start(f.candidate.id,attempt.id);
+    service.save(f.candidate.id,attempt.id,{expectedVersion:started.revision,answers:{'task-1':1}},false);
+    const original=service.row(attempt.id),process=service.recruitment.row(f.interest.id);
+    const body={expectedVersion:original.revision,processVersion:process.revision,idempotencyKey:'technical-report',category:'ANSWER_SAVE',statement:'Zapis odpowiedzi przestał działać. Proszę sprawdzić próbę.',confirmed:true,startedAt:'1999-01-01',answers:{'task-1':0}};
+    const path=`/api/faro/attempts/${attempt.id}/incident`;
+    for(const cookie of [f.admin.cookie,f.employer.cookie])await f.request(path,cookie,'POST',body,404);
+    await f.request('/api/faro/attempts/foreign/incident',f.candidate.cookie,'POST',body,404);
+    await f.request(path,f.candidate.cookie,'POST',{...body,confirmed:false},400);
+    await f.request(path,f.candidate.cookie,'POST',{...body,category:'DIAGNOSIS'},400);
+    await f.request(path,f.candidate.cookie,'POST',{...body,expectedVersion:1},409);
+    const reported=await f.request<ReturnType<AssessmentService['overview']>>(path,f.candidate.cookie,'POST',body,201);
+    assert.equal(reported.state,'STARTED');assert.equal(reported.incident!.state,'OPEN');
+    assert.equal(reported.incident!.originalStartedAt,original.started_at);assert.equal(reported.incident!.originalExpiresAt,original.expires_at);assert.equal(reported.incident!.observedRevision,original.revision);
+    assert.equal(service.row(attempt.id).answers,original.answers);assert.equal(service.row(attempt.id).deadline,original.deadline);assert.equal(service.row(attempt.id).result,null);
+    assert.equal(service.recruitment.row(f.interest.id).revision,process.revision);
+    unchanged(await f.request(path,f.candidate.cookie,'POST',body,201),reported);
+    await f.request(path,f.candidate.cookie,'POST',{...body,statement:'Zmiana danych tej samej operacji.'},409);
+    await f.request(path,f.candidate.cookie,'POST',{...body,expectedVersion:reported.revision,idempotencyKey:'second-report'},409);
+    const employerView=service.overview(f.employer.id,attempt.id);assert.deepEqual(employerView.answers,{});assert.deepEqual(employerView.reviewTasks,[]);
+    assert.doesNotMatch(JSON.stringify(employerView),/reporter_id|reviewer_id|correctOption/);
+    const resolve={expectedVersion:reported.revision,processVersion:process.revision,incidentVersion:1,idempotencyKey:'technical-resolve',resolution:'ISSUE_CONFIRMED',reason:'Sprawdzono zapis. Potwierdzamy problem; dalszy krok ustalimy ręcznie.',confirmed:true};
+    await f.request(`${path}/resolve`,f.candidate.cookie,'POST',resolve,404);await f.request(`${path}/resolve`,f.admin.cookie,'POST',resolve,404);
+    await f.request(`${path}/resolve`,f.employer.cookie,'POST',{...resolve,confirmed:false},400);
+    await f.request(`${path}/resolve`,f.employer.cookie,'POST',{...resolve,processVersion:1},409);
+    const resolved=await f.request<ReturnType<AssessmentService['overview']>>(`${path}/resolve`,f.employer.cookie,'POST',resolve);
+    assert.equal(resolved.state,'TECHNICAL_ISSUE');assert.equal(resolved.incident!.resolution,'ISSUE_CONFIRMED');assert.equal(resolved.result,null);
+    unchanged(await f.request(`${path}/resolve`,f.employer.cookie,'POST',resolve),resolved);
+    await f.request(`${path}/resolve`,f.employer.cookie,'POST',{...resolve,reason:'Inne uzasadnienie tej samej operacji.'},409);
+    const after=service.row(attempt.id);for(const key of ['started_at','expires_at','deadline','answers','result'] as const)assert.equal(after[key],original[key]);
+    const currentProcess=service.recruitment.row(f.interest.id);assert.equal(currentProcess.status,'ACTIVE');assert.equal(currentProcess.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(currentProcess.response_due_at,process.response_due_at);assert.equal(currentProcess.first_response_at,process.first_response_at);
+    await f.request(`/api/faro/attempts/${attempt.id}`,f.candidate.cookie,'POST',{},409);
+    await f.request(`/api/faro/attempts/${attempt.id}/answers`,f.candidate.cookie,'PUT',{expectedVersion:resolved.revision,answers:{}},409);
+    const events=f.app.db.db.prepare("SELECT id,data FROM faro_events WHERE process_id=? AND kind IN ('ATTEMPT_INCIDENT_REPORTED','ATTEMPT_INCIDENT_RESOLVED')").all(f.interest.id);assert.equal(events.length,2);
+    for(const event of events){assert.doesNotMatch(event.data as string,/Zapis odpowiedzi|Sprawdzono zapis/);assert.equal((f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key=?').get(event.id!) as {n:number}).n,2);}
+    const own=await f.request<{faro:{faro_attempt_incidents:Array<{statement:string;resolution:string}>}}>('/api/export',f.candidate.cookie);assert.equal(own.faro.faro_attempt_incidents[0]!.statement,body.statement);assert.equal(own.faro.faro_attempt_incidents[0]!.resolution,'ISSUE_CONFIRMED');
+    const other=await f.request<{faro:{faro_attempt_incidents:unknown[]}}>('/api/export',f.employer.cookie);assert.deepEqual(other.faro.faro_attempt_incidents,[]);
+    f.app.db.db.prepare('UPDATE faro_members SET active=0 WHERE organization_id=? AND user_id=?').run(f.org.id,f.employer.id);
+    await f.request(`${path}/resolve`,f.employer.cookie,'POST',resolve,404);await f.request(`/api/faro/attempts/${attempt.id}`,f.employer.cookie,'GET',undefined,404);
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});
+    const caches=f.app.db.db.prepare('SELECT result FROM faro_commands WHERE user_id=?').all(f.employer.id);
+    assert.doesNotMatch(JSON.stringify(caches),/Zapis odpowiedzi przestał|Sprawdzono zapis/);
+    assert.equal((f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_attempt_incidents').get() as {n:number}).n,0);assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
+
+test('open technical report requires human handling before result review; resolution preserves submitted evidence and terminal decisions',async()=>{
+  const f=await assessmentSetup();try {
+    const s=new AssessmentService(f.app.db);
+    const d=s.create(f.employer.id,f.offer.id,{title:'Próba z przeglądem',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'incident-r2',tasks:[{prompt:'Pytanie',options:['A','B'],answer:1,points:2}]});
+    s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const attempt=s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'pending-assign'});
+    const before=s.overview(f.candidate.id,attempt.id);
+    const reported=s.reportIncident(f.candidate.id,attempt.id,{expectedVersion:before.revision,processVersion:before.processVersion,idempotencyKey:'prestart-incident',category:'ACCESS',statement:'Pojawił się błąd dostępu przed rozpoczęciem próby.',confirmed:true});
+    assert.equal(reported.startedAt,null);assert.equal(reported.expiresAt,null);
+    const started=s.start(f.candidate.id,attempt.id),submitted=s.save(f.candidate.id,attempt.id,{expectedVersion:started.revision,answers:{'task-1':1}},true);
+    const review={expectedVersion:submitted.revision,processVersion:submitted.processVersion,idempotencyKey:'blocked-review',note:'Sprawdzono odpowiedź według oryginalnej rubryki.',confirmed:true};
+    await f.request(`/api/faro/attempts/${attempt.id}/review`,f.employer.cookie,'POST',review,409);
+    const original=s.row(attempt.id),process=s.recruitment.row(f.interest.id);
+    await f.request(`/api/faro/processes/${f.interest.id}/commands`,f.candidate.cookie,'POST',{command:'WITHDRAW',expectedVersion:process.revision,idempotencyKey:'incident-withdraw'});
+    const terminal=s.recruitment.row(f.interest.id);
+    const current=s.overview(f.employer.id,attempt.id);
+    const resolved=s.resolveIncident(f.employer.id,attempt.id,{expectedVersion:current.revision,processVersion:current.processVersion,incidentVersion:1,idempotencyKey:'terminal-technical',resolution:'ISSUE_CONFIRMED',reason:'Potwierdzono problem. Proces został wycofany; nie zmieniamy jego decyzji.',confirmed:true});
+    assert.equal(resolved.incident!.observedState,'INVITED');assert.equal(resolved.incident!.originalStartedAt,null);
+    assert.equal(resolved.result,null);assert.equal(s.row(attempt.id).result,original.result);
+    assert.deepEqual(s.recruitment.row(f.interest.id),terminal);
+    assert.equal(s.row(attempt.id).answers,original.answers);assert.equal(s.row(attempt.id).started_at,original.started_at);assert.equal(s.row(attempt.id).expires_at,original.expires_at);
+    const duplicate={expectedVersion:resolved.revision,processVersion:resolved.processVersion,incidentVersion:2,idempotencyKey:'another-resolution',resolution:'NOT_ESTABLISHED',reason:'Nie wolno zastąpić wcześniejszego rozstrzygnięcia.',confirmed:true};
+    await f.request(`/api/faro/attempts/${attempt.id}/incident/resolve`,f.employer.cookie,'POST',duplicate,409);
+  }finally{await f.close();}
+});
+
+test('expired technical incident cannot overwrite a newer active assessment; unconfirmed report leaves its invitation and original times intact',async()=>{
+  const f=await assessmentSetup();try {
+    let now=new Date();const s=new AssessmentService(f.app.db,()=>now);
+    const create=(title:string)=>{const d=s.create(f.employer.id,f.offer.id,{title,timeLimitMinutes:1,expectedMinutes:1,rubricVersion:'expiry-incident',tasks:[{prompt:'Zadanie',options:['A','B'],answer:0,points:1}]});s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});return d;};
+    const assign=(d:{id:string})=>s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(now.getTime()+86400000).toISOString(),expectedVersion:s.recruitment.row(f.interest.id).revision,idempotencyKey:`assign:${d.id}`});
+    const report=(id:string)=>{const a=s.overview(f.candidate.id,id);return s.reportIncident(f.candidate.id,id,{expectedVersion:a.revision,processVersion:a.processVersion,idempotencyKey:`report:${id}`,category:'CONNECTION',statement:'Połączenie przerwano w trakcie próby technicznej.',confirmed:true});};
+    const old=assign(create('Pierwsza próba')),started=s.start(f.candidate.id,old.id);
+    s.save(f.candidate.id,old.id,{expectedVersion:started.revision,answers:{'task-1':0}},false);
+    const evidence=s.row(old.id);now=new Date(Date.parse(started.expiresAt!)+1);s.expire(old.id);
+    const reported=report(old.id);assert.equal(reported.incident!.observedState,'EXPIRED');
+    const next=assign(create('Nowa odrębna wersja zadania')),nextEvidence=s.row(next.id),before=s.recruitment.row(f.interest.id);
+    const current=s.overview(f.employer.id,old.id);
+    s.resolveIncident(f.employer.id,old.id,{expectedVersion:current.revision,processVersion:current.processVersion,incidentVersion:1,idempotencyKey:'old-confirmation',resolution:'ISSUE_CONFIRMED',reason:'Potwierdzono problem starej próby. Nowe zaproszenie zachowuje swój termin.',confirmed:true});
+    assert.equal(s.row(old.id).state,'TECHNICAL_ISSUE');assert.equal(s.row(old.id).started_at,evidence.started_at);assert.equal(s.row(old.id).expires_at,evidence.expires_at);assert.equal(s.row(old.id).answers,evidence.answers);
+    assert.deepEqual(s.recruitment.row(f.interest.id),before);assert.deepEqual(s.row(next.id),nextEvidence);
+    const newerReport=report(next.id);
+    const result=s.resolveIncident(f.employer.id,next.id,{expectedVersion:newerReport.revision,processVersion:newerReport.processVersion,incidentVersion:1,idempotencyKey:'new-no-evidence',resolution:'NOT_ESTABLISHED',reason:'Sprawdzono dostęp. Nie potwierdzono awarii; zaproszenie pozostaje aktywne.',confirmed:true});
+    assert.equal(result.state,'INVITED');assert.equal(result.startedAt,null);assert.equal(result.expiresAt,null);assert.equal(result.deadline,nextEvidence.deadline);assert.deepEqual(s.recruitment.row(f.interest.id),before);
+    assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
+
 test('assessment lifecycle is approved before assignment and timer is server-authoritative', async () => {
   const f = await assessmentSetup();
   try {
