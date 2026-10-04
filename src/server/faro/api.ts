@@ -140,6 +140,8 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (orgAssessments && method === 'GET') return ok({ assessments: assessments.list(user.id, orgAssessments[1]!) });
     if (orgAssessments && method === 'POST') return ok(assessments.create(user.id, orgAssessments[1]!, body), 201);
     const assessmentVersion = path.match(/^\/api\/faro\/assessments\/([^/]+)\/versions\/([^/]+)$/);
+    const cohortCorrection=path.match(/^\/api\/faro\/assessments\/([^/]+)\/versions\/(\d+)\/key-correction(?:\/(preview))?$/);
+    if(cohortCorrection&&method==='POST')return ok(cohortCorrection[3]?assessments.keyCorrectionPreview(user.id,cohortCorrection[1]!,Number(cohortCorrection[2]),body):assessments.correctCohortKey(user.id,cohortCorrection[1]!,Number(cohortCorrection[2]),body));
     if (assessmentVersion && method === 'GET') return ok(assessments.read(user.id,assessmentVersion[1]!,Number(assessmentVersion[2])));
     if (assessmentVersion && method === 'PUT') return ok(assessments.edit(user.id,assessmentVersion[1]!,Number(assessmentVersion[2]),body),201);
     if (assessmentVersion && method === 'POST') return ok(assessments.approve(user.id, assessmentVersion[1]!, { ...body, version: Number(assessmentVersion[2]) }));

@@ -7,6 +7,8 @@ const root = $('#appView');
 let user: User | null = null, skills: Skill[] = [], organizations: Organization[] = [];
 let role: 'candidate' | 'employer' = 'candidate', orgId = '', filter = '', modelFilter = '';
 let includeUnknown=false;
+interface KeyPreview {token:string;blocked:boolean;manualCount:number;affected:number;attempts:Array<{id:string;state:string;validity:string|null;individualAmendment:boolean;before:number|null;after:number|null}>;}
+let keyDraft:{id:string;version:number;reason:string;acceptedOptions:Record<string,number[]>;preview:KeyPreview}|null=null;
 let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setInterval> | undefined;
 let offers: Offer[] = [], currentOffer: Offer | null = null, currentProcess: Process | null = null, currentAttempt: Attempt | null = null;
 const compared = new Set<string>();
@@ -37,7 +39,7 @@ function notify(text: string, error = false) {
   const status = $('#f-status');
   if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
 }
-function loggedOut() { includeUnknown=false;
+function loggedOut() { includeUnknown=false;keyDraft=null;
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
   user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear(); watchAlerts.clear();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[]; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
@@ -132,7 +134,11 @@ async function render() {
       else html = `<h1>Twoje assessmenty</h1>${attemptLinks((await api<{attempts:Attempt[]}>('/attempts')).attempts)}`;
     } else if(page==='assessment-edit') {
       const d=await api<{id:string;version:number;content:string;offer_id:string}>(`/assessments/${id}/versions/${version}`);
-      html=assessmentEditor(d.id,d.version,JSON.parse(d.content) as AssessmentDefinition,d.offer_id);
+      html=assessmentEditor(d.id,d.version,JSON.parse(d.content) as AssessmentDefinition,d.offer_id)+`<p><a href="#assessment-correction/${esc(d.id)}/${d.version}">Przejrzyj wspólną korektę klucza tej wersji</a></p>`;
+    } else if(page==='assessment-correction') {
+      const d=await api<{id:string;version:number;content:string;state:string}>(`/assessments/${id}/versions/${version}`),content=JSON.parse(d.content) as AssessmentDefinition;
+      const draft=keyDraft?.id===id&&keyDraft.version===d.version?keyDraft:null;
+      html=`<h1>Wspólna korekta klucza</h1><p>Zachowa oryginalny test, odpowiedzi, wyniki i decyzje. Przeliczy wszystkie aktualne zatwierdzone wyniki tej wersji według wspólnego klucza. Nieważne wyniki pozostaną nieważne. Nowe próby wymagają potem nowej zatwierdzonej wersji.</p>${form('key-preview',`<input type="hidden" name="version" value="${d.version}">`+(content.tasks as Array<AssessmentDefinition['tasks'][number]&{id:string}>).map(t=>`<fieldset><legend>${esc(t.prompt)}</legend><ol>${t.options.map(o=>`<li>${esc(o)}</li>`).join('')}</ol>${input(t.id,'Numery uznanych odpowiedzi (od 1), oddzielone przecinkami',draft?.acceptedOptions[t.id]?.map(n=>n+1).join(',')??String(t.answer+1),'text','required')}</fieldset>`).join('')+area('reason','Uzasadnienie wspólnej korekty widoczne dla kandydatów',draft?.reason??'','required minlength="10" maxlength="1000"'),'Pokaż skutki korekty',id)}${draft?`<section class="f-card"><h2>Podgląd całej grupy</h2><p>Wyników do korekty: ${draft.preview.affected}. Indywidualnych korekt: ${draft.preview.manualCount}.</p>${draft.preview.attempts.map((a,i)=>`<p>Próba ${i+1}: ${esc(label(a.state))}, ${esc(a.validity??'bez wyniku')} · ${a.before??'brak'} → ${a.after??'bez zmiany'}${a.individualAmendment?' · indywidualna korekta':''}</p>`).join('')}${draft.preview.blocked?'<p role="status">Istnieją aktywne lub nieprzejrzane próby. Korekta jest zablokowana do ich rozpatrzenia.</p>':form('key-apply',check('confirmed','Potwierdzam wspólny klucz i skutki dla pokazanej grupy.')+(draft.preview.manualCount?check('replaceIndividualAmendments','Potwierdzam zastąpienie indywidualnych korekt wspólnym kluczem; historia pozostanie.'):'')+'<p>Zmiana grupy po podglądzie wymaga ponownego przeglądu.</p>','Zastosuj wspólną korektę',id)}</section>`:''}`;
     } else if (page === 'assessment-create' || page === 'assessment-assign') {
       const process = page === 'assessment-assign' ? await api<Process>(`/processes/${id}`) : null;
       const offerId = process?.offerId ?? id;
@@ -293,6 +299,8 @@ root.addEventListener('submit', event => {
       if(action==='attempt-retry') { const next=await api<Attempt>(`/attempts/${id}/retry`,'POST',{reason:value(f,'reason'),deadline:toDate(value(f,'deadline')),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});destination=`attempts/${next.id}`; }
       if(action==='attempt-invalidate')await api(`/attempts/${id}/invalidate-result`,'POST',{reasonCode:value(f,'reasonCode'),reason:value(f,'reason'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});
       if(action==='attempt-amend') {const scores:Record<string,number|null>={};for(const t of currentAttempt?.reviewTasks??[])scores[t.id]=t.chosenOption===null?null:number(f,t.id);await api(`/attempts/${id}/amend-result`,'POST',{scores,reason:value(f,'reason'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});}
+      if(action==='key-preview') {const acceptedOptions:Record<string,number[]>={};for(const [name,v] of f.entries())if(name.startsWith('task-'))acceptedOptions[name]=String(v).split(',').map(n=>Number(n.trim())-1);const version=number(f,'version'),reason=value(f,'reason'),preview=await api<KeyPreview>(`/assessments/${id}/versions/${version}/key-correction/preview`,'POST',{acceptedOptions,reason});keyDraft={id,version,reason,acceptedOptions,preview};}
+      if(action==='key-apply') {if(!keyDraft||keyDraft.id!==id)throw new Error('Najpierw wykonaj podgląd.');await api(`/assessments/${id}/versions/${keyDraft.version}/key-correction`,'POST',{reason:keyDraft.reason,acceptedOptions:keyDraft.acceptedOptions,previewToken:keyDraft.preview.token,confirmed:f.has('confirmed'),replaceIndividualAmendments:f.has('replaceIndividualAmendments'),idempotencyKey:crypto.randomUUID()});keyDraft=null;destination='attempts';}
       if (mine !== epoch) return;
       if(destination) navigate(destination); else { await render(); notify('Zapisano.'); }
     } catch(e) { if(mine === epoch && (e as Error).name !== 'AbortError') { const message=el.querySelector('.f-form-message'); if(message) message.textContent=(e as Error).message; else notify((e as Error).message,true); } }
