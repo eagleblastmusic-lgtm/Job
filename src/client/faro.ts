@@ -240,7 +240,7 @@ root.addEventListener('submit', event => {
       let destination = '';
       if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model'); }
       else if (action === 'profile') await api('/profile','PUT',{firstName:value(f,'firstName'),phone:value(f,'phone'),expectedVersion:number(f,'version'),availability:{kind:value(f,'availability'),value:value(f,'availabilityValue')}});
-      else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends')}});
+      else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends'),salaryMinimum:f.has('salaryEnabled')?{amount:Math.round(number(f,'salaryMinimum')*100),currency:'PLN',basis:value(f,'salaryBasis'),period:value(f,'salaryPeriod'),hoursPerPeriod:number(f,'salaryHours'),ftePercent:number(f,'salaryFte')}:null}});
       else if(action==='phone-grant') {await api(`/processes/${id}/phone-grant`,'POST',{phoneConfirmed:f.has('phoneConfirmed'),confirmationToken:f.get('confirmationToken')});el.closest('dialog')?.close();}
       else if (action === 'claim') await api('/claims','POST',claim(f));
       else if (action === 'learning') await api('/learning','POST',{skillId:value(f,'skillId'),mode:value(f,'mode'),practice:practice(f)});

@@ -6,15 +6,28 @@ export interface SalaryOption {
   variable: string; hoursPerPeriod: number; ftePercent: number;
 }
 export interface Requirement { id: string; skillId: string; kind: 'MUST_HAVE' | 'NICE_TO_HAVE' | 'WILL_TEACH'; level: SkillLevel; rationale: string; }
+export interface SalaryMinimum {
+  amount: number; currency: SalaryOption['currency']; basis: SalaryOption['basis']; period: SalaryOption['period'];
+  hoursPerPeriod: number; ftePercent: number;
+}
 export interface CandidateConstraints {
   active:boolean;workModels:Array<OfferData['workModel']>;contracts:Array<SalaryOption['contract']>;noNights:boolean;noWeekends:boolean;
+  salaryMinimum?:SalaryMinimum|null;
 }
-export const DEFAULT_CONSTRAINTS:CandidateConstraints={active:false,workModels:[],contracts:[],noNights:false,noWeekends:false};
+export const DEFAULT_CONSTRAINTS:CandidateConstraints={active:false,workModels:[],contracts:[],noNights:false,noWeekends:false,salaryMinimum:null};
 export function explainConditions(offer:OfferData,c:CandidateConstraints) {
   const result:Array<{field:string;state:'SATISFIED'|'KNOWN_NOT_MET'|'UNKNOWN'}>=[];
   if(!c.active)return result;
   if(c.workModels.length)result.push({field:'workModel',state:c.workModels.includes(offer.workModel)?'SATISFIED':'KNOWN_NOT_MET'});
   if(c.contracts.length)result.push({field:'contract',state:offer.salary.some(s=>c.contracts.includes(s.contract))?'SATISFIED':'KNOWN_NOT_MET'});
+  if(c.salaryMinimum) {
+    const minimum=c.salaryMinimum;
+    const eligible=offer.salary.filter(s=>!c.contracts.length||c.contracts.includes(s.contract));
+    const comparable=eligible.filter(s=>s.currency===minimum.currency&&s.basis===minimum.basis&&s.period===minimum.period&&s.hoursPerPeriod===minimum.hoursPerPeriod&&s.ftePercent===minimum.ftePercent);
+    // Guaranteed range floor, never the maximum/variable component or an inferred net amount.
+    const state=comparable.some(s=>s.min>=minimum.amount)?'SATISFIED':!eligible.length||comparable.length!==eligible.length?'UNKNOWN':'KNOWN_NOT_MET';
+    result.push({field:'salary',state});
+  }
   for(const [field,enabled,value] of [['nights',c.noNights,offer.nights],['weekends',c.noWeekends,offer.weekends]] as const)if(enabled)result.push({field,state:value===null?'UNKNOWN':value?'KNOWN_NOT_MET':'SATISFIED'});
   return result;
 }
