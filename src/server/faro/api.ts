@@ -154,6 +154,8 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if(attemptIncident&&method==='POST')return ok(assessments.reportIncident(user.id,attemptIncident[1]!,body),201);
     const incidentResolution=path.match(/^\/api\/faro\/attempts\/([^/]+)\/incident\/resolve$/);
     if(incidentResolution&&method==='POST')return ok(assessments.resolveIncident(user.id,incidentResolution[1]!,body));
+    const attemptRetry=path.match(/^\/api\/faro\/attempts\/([^/]+)\/retry$/);
+    if(attemptRetry&&method==='POST')return ok(assessments.retry(user.id,attemptRetry[1]!,body),201);
     const offerEconomics = path.match(/^\/api\/faro\/offers\/([^/]+)\/economics$/);
     if (offerEconomics && method === 'GET') return ok(economics.get(user.id, offerEconomics[1]!));
     if (offerEconomics && method === 'PUT') return ok(economics.save(user.id, offerEconomics[1]!, body));

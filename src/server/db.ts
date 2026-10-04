@@ -25,15 +25,18 @@ export class JobDatabase {
       const applied = this.db.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(version);
       if (applied) continue;
       const sql = readFileSync(resolve(migrationDir, file), 'utf8');
+      const rebuild=/^-- rebuild-with-foreign-key-check\r?\n/.test(sql);
+      if(rebuild)this.db.exec('PRAGMA foreign_keys = OFF;');
       this.db.exec('BEGIN IMMEDIATE;');
       try {
         this.db.exec(sql);
+        if(rebuild&&this.db.prepare('PRAGMA foreign_key_check').all().length)throw new Error('Niespójne relacje po przebudowie tabeli.');
         this.db.prepare('INSERT INTO schema_migrations(version) VALUES (?)').run(version);
         this.db.exec('COMMIT;');
       } catch (error) {
         this.db.exec('ROLLBACK;');
         throw new Error(`Migracja ${file} nie powiodła się: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      } finally {if(rebuild)this.db.exec('PRAGMA foreign_keys = ON;');}
     }
   }
 

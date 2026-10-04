@@ -45,10 +45,19 @@ test('real attempt incident is shared for human review without resetting time or
     await resolution.getByRole('button',{name:'Zapisz rozstrzygnięcie techniczne'}).click();
     await expect(page.getByText('Próba z problemem technicznym',{exact:true})).toBeVisible();
     expect((await new AxeBuilder({page}).include('#appView').analyze()).violations).toEqual([]);
+    const retry=page.locator('[data-form=attempt-retry]');await retry.locator('[name=deadline]').fill(new Date(Date.now()+172800000).toISOString().slice(0,16));
+    await retry.locator('[name=reason]').fill('Potwierdzona awaria; zapraszamy do osobnej próby tej samej wersji.');await retry.locator('[name=confirmed]').check();
+    await retry.getByRole('button',{name:'Zaproś do osobnej próby'}).click();
+    await expect(page.getByRole('heading',{name:'Ponowienie próby 2'})).toBeVisible();
+    const next=s.attempts(employer.id,process.id).find(attempt=>attempt.retryOf===a.id)!;expect(next.state).toBe('INVITED');expect(next.startedAt).toBeNull();expect(next.expiresAt).toBeNull();
+    expect((await new AxeBuilder({page}).include('#appView').analyze()).violations).toEqual([]);
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);await page.goto(`${f.base}/#attempts/${a.id}`);
     await expect(page.getByText(/Uzasadnienie przeglądu: Potwierdzono awarię/)).toBeVisible();
     await expect(page.locator('[data-form=attempt-answers]')).toHaveCount(0);await expect(page.getByRole('heading',{name:'Wynik w tej rekrutacji'})).toHaveCount(0);
     const after=s.row(a.id);expect(after.started_at).toBe(before.started_at);expect(after.expires_at).toBe(before.expires_at);expect(after.answers).toBe(before.answers);expect(s.recruitment.row(process.id).first_response_at).toBe(first);
+    await page.getByRole('link',{name:'Zobacz powiązane ponowienie'}).click();await expect(page.getByRole('heading',{name:'Ponowienie próby 2'})).toBeVisible();
+    await page.getByRole('button',{name:'Rozpocznij assessment',exact:true}).click();await expect(page.locator('[data-form=attempt-answers]')).toBeVisible();expect(s.row(next.id).answers).toBe('{}');
+    await page.getByRole('link',{name:'Zobacz pierwotną próbę i zachowane terminy'}).click();await expect(page.locator('[data-form=attempt-answers]')).toHaveCount(0);
     const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));expect(widths.scroll).toBeLessThanOrEqual(widths.client+1);expect(errors).toEqual([]);
   }finally{await f.close();}
 });

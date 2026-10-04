@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { faroFixture, offerInput } from './faro-fixture.js';
 import { AssessmentService } from '../server/faro/assessmentService.js';
 import { TrustService } from '../server/faro/trustService.js';
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { JobDatabase } from '../server/db.js';
 
 async function assessmentSetup() {
   const f = await faroFixture();
@@ -19,6 +23,74 @@ async function assessmentSetup() {
   await f.request(`/api/faro/processes/${interest.id}/commands`, employer.cookie, 'POST', { command: 'ADVANCE', nextAction: 'Ukończ assessment', dueAt: new Date(Date.now() + 86_400_000).toISOString(), expectedVersion: 1, idempotencyKey: 'assessment-advance' });
   return { ...f, employer, candidate, admin, org, offer, interest };
 }
+
+test('technical retry creates a pinned separate lineage, preserves original evidence and clocks, scopes replay and cascades privacy',async()=>{
+  const f=await assessmentSetup();try {
+    const s=new AssessmentService(f.app.db),d=s.create(f.employer.id,f.offer.id,{title:'Retry synthetic',timeLimitMinutes:5,expectedMinutes:2,rubricVersion:'retry-1',tasks:[{prompt:'Q',options:['A','B'],answer:1,points:2}]});
+    s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const a=s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'retry-assign'});
+    s.start(f.candidate.id,a.id);s.save(f.candidate.id,a.id,{expectedVersion:s.row(a.id).revision,answers:{'task-1':1}},false);
+    const baseBody=()=>({expectedVersion:s.row(a.id).revision,processVersion:s.recruitment.row(f.interest.id).revision});
+    const path=`/api/faro/attempts/${a.id}/retry`,deadline=new Date(Date.now()+172800000).toISOString();
+    const body={...baseBody(),deadline,reason:'Potwierdzona awaria; osobna próba bez resetu historii.',confirmed:true,idempotencyKey:'retry-command'};
+    await f.request(path,f.employer.cookie,'POST',body,409);
+    s.reportIncident(f.candidate.id,a.id,{...baseBody(),idempotencyKey:'retry-report',category:'ANSWER_SAVE',statement:'Syntetyczny problem techniczny zapisu odpowiedzi.',confirmed:true});
+    s.resolveIncident(f.employer.id,a.id,{...baseBody(),incidentVersion:1,idempotencyKey:'retry-resolve',resolution:'ISSUE_CONFIRMED',reason:'Potwierdzono syntetyczny problem techniczny.',confirmed:true});
+    const original={...s.row(a.id)},originalIncident=s.incident(a.id),process={...s.recruitment.row(f.interest.id)};
+    // An unrelated newer draft must not alter the pinned approved definition used for recovery.
+    s.create(f.employer.id,f.offer.id,{title:'New draft',timeLimitMinutes:1,expectedMinutes:1,rubricVersion:'different',tasks:[{prompt:'Other',options:['C','D'],answer:0,points:9}]},d.id);
+    const retry={...body,...baseBody()};
+    for(const cookie of [f.candidate.cookie,f.admin.cookie])await f.request(path,cookie,'POST',retry,404);
+    f.app.db.db.prepare("UPDATE faro_members SET role='HIRING_MANAGER' WHERE organization_id=? AND user_id=?").run(f.org.id,f.employer.id);
+    assert.equal(s.overview(f.employer.id,a.id).canRetry,false);await f.request(path,f.employer.cookie,'POST',retry,404);
+    f.app.db.db.prepare("UPDATE faro_members SET role='OWNER' WHERE organization_id=? AND user_id=?").run(f.org.id,f.employer.id);
+    f.app.db.db.prepare("UPDATE faro_interests SET status='WITHDRAWN' WHERE id=?").run(f.interest.id);
+    await f.request(path,f.employer.cookie,'POST',retry,409);assert.deepEqual({...s.row(a.id)},original);
+    f.app.db.db.prepare("UPDATE faro_interests SET status='ACTIVE' WHERE id=?").run(f.interest.id);
+    await f.request(path,f.employer.cookie,'POST',{...retry,expectedVersion:1},409);
+    await f.request(path,f.employer.cookie,'POST',{...retry,confirmed:false},400);
+    await f.request(path,f.employer.cookie,'POST',{...retry,deadline:'2000-01-01T00:00:00.000Z'},400);
+    const next=await f.request<ReturnType<AssessmentService['overview']>>(path,f.employer.cookie,'POST',retry,201);
+    assert.equal(next.state,'INVITED');assert.equal(next.attemptNumber,2);assert.equal(next.retryOf,a.id);assert.equal(next.rubricVersion,'retry-1');assert.equal(next.startedAt,null);assert.equal(next.expiresAt,null);assert.equal(next.result,null);
+    assert.deepEqual({...s.row(a.id)},original);assert.deepEqual(s.incident(a.id),originalIncident);
+    assert.equal(s.recruitment.row(f.interest.id).first_response_at,process.first_response_at);assert.equal(s.recruitment.row(f.interest.id).response_due_at,process.response_due_at);assert.equal(s.recruitment.row(f.interest.id).snapshot,process.snapshot);
+    const replay=await f.request<ReturnType<AssessmentService['overview']>>(path,f.employer.cookie,'POST',retry,201);assert.equal(replay.id,next.id);
+    await f.request(path,f.employer.cookie,'POST',{...retry,reason:'Zmienione uzasadnienie ponowienia.'},409);
+    await f.request(path,f.employer.cookie,'POST',{...retry,...baseBody(),idempotencyKey:'another-retry'},409);
+    assert.equal(s.overview(f.candidate.id,a.id).retryAttemptId,next.id);assert.equal(s.overview(f.employer.id,a.id).canRetry,false);
+    const started=s.start(f.candidate.id,next.id);assert.equal(started.state,'STARTED');assert.deepEqual(started.answers,{});assert.equal(started.tasks[0]!.prompt,'Q');assert.deepEqual({...s.row(a.id)},original);
+    const events=f.app.db.db.prepare("SELECT id,data FROM faro_events WHERE kind='ATTEMPT_RETRY_AUTHORIZED'").all();assert.equal(events.length,1);assert.doesNotMatch(events[0]!.data as string,/Potwierdzona|osobna próba/);
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key=?').get(events[0]!.id!)!.n,2);
+    const own=await f.request<{faro:{faro_attempts:Array<{id:string;retry_of:string|null}>}}>('/api/export',f.candidate.cookie);assert.equal(own.faro.faro_attempts.find(r=>r.id===next.id)!.retry_of,a.id);
+    assert.doesNotMatch(JSON.stringify(own.faro.faro_attempts),/retry_authorized_by|reviewer_id/);
+    f.app.db.db.prepare('UPDATE faro_members SET active=0 WHERE organization_id=? AND user_id=?').run(f.org.id,f.employer.id);await f.request(path,f.employer.cookie,'POST',retry,404);
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_attempts').get()!.n,0);assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
+
+test('0031 upgrade preserves old attempts and cascading incident/result children with foreign keys restored',async()=>{
+  const f=await assessmentSetup();let upgraded:JobDatabase|undefined;
+  try {
+    const s=new AssessmentService(f.app.db),d=s.create(f.employer.id,f.offer.id,{title:'Migration synthetic',timeLimitMinutes:5,expectedMinutes:1,rubricVersion:'migration-1',tasks:[{prompt:'Q',options:['A','B'],answer:0,points:1}]});
+    s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const a=s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'migration-assign'});
+    s.start(f.candidate.id,a.id);s.reportIncident(f.candidate.id,a.id,{expectedVersion:2,processVersion:3,idempotencyKey:'migration-incident',category:'CONNECTION',statement:'Syntetyczny zapis historii migracji.',confirmed:true});
+    f.app.db.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,created_at) VALUES(?,1,'VALID','{}',NULL)").run(a.id);
+    const target=join(f.app.config.dataDir,'upgrade.sqlite');f.app.db.db.exec(`VACUUM INTO '${target.replaceAll("'","''")}'`);
+    const old=new DatabaseSync(target);
+    try {
+      old.exec('PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE;');
+      // Reconstruct the genuine pre0031 table from its immutable original migration.
+      const create=readFileSync('migrations/0022_faro_assessment_trust_economics.sql','utf8').split('CREATE TABLE faro_attempts (')[1]!.split('CREATE TABLE faro_cases')[0]!;
+      old.exec('CREATE TABLE old_attempts ('+create.replaceAll('faro_attempts','old_attempts'));
+      old.exec('INSERT INTO old_attempts SELECT id,process_id,assessment_id,assessment_version,state,deadline,started_at,expires_at,answers,revision,result,reviewer_id,reviewed_at FROM faro_attempts; DROP TABLE faro_attempts; ALTER TABLE old_attempts RENAME TO faro_attempts; DELETE FROM schema_migrations WHERE version=\'0031_faro_attempt_retry_lineage\'; COMMIT;');
+    }finally{old.close();}
+    upgraded=new JobDatabase(target);
+    const restored=new AssessmentService(upgraded);assert.equal(restored.row(a.id).attempt_number,1);assert.equal(restored.row(a.id).answers,s.row(a.id).answers);assert.deepEqual(restored.incident(a.id),s.incident(a.id));assert.deepEqual(restored.resultHistory(a.id),s.resultHistory(a.id));
+    assert.equal(upgraded.db.prepare('PRAGMA foreign_keys').get()!.foreign_keys,1);assert.deepEqual(upgraded.db.prepare('PRAGMA foreign_key_check').all(),[]);
+    upgraded.db.prepare('DELETE FROM faro_interests WHERE id=?').run(f.interest.id);assert.equal(upgraded.db.prepare('SELECT COUNT(*) n FROM faro_attempt_incidents').get()!.n,0);assert.equal(upgraded.db.prepare('SELECT COUNT(*) n FROM faro_result_history').get()!.n,0);
+  }finally{upgraded?.close();await f.close();}
+});
 
 test('attempt technical report and human confirmation preserve evidence and clocks, reject stale/scoped retries and erase derivatives',async()=>{
   const f=await assessmentSetup();try {
