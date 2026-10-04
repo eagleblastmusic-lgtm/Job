@@ -9,3 +9,5 @@ The periodic worker is enabled in development and disabled in production indepen
 Before public activation: resolve KRAZ/service qualification, GDPR roles/purposes/retention/DPIA, recruitment AI/scoring gates, staffed moderation/appeal policy, durable persistence and recovery, erasure reconciliation, secret/session operations and required browser/regression evidence. Maintain free-first; future organization billing cannot enter matching or offer ordering.
 
 Deployment changes, provider purchases, live data processing and external outreach require their own concrete authorized scope. Local foundations and synthetic tests can progress independently of these gates.
+
+CP11-B proves local DB-only recovery against an older snapshot and a current authority source. It does not prove catastrophe recovery when both sources are lost, uploaded-file safety, PostgreSQL cutover or production restart/redeploy durability. Activation remains review-required and production API/worker gates stay closed.

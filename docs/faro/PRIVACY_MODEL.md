@@ -8,7 +8,7 @@ Initial projection is snapshotted on interest. Phone is a separate candidate gra
 
 `DELETE /api/account` requires exact `USUŃ KONTO`, current password and the existing deletion rate limit. Personal tables cascade; shared process inbox/outbox references are removed and linked free-text case content is redacted. Erasure records contain a SHA-256 subject identifier, timestamp and policy version, not the profile itself. A solo-owner organization is restricted and its offers/processes closed; shared organization ownership must first be transferred to an active member with password reauthentication.
 
-The erasure log is a local restore hook, not a durable external deletion journal. Before restoring a pre-erasure backup, operators must reconcile the current erasure ledger. Automated reconciliation and approved backup retention/legal-hold policy are release gates. No arbitrary legal retention period is encoded.
+The erasure log is a local restore hook, not a durable external deletion journal. Before restoring a pre-erasure backup, operators must reconcile the current erasure ledger. Offline DB-only reconciliation is now implemented; independently durable authority/erasure storage and approved backup retention/legal-hold policy remain release gates. No arbitrary legal retention period is encoded.
 
 PWA caching is limited to explicit public shell assets; authenticated API responses use no-store. Navigation aborts stale fetches, logout removes private DOM/state, and server authorization is re-evaluated on every request. File/CV upload routes are retired; assessment file execution is not enabled.
 
@@ -23,3 +23,5 @@ Private case explanations and appeal text are visible to their author and an ind
 Watch alert flags and upcoming-close delivery are private to the candidate. No employer count/list is exposed. The optional watch preference does not suppress updates associated with an existing interest. Muting removes pending optional watch alerts; already delivered own notification history remains exportable.
 
 Candidate work-condition constraints are private profile preferences, not evidence of ability or an employer eligibility score. They filter the candidate's offer list only; initial employer projection never contains them. Unknown structured offer conditions remain unknown. The user may explicitly deactivate the boundaries and still access saved offers/processes outside the filtered list.
+
+CP11-B recovery is offline and has no HTTP route or public erasure override. The internal authority snapshot includes password hashes and must never be logged/exported. Restored consent does not disclose a phone or enable optional analytics; current credentials and roles supersede historical values. A missing surviving account authority fails closed.

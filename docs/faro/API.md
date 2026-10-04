@@ -61,3 +61,5 @@ PUT `/profile/constraints` accepts `{expectedVersion,constraints:{active,workMod
 # Economics units and selected variant
 
 New manual calculations are `manual-scenario-v2`, recording units `{money:PLN_MINOR,netPeriod:<salary period>,commuteCostPeriod:<salary period>,commuteTime:ROUND_TRIP_MINUTES_PER_WORK_DAY}` and salary option index. All input amounts are integer grosze; private net and commute cost use the selected salary period. Optional assertions netPeriod/commuteCostPeriod/commuteTimeBasis reject conflicting units with ECONOMICS_UNIT_MISMATCH. Historical v1 JSON is preserved. Comparison uses stored scenario salary bounds/basis/period rather than the first current offer variant and flags changed offer versions. No automatic tax or cross-basis conversion is performed.
+
+CP11-B adds no public endpoint. RecoveryService and restore-faro.mjs operate only on an isolated new database; public account deletion retains the owner-transfer guard and cannot enable the internal recovery override.

@@ -28,8 +28,10 @@ export class PrivacyService extends FaroStore {
     if (sharedOwnership) throw new HttpError(409, 'Przenieś własność organizacji na aktywnego członka przed usunięciem konta.', 'OWNERSHIP_TRANSFER_REQUIRED');
   }
   /** Called inside the transaction that deletes users; cascade handles personal rows. */
-  eraseDerivatives(userId: string) {
-    this.assertDeletable(userId);
+  eraseDerivatives(userId: string, isolatedRecovery = false) {
+    // Offline replay targets an isolated restore, never an HTTP-provided flag.
+    // An obsolete shared owner must not resurrect an erased account; unresolved organizations close.
+    if(!isolatedRecovery)this.assertDeletable(userId);
     const user = this.db.prepare('SELECT email FROM users WHERE id=?').get(userId) as { email: string } | undefined;
     if (!user) throw new HttpError(404, 'Nie znaleziono konta.');
     // Abandoned solo organizations cannot continue accepting candidates.
@@ -39,7 +41,7 @@ export class PrivacyService extends FaroStore {
       const processes = this.db.prepare("SELECT p.id FROM faro_interests p JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=? AND p.status IN ('INTERESTED','ACTIVE','OFFERED')").all(org.organization_id) as Array<{id:string}>;
       for (const process of processes) {
         const row = recruitment.row(process.id);
-        this.db.prepare("UPDATE faro_interests SET status='CANCELLED',stage='TERMINAL',stage_due_at=NULL,next_action=NULL,reason=?,revision=revision+1 WHERE id=?").run(JSON.stringify({code:'RECRUITMENT_CANCELLED',explanation:'Organizacja zakończyła rekrutację po usunięciu konta jedynego właściciela.'}),row.id);
+        this.db.prepare("UPDATE faro_interests SET status='CANCELLED',stage='TERMINAL',stage_due_at=NULL,next_action=NULL,reason=?,revision=revision+1 WHERE id=?").run(JSON.stringify({code:'RECRUITMENT_CANCELLED',explanation:isolatedRecovery?'Organizacja wymaga ponownej weryfikacji po odtworzeniu danych.':'Organizacja zakończyła rekrutację po usunięciu konta jedynego właściciela.'}),row.id);
         recruitment.cancelObligations(row.id);
         recruitment.event(row,userId,'CANCEL',{reason:{code:'RECRUITMENT_CANCELLED'},source:'ORGANIZATION_CLOSED'});
       }

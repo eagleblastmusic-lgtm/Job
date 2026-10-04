@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtemp,mkdir,writeFile,rm,stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join,resolve,relative,isAbsolute } from 'node:path';
+import { JobDatabase } from '../dist/server/db.js';
+import { ProfileService } from '../dist/server/faro/profileService.js';
+import { PrivacyService } from '../dist/server/faro/privacyService.js';
+import { OfferService } from '../dist/server/faro/offerService.js';
+import { RecruitmentService } from '../dist/server/faro/recruitmentService.js';
+import { AssessmentService } from '../dist/server/faro/assessmentService.js';
+import { InterviewService } from '../dist/server/faro/interviewService.js';
+import { RecoveryService } from '../dist/server/faro/recoveryService.js';
+import { hashPassword,verifyPassword } from '../dist/server/auth.js';
+import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
+import { restoreFaro,readLatestLedger } from './restore-faro.mjs';
+
+const root=await mkdtemp(join(tmpdir(),'faro-recovery-')),f=await faroFixture();
+try {
+  const employer=await f.user('RecoveryEmployer'),gone=await f.user('RecoveryErased'),kept=await f.user('RecoveryKept'),successor=await f.user('RecoverySuccessor'),revoked=await f.user('RecoveryRevoked');
+  const profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),r=new RecruitmentService(f.app.db);
+  for(const [u,name] of [[gone,'Anna'],[kept,'Ola']]) {
+    profiles.save(u.id,{firstName:name,phone:'+48500200300',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    profiles.addClaim(u.id,{skillId:'faro:activity:customer-service',level:'INDEPENDENT',source:'HOBBY',practice:{quantity:2,unit:'TASKS'},confirmed:true});
+  }
+  const org=profiles.organization(employer.id,{name:'Syntetyczna organizacja odtworzenia'});
+  f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+  const invite=profiles.invite(employer.id,org.id,{email:successor.email,role:'RECRUITER'});profiles.acceptInvite(successor.id,successor.email,invite.token);
+  const oldInvite=profiles.invite(employer.id,org.id,{email:revoked.email,role:'RECRUITER'});profiles.acceptInvite(revoked.id,revoked.email,oldInvite.token);
+  f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(revoked.id);
+  const offer=offers.create(employer.id,org.id,offerInput(employer.id));
+  offers.lifecycle(employer.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  f.app.db.db.prepare('INSERT INTO faro_assignments(offer_id,user_id) VALUES(?,?)').run(offer.id,revoked.id);
+  const interest=u=>r.interest(u.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(u.id).confirmationToken,idempotencyKey:`recovery:${u.id}`});
+  const removed=interest(gone),surviving=interest(kept);
+  for(const p of [removed,surviving])r.change(employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:`advance:${p.id}`,nextAction:'Sprawdź następny etap',dueAt:new Date(Date.now()+86400000).toISOString()});
+  r.watch(gone.id,offer.id,true);r.grant(gone.id,removed.id,true);
+  r.grant(kept.id,surviving.id,true);f.app.store.recordConsent(kept.id,'ANALYTICS',true,'synthetic-before-backup');
+  const assessments=new AssessmentService(f.app.db);
+  const definition=assessments.create(employer.id,offer.id,{title:'Kopia próby',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'backup-r1',tasks:[{prompt:'Zadanie',options:['A','B'],answer:1,points:2}]});
+  assessments.approve(employer.id,definition.id,{version:1,action:'REVIEW'});assessments.approve(employer.id,definition.id,{version:1,action:'APPROVE',confirmed:true});
+  const attempt=assessments.assign(employer.id,removed.id,{assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'backup-assign'});
+  const started=assessments.start(gone.id,attempt.id);assessments.save(gone.id,attempt.id,{expectedVersion:started.revision,answers:{'task-1':1}},false);
+  const interviews=new InterviewService(f.app.db);
+  const slot=interviews.propose(employer.id,surviving.id,{expectedVersion:2,idempotencyKey:'backup-slot',confirmed:true,startsAt:new Date(Date.now()+2*86400000).toISOString(),endsAt:new Date(Date.now()+2*86400000+3600000).toISOString(),confirmBy:new Date(Date.now()+86400000).toISOString(),timezone:'Europe/Warsaw',location:'Rozmowa online',meetingUrl:'https://example.test/meeting'});
+  const before=new ProfileService(f.app.db).projection(kept.id),firstClock=r.row(surviving.id).first_response_at;
+  const otherOrg=profiles.organization(kept.id,{name:'Niezależna organizacja'});
+  f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(otherOrg.id);
+  const otherOffer=offers.create(kept.id,otherOrg.id,offerInput(kept.id));
+  offers.lifecycle(kept.id,otherOffer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(kept.id,otherOffer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const backup=join(root,'backup');await mkdir(backup);
+  const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
+  await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
+  // Current source advances after the old snapshot: owner transfer and two erasures.
+  new PrivacyService(f.app.db).transferOwner(employer.id,org.id,successor.id);
+  profiles.revokeMember(successor.id,org.id,revoked.id);
+  f.app.db.db.prepare("UPDATE users SET role='USER' WHERE id=?").run(revoked.id);
+  f.app.db.db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword('OdnowioneBezpieczne123'),kept.id);
+  r.grant(kept.id,surviving.id,false);f.app.store.recordConsent(kept.id,'ANALYTICS',false,'synthetic-after-backup');
+  f.app.db.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(otherOrg.id);
+  f.app.store.deleteUser(gone.id);f.app.store.deleteUser(employer.id);
+  const sourceCount=f.app.db.db.prepare('SELECT COUNT(*) n FROM users').get().n;
+  const ledger=readLatestLedger(f.app.config.databasePath);
+  const targetDir=join(root,'restored');
+  const result=await restoreFaro({source:backup,dataDir:targetDir,erasureSource:f.app.config.databasePath});
+  assert.equal(result.erasedSubjects,2);assert.equal(result.restoredOwnerships,1);assert.equal(result.pausedOffers,1);assert.equal(result.activation,'REVIEW_REQUIRED');
+  assert.equal(offers.get(otherOffer.id).status,'PUBLISHED','source intake must not be altered by rehearsal');
+  assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM users').get().n,sourceCount,'source must remain unchanged');
+  const restored=new JobDatabase(result.databasePath);
+  try {
+    const db=restored.db,pr=new ProfileService(restored),rec=new RecruitmentService(restored);
+    for(const u of [gone,employer])assert.equal(db.prepare('SELECT id FROM users WHERE id=?').get(u.id),undefined);
+    assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(attempt.id),undefined);
+    assert.equal(db.prepare('SELECT process_id FROM faro_contact_grants WHERE process_id=?').get(removed.id),undefined);
+    assert.deepEqual(pr.projection(kept.id),before);assert.equal(pr.member(successor.id,org.id).role,'OWNER');
+    assert.equal(rec.row(surviving.id).first_response_at,firstClock);assert.equal(rec.row(surviving.id).status,'ACTIVE');
+    assert.equal(new InterviewService(restored).row(slot.id).state,'CANCELLED');
+    assert.equal(new OfferService(restored).get(offer.id).status,'PAUSED');
+    assert.equal(new OfferService(restored).get(otherOffer.id).status,'PAUSED');
+    assert.equal(db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(otherOrg.id).verification,'RESTRICTED');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM sessions').get().n,0);
+    assert.ok(db.prepare('SELECT revoked_at FROM faro_contact_grants WHERE process_id=?').get(surviving.id).revoked_at);
+    assert.equal(db.prepare("SELECT granted FROM consents WHERE user_id=? AND consent_type='ANALYTICS' ORDER BY created_at DESC,rowid DESC LIMIT 1").get(kept.id).granted,0);
+    assert.equal(db.prepare('SELECT active FROM faro_members WHERE organization_id=? AND user_id=?').get(org.id,revoked.id).active,0);
+    assert.equal(db.prepare('SELECT user_id FROM faro_assignments WHERE offer_id=? AND user_id=?').get(offer.id,revoked.id),undefined);
+    assert.equal(db.prepare('SELECT role FROM users WHERE id=?').get(revoked.id).role,'USER');
+    const passwordHash=db.prepare('SELECT password_hash FROM users WHERE id=?').get(kept.id).password_hash;
+    assert.equal(verifyPassword('Bezpieczne123',passwordHash),false);assert.equal(verifyPassword('OdnowioneBezpieczne123',passwordHash),true);
+    assert.equal(new OfferService(restored).version(offer.id,1).salary[0].min,550000);
+    const hash=createHash('sha256').update(gone.id).digest('hex');
+    assert.equal(db.prepare('SELECT erased_at FROM faro_erasure_log WHERE subject_hash=?').get(hash).erased_at,ledger.erasures.find(e=>e.subject_hash===hash).erased_at);
+    assert.equal(new RecoveryService(restored).reconcile(ledger).erasedSubjects,0);
+    assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+    assert.throws(()=>new RecoveryService(restored).reconcile({erasures:[{subject_hash:hash,erased_at:new Date().toISOString(),policy_version:'unknown-policy'}],owners:[]}),/nieobsługiwany/);
+  } finally {restored.close();}
+  await assert.rejects(()=>restoreFaro({source:backup,dataDir:targetDir,erasureSource:f.app.config.databasePath}),/już istnieje/);
+  // Without a recoverable confirmed successor, stale ownership closes instead of resurrecting owner.
+  const noOwnerPath=join(root,'current-without-owner.sqlite');f.app.db.db.exec(`VACUUM INTO '${noOwnerPath.replaceAll("'","''")}'`);
+  const noOwner=new JobDatabase(noOwnerPath);
+  try {
+    noOwner.db.prepare("UPDATE faro_members SET role='ADMIN' WHERE organization_id=? AND role='OWNER'").run(org.id);
+    noOwner.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(org.id);
+  } finally {noOwner.close();}
+  const closed=await restoreFaro({source:backup,dataDir:join(root,'fallback'),erasureSource:noOwnerPath});
+  assert.equal(closed.closedOrganizations,1);assert.equal(closed.erasedSubjects,2);
+  const fallback=new JobDatabase(closed.databasePath);
+  try {
+    assert.equal(fallback.db.prepare('SELECT id FROM users WHERE id=?').get(employer.id),undefined);
+    assert.equal(new OfferService(fallback).get(offer.id).status,'CLOSED');
+    assert.equal(new RecruitmentService(fallback).row(surviving.id).status,'CANCELLED');
+    assert.deepEqual(new ProfileService(fallback).projection(kept.id),before);
+  } finally {fallback.close();}
+  const failedSource=join(root,'bad-ledger.sqlite'),bad=new JobDatabase(failedSource);
+  bad.db.prepare('INSERT INTO faro_erasure_log(subject_hash,erased_at,policy_version) VALUES(?,?,?)').run('a'.repeat(64),new Date().toISOString(),'unsupported');bad.close();
+  const failedDir=join(root,'failed');
+  await assert.rejects(()=>restoreFaro({source:backup,dataDir:failedDir,erasureSource:failedSource}),/nieobsługiwany/);
+  await assert.rejects(()=>stat(join(failedDir,'job.sqlite')),e=>e.code==='ENOENT');
+  console.log('Faro backup/restore: PASS (immutable history, clocks, privacy erasure replay, owner continuity, fail-closed target).');
+} finally {
+  await f.close();
+  const rel=relative(resolve(tmpdir()),resolve(root));
+  if(!rel||rel.startsWith('..')||isAbsolute(rel))throw new Error('Unsafe temporary exercise cleanup target.');
+  await rm(root,{recursive:true,force:true});
+}

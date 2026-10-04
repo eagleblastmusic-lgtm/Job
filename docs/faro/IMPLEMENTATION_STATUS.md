@@ -278,3 +278,18 @@ RISK / DEFERRED: additional offer alternatives currently read-only in editor; au
 ROLLBACK: revert client/domain/API together; preserve versioned offer/scenario JSON. Do not remove existing alternatives during rollback.
 STATUS: DONE for scoped CP04-C/CP09-B integrity; full CP04/CP09 remain PARTIAL.
 NEXT CHECKPOINT: Canonical backup/restore and erasure reconciliation, relevant CI release evidence.
+
+## CP11-B — Fail-closed Canonical DB-only recovery (2026-10-04)
+ID / TITLE: CP11-B, isolated recovery with current erasure and access authority.
+GOAL / PURPOSE / CURRENT GAP: a legacy snapshot could resurrect erased subjects, old credentials/privileges and disclosures.
+SCOPE / IMPLEMENTATION / FILES: recoveryService.ts, privacyService.ts internal recovery reuse, db.ts constructor cleanup, restore-faro.mjs, faro-backup-restore-exercise.mjs, package.json and operational documentation. New absent target only; integrity/FK validation; current consistent read-only authority snapshot captured after copying/migration; transactionally replay deletions and restrict stale authority/disclosure/intake. No sensitive ledger output.
+DB CHANGE / MIGRATIONS: none; existing erasure/member/grant/audit records reused.
+API CHANGE / FRONTEND CHANGE: none; no offline override reachable from API.
+DEPENDENCIES: CP11-A erasure/ownership, CP02 RBAC, CP04 versioning, CP06 processes, CP10 attempts.
+TESTS / TESTED: real-file restore rehearsal PASS including current credentials, owner transfer/fallback closure, erasure replay and failure cleanup; build/typecheck/lint, 27 migrations and 28 Faro Node scenarios PASS. Final authority-capture script change verified by recovery rehearsal.
+ACCEPTANCE CRITERIA: no erased account/attempt/watch/grant resurrection; current passwords/roles/restrictions win; historical survivor process/version/first clock retained; no sessions or automatic phone/analytics disclosure; existing target refused; failed ledger validation leaves no database; replay has no duplicate erasure; source unchanged.
+LEGAL STATUS: local synthetic foundation only; retention/legal hold and public release gates unresolved.
+RISK / DEFERRED: DB-only; uploads refused. Current authoritative source must survive and be quiescent; independent durable journal, file recovery, PostgreSQL/multi-instance persistence, production cutover and external legal decisions remain. No distributed source/target transaction claimed.
+ROLLBACK: revert offline helper/service only; preserve erasure history and safe default API deletion. Do not activate failed or unreconciled snapshots.
+STATUS: DONE for bounded CP11-B foundation; overall CP11 PARTIAL.
+NEXT CHECKPOINT: explicit confirmation of exact phone number and revocation on profile change.

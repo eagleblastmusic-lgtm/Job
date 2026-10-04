@@ -16,6 +16,7 @@
     "test": "npm run build && node --test dist/tests/*.test.js",
     "test:browser": "npm run build && playwright test",
     "verify:backup-restore": "npm run build && node scripts/backup-restore-exercise.mjs",
+    "verify:faro-recovery": "npm run build && node scripts/faro-backup-restore-exercise.mjs",
     "check": "npm run lint && npm run typecheck && npm run validate:migrations && npm test && npm run verify:backup-restore && npm run test:browser",
     "smoke:staging": "node scripts/staging-smoke.mjs",
     "backup:data": "node scripts/backup.mjs",

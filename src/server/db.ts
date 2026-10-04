@@ -8,8 +8,10 @@ export class JobDatabase {
   constructor(path: string) {
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
-    this.migrate();
+    try {
+      this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+      this.migrate();
+    } catch(error) {this.db.close();throw error;}
   }
 
   private migrate(): void {
