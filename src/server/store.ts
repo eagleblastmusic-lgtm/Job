@@ -72,8 +72,7 @@ export class AppStore {
     const timestamp = now();
     this.db.prepare(`INSERT INTO users(id,email,password_hash,name,locale,timezone,role,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id, input.email, input.passwordHash, input.name, 'pl-PL', 'Europe/Warsaw', input.role, timestamp, timestamp);
     this.db.prepare(`INSERT INTO career_profiles(user_id,created_at,updated_at) VALUES(?,?,?)`).run(id, timestamp, timestamp);
-    const trialEnd = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
-    this.db.prepare(`INSERT INTO subscriptions(id,user_id,plan,status,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`).run(randomUUID(), id, 'TRIAL', 'TRIALING', trialEnd, timestamp, timestamp);
+    this.db.prepare(`INSERT INTO subscriptions(id,user_id,plan,status,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`).run(randomUUID(), id, 'FREE', 'ACTIVE', null, timestamp, timestamp);
     return { id, email: input.email, passwordHash: input.passwordHash, name: input.name, locale: 'pl-PL', timezone: 'Europe/Warsaw', role: input.role, createdAt: timestamp, updatedAt: timestamp };
   }
 
