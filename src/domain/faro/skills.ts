@@ -1,4 +1,6 @@
-import { ONTOLOGY, normalizeText } from '../ontology.js';
+import { normalizeText } from '../ontology.js';
+import { SKILL_CATALOG } from './skillCatalog.js';
+export { SKILL_CATALOG } from './skillCatalog.js';
 
 export const LEVELS = ['BASICS', 'INDEPENDENT', 'FLUENT'] as const;
 export type SkillLevel = typeof LEVELS[number];
@@ -11,16 +13,6 @@ export interface Claim {
 }
 export interface Learning { skillId: string; mode: 'SELF_DEVELOPING' | 'WANTS_TO_LEARN'; practice: Practice; }
 export interface Availability { kind: 'UNKNOWN' | 'IMMEDIATE' | 'AFTER_PERIOD' | 'ON_DATE'; value: string | null; updatedAt: string; }
-export const SKILL_CATALOG = [
-  ...ONTOLOGY.map((entry, index) => ({ id: `faro:legacy:${index + 1}`, label: entry.canonical, aliases: entry.aliases, taxonomyVersion: 'legacy-curated-v1', canonicalURI: null, licenseRef: 'repository-authored; ESCO mapping pending review' })),
-  ...[
-    ['customer-service', 'Obsługa klienta', ['obsługa klienta', 'klient', 'stacji']],
-    ['cash-register', 'Obsługa kasy', ['kasa', 'kasę', 'stacji']],
-    ['sales', 'Sprzedaż', ['sprzedaż', 'stacji']],
-    ['shift-work', 'Praca zmianowa', ['zmianowa', 'zmiany', 'stacji']],
-    ['conflict-resolution', 'Rozwiązywanie sytuacji konfliktowych', ['reklamacje', 'konflikt', 'stacji']]
-  ].map(([id, label, aliases]) => ({ id: `faro:activity:${id as string}`, label: label as string, aliases: aliases as string[], taxonomyVersion: 'faro-activities-v1', canonicalURI: null, licenseRef: 'Faro authored task labels; not ESCO certification' }))
-];
 export function skillById(id: string) { return SKILL_CATALOG.find(skill => skill.id === id); }
 export function suggestSkills(description: string) {
   const text = normalizeText(description);

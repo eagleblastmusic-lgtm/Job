@@ -379,3 +379,19 @@ RISK / DEFERRED: objective quiz only; missing answer is null. Structured technic
 ROLLBACK: revert DTO/UI together, retain candidate/draft answer boundary and human review gate.
 STATUS: DONE for CP10-E; overall CP10 PARTIAL.
 NEXT CHECKPOINT: stable curated skill identities independent of legacy ontology ordering; current CI acceptance.
+
+## CP03-B — Stable authored skill identities (2026-10-04)
+ID / TITLE: CP03-B, remove positional identity coupling.
+GOAL / PURPOSE / CURRENT GAP: skill IDs came from legacy ontology array indices, so historical insertion/reorder could reinterpret persisted claims/requirements without a migration or user confirmation.
+SCOPE / IMPLEMENTATION / FILES: domain/faro/skillCatalog.ts explicit23-node frozen seed; skills.ts same catalog reexport and unchanged suggestion/projection algorithms; isolated import regression; architecture/domain/status docs.
+DB CHANGE / MIGRATIONS: none; every existing identifier/label/alias/version/license preserved, no rekeying.
+API CHANGE: same catalog endpoint; additive kind/family descriptive metadata, no official taxonomy claim.
+FRONTEND CHANGE: none; same choices/labels and matching meanings.
+DEPENDENCIES: CP03 confirmed claims, CP04 requirements, CP05 exact matching.
+TESTS / TESTED: build/typecheck/lint and15 skills/profile/recruitment scenarios PASS. Isolated subprocess imports reordered/extended historical ontology first and confirms stable IDs plus no automatic new node; actual profile/matching/phone/publication contracts retained.
+ACCEPTANCE CRITERIA: persisted identity independent of unrelated ontology ordering; no new concepts introduced without explicit curated release; readonly frozen seed/aliases; confirmation semantics and exact matching unchanged; ESCO URI remains null rather than guessed.
+LEGAL STATUS: repository-authored local taxonomy; ESCO/license/provider mapping remains REVIEW before use.
+RISK / DEFERRED: only23 authored nodes, no complete ESCO graph/validated equivalences or semantic entailment. Existing family metadata never restricts occupations/geography or certifies an ability. Future labels/relations require reviewed versioning, never ID recycling.
+ROLLBACK: retain stable seed; revert consumers together without restoring index-derived identity or rekeying claims.
+STATUS: DONE for CP03-B identity integrity; overall CP03 graph integration PARTIAL.
+NEXT CHECKPOINT: updated CI acceptance; remaining skills/evidence/privacy and operational gates.
