@@ -1,0 +1,51 @@
+name: FARO Canonical
+
+on:
+  push:
+    branches: [main, "codex/faro-**", "codex/faro-canonical"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run validate:migrations
+      - name: Canonical invariants and reused authentication/security contracts
+        run: npm run test:faro
+      - name: Real-file Canonical erasure and authority recovery
+        run: node scripts/faro-backup-restore-exercise.mjs
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Both roles and retained public accessibility contracts, desktop/mobile
+        run: npm run test:browser:faro
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: faro-browser-failures
+          path: test-results/
+          retention-days: 7

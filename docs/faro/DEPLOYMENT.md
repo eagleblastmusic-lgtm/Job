@@ -11,3 +11,5 @@ Before public activation: resolve KRAZ/service qualification, GDPR roles/purpose
 Deployment changes, provider purchases, live data processing and external outreach require their own concrete authorized scope. Local foundations and synthetic tests can progress independently of these gates.
 
 CP11-B proves local DB-only recovery against an older snapshot and a current authority source. It does not prove catastrophe recovery when both sources are lost, uploaded-file safety, PostgreSQL cutover or production restart/redeploy durability. Activation remains review-required and production API/worker gates stay closed.
+
+CP11-D adds separate Canonical CI without replacing or making the original historical CI optional. Branch protection is not modified. Current evidence is local Node24 only; CI Node22/24 and Docker results require actual remote verification. Production API and scheduler activation gates remain closed.

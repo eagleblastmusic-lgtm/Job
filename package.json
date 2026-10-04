@@ -24,7 +24,9 @@
     "provision:admin": "node scripts/provision-admin.mjs",
     "feature:flag": "node scripts/set-feature-flag.mjs",
     "start": "node --enable-source-maps dist/server/index.js",
-    "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js"
+    "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js",
+    "test:faro": "npm run build && node --test dist/tests/faro-*.test.js dist/tests/auth-security.test.js dist/tests/admin-security.test.js dist/tests/security.test.js dist/tests/http-proxy-security.test.js dist/tests/consents.test.js dist/tests/config.test.js dist/tests/health.test.js",
+    "test:browser:faro": "npm run build && playwright test e2e/faro.spec.ts e2e/accessibility.spec.ts --workers=1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

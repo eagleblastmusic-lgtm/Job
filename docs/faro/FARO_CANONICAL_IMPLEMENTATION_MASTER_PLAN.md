@@ -264,3 +264,17 @@ RISK: parser rejection is intentionally limited to URL validation, other interna
 ROLLBACK: revert handler/test together; preserve safe security headers.
 STATUS: DONE for CP11-C; overall CP11 PARTIAL.
 NEXT CHECKPOINT: relevant CI and regression evidence.
+
+## CP11-D — Explicit Canonical CI and aggregate regression (2026-10-04)
+ID / TITLE: CP11-D, executable current-system quality scope.
+GOAL / PURPOSE / CURRENT GAP: CI lacked canonical recovery and codex branch push coverage; old browser contracts targeted retired product.
+SCOPE / IMPLEMENTATION / FILES: package.json new test:faro/test:browser:faro scripts; .github/workflows/faro.yml; testing/operations docs. Keep original CI/tests and container unchanged and visibly unresolved.
+DB CHANGE / MIGRATIONS / API CHANGE / FRONTEND CHANGE: none.
+DEPENDENCIES: CP01 runtime, CP08 workspace, CP11-B recovery and CP06-H consent.
+TESTS / TESTED: local Node24 aggregate 50/50 Node, 20/20 browser, lint/typecheck and 27 migrations PASS; recovery PASS at current relevant code. Remote Node22/24 execution pending; no Docker available locally.
+ACCEPTANCE CRITERIA: CI explicitly exercises all Canonical invariant suites and shared auth/privacy/security contracts; actual real-file recovery; both roles/mobile/desktop and retained public accessibility; no hidden legacy failures/skips/continue-on-error; workflow least-privilege contents:read.
+LEGAL STATUS: synthetic CI only; release gates unchanged.
+RISK / DEFERRED: original full legacy CI has known OLX/LinkedIn fixture failures and obsolete browser expectations. These and Node22/container/persistence validation remain gates; this bounded CI addition is not full CP11 completion.
+ROLLBACK: revert additive workflow/scripts; historical pipeline remains intact.
+STATUS: DONE for local aggregate verification and CI definition; remote verification pending, overall CP11 PARTIAL.
+NEXT CHECKPOINT: publish reviewable dependent drafts and continue remaining invariant/security/domain gaps.
