@@ -309,3 +309,18 @@ RISK / DEFERRED: revocation cannot erase a previously observed number from human
 ROLLBACK: revert UI/API together while retaining revoke-on-number-change protection; never restore immediate unconfirmed disclosure.
 STATUS: DONE for CP06-H; overall CP06 PARTIAL.
 NEXT CHECKPOINT: malformed request URL boundary and relevant CI release verification.
+
+## CP11-C — Malformed request boundary (2026-10-04)
+ID / TITLE: CP11-C, contain invalid URL parsing.
+GOAL / PURPOSE / CURRENT GAP: URL parsing ran before the async handler catch and could reject without an HTTP response.
+SCOPE / IMPLEMENTATION / FILES: faroApp.ts request boundary and faro-runtime.test.ts raw HTTP counterexample.
+DB CHANGE / MIGRATIONS / FRONTEND CHANGE: none.
+API CHANGE: malformed URLs return 400 INVALID_URL, no-store and standard security headers.
+DEPENDENCIES: CP01 runtime allowlist.
+TESTS / TESTED: build and both runtime scenarios PASS; lint/typecheck PASS.
+ACCEPTANCE CRITERIA: malformed raw target produces a stable error, does not leak parse details or terminate service; subsequent health remains 200; retirement/auth contract retained.
+LEGAL STATUS: local security fix; production gates remain closed.
+RISK: parser rejection is intentionally limited to URL validation, other internal errors remain opaque 500.
+ROLLBACK: revert handler/test together; preserve safe security headers.
+STATUS: DONE for CP11-C; overall CP11 PARTIAL.
+NEXT CHECKPOINT: relevant CI and regression evidence.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createFaroApp } from '../server/faroApp.js';
 
@@ -24,4 +25,22 @@ test('canonical runtime retires CV, EHV, candidate billing and external import w
       assert.equal(denied.headers.get('cache-control'), 'no-store');
     }
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test('malformed raw request URL returns 400 without unhandled rejection and subsequent requests remain available',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'faro-url-'));
+  const app=createFaroApp({nodeEnv:'test',databasePath:join(dir,'db.sqlite'),dataDir:dir});
+  await new Promise<void>(resolve=>app.server.listen(0,'127.0.0.1',resolve));
+  const port=(app.server.address() as AddressInfo).port;
+  try {
+    const bad=await new Promise<{status:number|undefined;cache:string|undefined;body:string}>( (resolve,reject)=>{
+      const req=request({hostname:'127.0.0.1',port,path:'http://['},res=>{
+        let body='';res.setEncoding('utf8');res.on('data',(chunk:string)=>{body+=chunk;});
+        res.on('end',()=>resolve({status:res.statusCode,cache:res.headers['cache-control'],body}));
+      });req.on('error',reject);req.end();
+    });
+    assert.equal(bad.status,400);assert.equal(bad.cache,'no-store');
+    assert.equal((JSON.parse(bad.body) as {error:{code:string}}).error.code,'INVALID_URL');
+    const health=await fetch(`http://127.0.0.1:${port}/api/health`);assert.equal(health.status,200);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });

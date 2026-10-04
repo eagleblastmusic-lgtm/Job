@@ -16,14 +16,15 @@ export function createFaroApp(overrides: Partial<AppConfig> = {}) {
   worker.start();
   app.server.removeAllListeners('request');
   app.server.on('request', async (req, res) => {
-    const path = new URL(req.url ?? '/', app.config.appOrigin).pathname;
-    const allowed = /^\/api\/auth\/(register|login|logout)$/.test(path)
-      || ['/api/health', '/api/legal', '/api/me', '/api/consents', '/api/consents/analytics', '/api/account', '/api/export', '/api/admin/diagnostics'].includes(path);
-    if (!path.startsWith('/api/') || allowed) { original(req, res); return; }
     securityHeaders(res, app.config);
     res.setHeader('cache-control', 'no-store');
-    res.setHeader('x-content-type-options', 'nosniff');
     try {
+      let path:string;
+      try {path=new URL(req.url ?? '/', app.config.appOrigin).pathname;}
+      catch {throw new HttpError(400,'Nieprawidłowy adres żądania.','INVALID_URL');}
+      const allowed = /^\/api\/auth\/(register|login|logout)$/.test(path)
+        || ['/api/health', '/api/legal', '/api/me', '/api/consents', '/api/consents/analytics', '/api/account', '/api/export', '/api/admin/diagnostics'].includes(path);
+      if (!path.startsWith('/api/') || allowed) { original(req, res); return; }
       enforceExtendedOrigin(req, app.config);
       if (await handleFaro(req, res, path)) return;
       throw new HttpError(410, 'Ta funkcja nie należy do aktualnego Faro.', 'RETIRED_FEATURE');
