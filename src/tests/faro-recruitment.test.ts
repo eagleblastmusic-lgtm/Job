@@ -4,7 +4,8 @@ import { faroFixture, offerInput } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { OfferService, type OfferRecord } from '../server/faro/offerService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
-import { explainOffer, sortOffers } from '../domain/faro/offers.js';
+import { explainOffer, explainConditions, DEFAULT_CONSTRAINTS, sortOffers } from '../domain/faro/offers.js';
+import { parseOffer } from '../server/faro/offerService.js';
 import { TrustService } from '../server/faro/trustService.js';
 
 async function setup() {
@@ -18,6 +19,62 @@ async function setup() {
   const offer = await f.request<OfferRecord>(`/api/faro/offers/${draft.id}/lifecycle`, employer.cookie, 'POST', { action: 'PUBLISH', expectedVersion: 2, confirmed: true });
   return { ...f, employer, candidate, outsider, org, offer };
 }
+
+test('salary minimum compares range floors and identical units without net/FTE conversion or unrelated contract alternatives',()=>{
+  const offer=parseOffer(offerInput('recruiter'));
+  const salaryMinimum={amount:550000,currency:'PLN' as const,basis:'GROSS_EMPLOYMENT' as const,period:'MONTH' as const,hoursPerPeriod:168,ftePercent:100};
+  const constraints={...DEFAULT_CONSTRAINTS,active:true,salaryMinimum};
+  const state=(data=offer,c=constraints)=>explainConditions(data,c).find(row=>row.field==='salary')?.state;
+  assert.equal(state(),'SATISFIED');
+  assert.equal(state(offer,{...constraints,salaryMinimum:{...salaryMinimum,amount:550001}}),'KNOWN_NOT_MET');
+  for(const changed of [{basis:'B2B_NET_INVOICE_EXCL_VAT' as const,contract:'B2B' as const},{period:'HOUR' as const},{hoursPerPeriod:160},{ftePercent:50}]) {
+    assert.equal(state({...offer,salary:[{...offer.salary[0]!,...changed,min:9999999,max:9999999}]}),'UNKNOWN');
+  }
+  const mixed={...offer,salary:[{...offer.salary[0]!,min:540000},{...offer.salary[0]!,contract:'B2B' as const,basis:'B2B_NET_INVOICE_EXCL_VAT' as const,min:9999999,max:9999999}]};
+  assert.equal(state(mixed),'UNKNOWN');
+  assert.equal(state(mixed,{...constraints,contracts:['UOP']}),'KNOWN_NOT_MET');
+  assert.equal(state(offer,{...constraints,contracts:['B2B']}),'UNKNOWN');
+  assert.deepEqual(explainConditions(offer,{...constraints,active:false}),[]);
+});
+
+test('private salary filter is persisted, versioned and scoped while projections/history/order stay unchanged',async()=>{
+  const f=await setup();try {
+    const profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),r=new RecruitmentService(f.app.db);
+    const alternative=offers.create(f.employer.id,f.org.id,{...offerInput(f.employer.id),salary:[{...offerInput(f.employer.id).salary[0]!,period:'HOUR',min:10000,max:10000}]});
+    offers.lifecycle(f.employer.id,alternative.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(f.employer.id,alternative.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const order=offers.list(f.candidate.id).map(o=>o.id),projection=profiles.projection(f.candidate.id);
+    const preview=profiles.previewConfirmation(f.candidate.id);
+    const process=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'salary-interest'});
+    r.watch(f.candidate.id,alternative.id,true);
+    const snapshot=r.row(process.id).snapshot,firstClock=r.row(process.id).response_due_at;
+    const salaryMinimum={amount:550000,currency:'PLN',basis:'GROSS_EMPLOYMENT',period:'MONTH',hoursPerPeriod:168,ftePercent:100,privateNote:'Never share'};
+    const constraints={...DEFAULT_CONSTRAINTS,active:true,salaryMinimum};
+    const update=async(s:Record<string,unknown>)=>f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:profiles.profile(f.candidate.id).version,constraints:s});
+    const initialVersion=profiles.profile(f.candidate.id).version;
+    await update(constraints);
+    assert.deepEqual(offers.list(f.candidate.id).map(o=>o.id),[f.offer.id]);
+    assert.equal(offers.detail(f.candidate.id,alternative.id).conditionExplanation.find(c=>c.field==='salary')!.state,'UNKNOWN');
+    assert.deepEqual(profiles.projection(f.candidate.id),projection);assert.equal(r.row(process.id).snapshot,snapshot);assert.equal(r.row(process.id).response_due_at,firstClock);
+    assert.deepEqual(offers.detail(f.employer.id,f.offer.id).conditionExplanation,[]);
+    assert.equal(JSON.stringify(profiles.profile(f.candidate.id).preferences).includes('Never share'),false);
+    assert.equal(profiles.constraints(f.outsider.id).salaryMinimum,null);
+    const exportOwn=await f.request<{faro:{faro_profiles:Array<{preferences:string}>}}>('/api/export',f.candidate.cookie);
+    assert.equal(JSON.parse(exportOwn.faro.faro_profiles[0]!.preferences).salaryMinimum.amount,550000);
+    await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:initialVersion,constraints},409);
+    const omit={active:true,workModels:[],contracts:[],noNights:false,noWeekends:false};
+    await update(omit);assert.equal(profiles.constraints(f.candidate.id).salaryMinimum!.amount,550000);
+    for(const changed of [{amount:1.5},{amount:0},{amount:Number.MAX_SAFE_INTEGER},{currency:'EUR'},{basis:'NET'},{hoursPerPeriod:0},{ftePercent:101},{period:'WEEK'}]) {
+      const before=profiles.profile(f.candidate.id);
+      await f.request('/api/faro/profile/constraints',f.candidate.cookie,'PUT',{expectedVersion:before.version,constraints:{...constraints,salaryMinimum:{...salaryMinimum,...changed}}},400);
+      assert.deepEqual(profiles.profile(f.candidate.id),before);
+    }
+    await update({...constraints,salaryMinimum:{...salaryMinimum,amount:650000}});
+    assert.equal(offers.list(f.candidate.id).length,0);assert.equal(offers.detail(f.candidate.id,f.offer.id).conditionExplanation.find(c=>c.field==='salary')!.state,'KNOWN_NOT_MET');
+    assert.equal(r.watches(f.candidate.id).length,1);assert.deepEqual(offers.list(f.employer.id,f.org.id).map(o=>o.id),order);
+    await update({...constraints,active:false});assert.deepEqual(offers.list(f.candidate.id).map(o=>o.id),order);
+    await update({...constraints,salaryMinimum:null});assert.deepEqual(offers.list(f.candidate.id).map(o=>o.id),order);
+  }finally{await f.close();}
+});
 
 test('native process: private watch, identical preview, rejection requirement, clocks, tenant isolation, explicit phone grant and immutable diff', async () => {
   const f = await setup();

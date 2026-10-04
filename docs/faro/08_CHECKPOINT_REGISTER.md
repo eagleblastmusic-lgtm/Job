@@ -441,3 +441,21 @@ RISK / DEFERRED: automated scans cover bounded current surfaces, not complete ma
 ROLLBACK: revert config/scripts/CI and test locations together, preserve explicit disposition and retirement/runtime guards; never enable CV/EHV to satisfy historical assertions.
 STATUS: local acceptance DONE; remote acceptance PENDING; overall CP11/master plan PARTIAL.
 NEXT CHECKPOINT: verify exact remote checkpoint, then explicit private salary constraints with comparable declared units/basis, no tax inference.
+
+CP11-F remote acceptance DONE: exact6a4be07 [FARO run37194266418](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37194266418) and [original CI run37194266464](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37194266464) SUCCESS. This includes Node22/24 Canonical/recovery,26 browser executions, all129 retained Node tests and actual Docker/closed-release smoke. [Draft44](https://github.com/eagleblastmusic-lgtm/Job/pull/44) reviews only this slice against pinned1816066 integration baseline; it is unmerged and depends on prior unmerged implementation. Overall CP11/master plan and external gates remain PARTIAL.
+
+## CP05-B — Explicit private comparable salary minimum (2026-10-04)
+ID / TITLE: CP05-B, salary constraint using declared comparable amounts.
+GOAL / PURPOSE / CURRENT GAP: existing private constraints cover work model/contracts/nights/weekends but not explicit salary; incomparable bases cannot be coerced into a universal minimum.
+SCOPE / IMPLEMENTATION / FILES: domain offers.ts SalaryMinimum/explainConditions, existing ProfileService JSON preferences/versioning, current client form/types/labels/controller, recruitment API/domain counterexamples and expanded real browser journey.
+DB CHANGE / MIGRATIONS: none; existing private preferences and erasure/export reused.
+API CHANGE: existing PUT profile/constraints accepts salaryMinimum {amount minor units,currency PLN,basis,period,hoursPerPeriod,ftePercent} or null. Omission by old clients preserves an existing minimum; explicit null removes it. Validation allowlists and rejects unsafe/non-integer/unsupported inputs before write.
+FRONTEND CHANGE: opt-in private salary minimum with explicit basis/period/hours/FTE, persists after reload; candidate detail shows separate condition, no global score or auth change.
+DEPENDENCIES: CP04 native declared salary versions, CP05-A constraints, CP08 real profile/offer workspace, CP11-A own export.
+TESTS / TESTED: build and13 focused recruitment scenarios PASS. Full npm run check PASS:131/131 Node tests,28 migrations, both real-file recovery drills,26/26 mobile/desktop browsers, lint/typecheck; zero skips. Review/diff checks PASS. Remote acceptance pending for new commit.
+ACCEPTANCE CRITERIA: range floor not maximum; identical basis/currency/period/hours/FTE only; accepted-contract alternatives checked together; incompatible alternative stays UNKNOWN instead of invented success/failure; active filter never relaxes; direct own saved/process views remain; employer projection/snapshot/clock/order unchanged; old callers cannot erase minimum silently; private own export includes it.
+LEGAL STATUS: deterministic declared salary comparison, no financial advice/tax/net inference, provider or production gate opened.
+RISK / DEFERRED: strict exact-unit comparison intentionally returns UNKNOWN for other hours/FTE/periods; it does not normalize these or treat B2B invoice as take-home. Commute constraints need source-backed estimates and remain open. General matching/skills and product usability remain partial.
+ROLLBACK: remove UI/domain consumer together; preserve stored private preferences and rights controls; do not expose or coerce values into employer view.
+STATUS: bounded local salary implementation/acceptance DONE; remote PENDING; overall CP05 PARTIAL.
+NEXT CHECKPOINT: attempt-bound technical incident with immutable observed times and explicit human handling; full retry/reassessment remains separate.

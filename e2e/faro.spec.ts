@@ -41,12 +41,17 @@ test('Faro real candidate and employer process, private watch, economics and res
     await constraints.locator('[name=active]').check();
     await constraints.locator('[name=workModels][value=REMOTE]').check();
     await constraints.locator('[name=noNights]').check();
+    await constraints.locator('[name=salaryEnabled]').check();
+    await constraints.locator('[name=salaryMinimum]').fill('5500');
     await constraints.getByRole('button',{name:'Zapisz prywatne granice'}).click();
     await expect(page.locator('[data-form=constraints] [name=active]')).toBeChecked();
+    await page.reload();
+    await expect(page.locator('[data-form=constraints] [name=salaryMinimum]')).toHaveValue('5500');
     await page.getByRole('link', { name: 'Możliwości', exact: true }).click();
     await page.locator(`.f-offer-card[href="#offers/${draft.id}"]`).click();
     await expect(page.getByRole('heading', { name: 'Droga do tej pracy' })).toBeVisible();
     await expect(page.getByText('Bez nocy: warunek spełniony',{exact:true})).toBeVisible();
+    await expect(page.getByText('Minimum wynagrodzenia: warunek spełniony',{exact:true})).toBeVisible();
     await expect(page.getByText('Wymagane · deklarujesz wymagany poziom', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Obserwuj prywatnie' }).click();
     await expect(page.getByRole('button', { name: 'Przestań obserwować' })).toBeVisible();
