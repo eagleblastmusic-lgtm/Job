@@ -156,3 +156,11 @@ All are draft and unmerged. Each compares only its checkpoint with the previous 
 | CP06-I durable outbox lease/conscious retry | [#47](https://github.com/eagleblastmusic-lgtm/Job/pull/47) | codex/faro-cp06i-outbox | codex/faro-cp10g-incidents | a4755a6 | 0030 |
 
 All five are verified OPEN/DRAFT/unmerged. CP11-F base pins the existing integration at1816066; it is deliberately not main and not a claim that earlier hardening was merged. Earlier integration checkpoints remain dependencies that need their own review/slicing before main integration. This table records bounded review diffs, not a release-ready stack. Later documentation-only acceptance updates do not change the listed code checkpoints. Current main must be rechecked at integration time; the historical ae4af4e statement above is not a current-main assertion. No force push, merge or deployment performed.
+
+Continuation slices (all draft/unmerged):
+| Checkpoint | Draft | Branch | Base | Code |
+| --- | --- | --- | --- | --- |
+| CP10-H explicit technical retry | [#48](https://github.com/eagleblastmusic-lgtm/Job/pull/48) | codex/faro-cp10h-retry | codex/faro-cp06i-outbox |40b0e6a|
+| CP07-E independent restriction restoration | [#49](https://github.com/eagleblastmusic-lgtm/Job/pull/49) | codex/faro-cp07e-restoration | codex/faro-cp10h-retry |6be3d1e|
+| CP05-C private commute/unknown listing | [#50](https://github.com/eagleblastmusic-lgtm/Job/pull/50) | codex/faro-cp05c-commute | codex/faro-cp07e-restoration |76dde71|
+These bounded slices have exact successful CI evidence in the checkpoint register. Earlier integration dependencies still require review before main; no merge/deploy/release occurred.

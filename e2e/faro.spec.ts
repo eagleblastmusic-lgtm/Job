@@ -325,6 +325,15 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await expect(page.getByText('Wynik zatwierdzony',{exact:true})).toBeVisible();
     const final=await f.request<{result:{earned:number;review:string}}>(`/api/faro/attempts/${id}`,candidate.cookie);
     expect(final.result.earned).toBe(1);expect(final.result.review).toBe('FINALIZED');
+    const amendment=page.locator('[data-form=attempt-amend]');
+    await amendment.locator('[name=task-1]').fill('0');
+    await amendment.locator('[name=reason]').fill('Ręczny przegląd koryguje punkty; pierwotny wynik pozostaje w historii.');
+    await amendment.locator('[name=confirmed]').check();
+    await amendment.getByRole('button',{name:'Zapisz korektę punktów'}).click();
+    await expect(page.getByText(/Indywidualna korekta człowieka/)).toBeVisible();
+    const amended=await f.request<{result:{earned:number;review:string;unanswered:number};resultHistory:unknown[]}>(`/api/faro/attempts/${id}`,candidate.cookie);
+    expect(amended.result.earned).toBe(0);expect(amended.result.review).toBe('AMENDED');expect(amended.result.unanswered).toBe(1);expect(amended.resultHistory).toHaveLength(2);
+    expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
     const correction=page.locator('[data-form=attempt-invalidate]');
     await correction.locator('[name=reasonCode]').selectOption('AMBIGUOUS_TASK');
     await correction.locator('[name=reason]').fill('Zadanie było niejednoznaczne; wynik nie może służyć decyzji.');
@@ -336,6 +345,7 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
     await page.getByText('Historia ważności wyniku',{exact:true}).click();
     await expect(page.getByText('Zadanie było niejednoznaczne; wynik nie może służyć decyzji.',{exact:true})).toBeVisible();
     await expect(page.locator('[data-form=attempt-invalidate]')).toHaveCount(0);
+    await expect(page.locator('[data-form=attempt-amend]')).toHaveCount(0);
     await expect(page.getByRole('heading',{name:'Wynik w tej rekrutacji'})).toHaveCount(0);
   }finally{await f.close();}
 });
