@@ -19,3 +19,5 @@ The returned activation=REVIEW_REQUIRED is mandatory. Before activating anything
 Run `npm run verify:faro-recovery` for the synthetic real-file rehearsal. Never point this rehearsal at live data.
 
 For Canonical validation use npm run test:faro, npm run test:browser:faro and npm run verify:faro-recovery. Original npm run check still includes historical modules and must not be described as passing until its known failures and retired browser scope have been explicitly resolved.
+
+CP11-E image smoke: node scripts/faro-container-smoke.mjs --base http://127.0.0.1:3000 only against an isolated disposable local container. Creates synthetic account; never use against real data. CI prints container logs and removes container after checks. Existing release gates stay closed. Historical backup exercise passed in its own temp data roots; it is not the Canonical authority-replay helper.

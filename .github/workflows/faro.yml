@@ -49,3 +49,25 @@ jobs:
           name: faro-browser-failures
           path: test-results/
           retention-days: 7
+  compatibility-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y python3-reportlab fonts-dejavu-core poppler-utils unzip
+      - run: npm ci --no-audit --no-fund
+      - name: All retained Node modules and Canonical tests (no skips)
+        run: npm test
+      - name: Historical storage compatibility rehearsal
+        run: node scripts/backup-restore-exercise.mjs
+      - name: Build actual production image
+        run: docker build -t faro-canonical:${{ github.sha }} .
+      - name: Isolated image readiness and closed-release boundary
+        run: |
+          docker run -d --name faro-canonical -p 3000:3000 -e APP_ORIGIN=http://127.0.0.1:3000 faro-canonical:${{ github.sha }}
+          trap 'docker logs faro-canonical; docker rm -f faro-canonical >/dev/null 2>&1 || true' EXIT
+          node scripts/faro-container-smoke.mjs --base http://127.0.0.1:3000

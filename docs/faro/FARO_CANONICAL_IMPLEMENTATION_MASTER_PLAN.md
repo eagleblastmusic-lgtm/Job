@@ -372,3 +372,17 @@ RISK / DEFERRED: only23 authored nodes, no complete ESCO graph/validated equival
 ROLLBACK: retain stable seed; revert consumers together without restoring index-derived identity or rekeying claims.
 STATUS: DONE for CP03-B identity integrity; overall CP03 graph integration PARTIAL.
 NEXT CHECKPOINT: updated CI acceptance; remaining skills/evidence/privacy and operational gates.
+
+## CP11-E — Full retained Node compatibility and production-image CI (2026-10-04)
+ID / TITLE: CP11-E, validate retained modules and actual image alongside Canonical contracts.
+GOAL / PURPOSE / CURRENT GAP: two historical ingestion fixtures mocked transports the existing connector no longer calls; Canonical CI lacked full retained Node and actual Docker acceptance.
+SCOPE / IMPLEMENTATION / FILES: public-job-ingestion.test.ts fixtures now serve real listing links and detail contracts; faro.yml adds Ubuntu compatibility/image job; scripts/faro-container-smoke.mjs verifies isolated production boundary.
+DB CHANGE / MIGRATIONS / API CHANGE / FRONTEND CHANGE: none; no production importer changes or retired routes reactivation.
+DEPENDENCIES: CP11-D CI, CP03-B stable identities, CP01 retirement/free-first, existing Dockerfile and recovery helpers.
+TESTS / TESTED: exact npm test PASS127/127, zero failures/skips; focused ingestion8/8; lint/typecheck/diff checks PASS; historical real-file backup-restore exercise PASS. Remote Canonical run37188962130 at0ca9676 PASS Node22/24, Canonical recovery and20 browser checks. New compatibility/container job pending actual remote result; local Docker unavailable.
+ACCEPTANCE CRITERIA: no weakened assertions/skips; OLX detail traversal and LinkedIn standard search/detail verified; every retained Node test executes; production image builds its own tests; isolated synthetic account FREE/ACTIVE and secure session; production Canonical remains503 and CV/EHV/billing/imports410.
+LEGAL STATUS: synthetic isolated engineering validation; release gates unchanged.
+RISK / DEFERRED: old full browser suite still describes retired product flows and remains separate unresolved scope; npm check is not claimed green. Container result is pending until remote completion. This is not deployment or permission to activate production.
+ROLLBACK: revert CI/helper and fixture delta together; keep Canonical boundary contracts and existing tests enabled.
+STATUS: implementation DONE; container acceptance PENDING; overall CP11 and master plan PARTIAL.
+NEXT CHECKPOINT: actual container CI, then remaining assessment/trust/domain engineering.

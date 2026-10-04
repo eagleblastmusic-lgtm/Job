@@ -207,7 +207,7 @@ test('public source ingestion fails closed on access blocks and leaves other sou
   }
 });
 
-test('public source ingestion fetches and normalizes OLX Praca ads from window.__PRERENDERED_STATE__', async () => {
+test('public source ingestion follows an OLX public listing link and normalizes prerendered detail data', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-olx-source-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
@@ -259,12 +259,13 @@ test('public source ingestion fetches and normalizes OLX Praca ads from window._
     const encodedState = JSON.stringify(JSON.stringify(olxState));
     const olxSearchHtml = `<!doctype html><html><head>
 <script>window.__PRERENDERED_STATE__= ${encodedState};</script>
-</head><body><div id="root">OLX Praca</div></body></html>`;
+</head><body><a href="https://www.olx.pl/oferta/praca/magazynier-z-udt-CID4-ID12345.html">Oferta</a></body></html>`;
 
-    let requestedUrl = '';
+    const requestedUrls:string[]=[];
     const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
-      requestedUrl = String(input);
-      if (requestedUrl.includes('olx.pl/praca')) {
+      const requestedUrl=String(input);requestedUrls.push(requestedUrl);
+      // Generic connector reads links on a listing, then the existing OLX detail parser.
+      if (requestedUrl.includes('olx.pl/praca')||requestedUrl.includes('/oferta/praca/magazynier-z-udt-CID4-ID12345.html')) {
         return new Response(olxSearchHtml, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
       }
       return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
@@ -279,7 +280,8 @@ test('public source ingestion fetches and normalizes OLX Praca ads from window._
     assert.equal(olxResult?.canonicalCount, 1);
 
     // Verify URL normalization stripped diacritics from 'Kraków'
-    assert.ok(requestedUrl.includes('/praca/krakow/q-magazynier/'), `Expected URL to contain /praca/krakow/q-magazynier/, got: ${requestedUrl}`);
+    assert.ok(requestedUrls.some(url=>url.includes('/praca/krakow/q-magazynier/')));
+    assert.ok(requestedUrls.some(url=>url.includes('/oferta/praca/')));
 
     const feed = new JobFeedService(app.db, app.store).list(user.id, 25, 0);
     assert.equal(feed.length, 1);
@@ -364,7 +366,7 @@ test('olx parser handles hourly rates, salary ranges, params, and single detail 
   assert.match(parsedDetail.rawText, /Miejsce pracy: Gdańsk, Pomorskie/);
 });
 
-test('public source ingestion fetches and normalizes LinkedIn jobs via Guest API', async () => {
+test('public source ingestion follows a LinkedIn public listing and normalizes its JobPosting detail without a Guest API request', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'job-linkedin-source-'));
   const app = createExtendedJobApp({ nodeEnv: 'test', port: 0, appOrigin: 'http://127.0.0.1', dataDir: dir, databasePath: join(dir, 'test.sqlite'), adminEmails: new Set() });
   await new Promise<void>((resolve, reject) => app.server.listen(0, '127.0.0.1', () => resolve()).once('error', reject));
@@ -400,12 +402,14 @@ test('public source ingestion fetches and normalizes LinkedIn jobs via Guest API
         </li>
       </ul>`;
 
-    let requestedUrl = '';
+    const detailPosting={ '@context':'https://schema.org','@type':'JobPosting',title:'Magazynier (k/m/n)',description:'Obsługa magazynu i kompletowanie zamówień. Wymagane uprawnienia UDT.',hiringOrganization:{name:'Hellmann Worldwide Logistics'},jobLocation:{address:{addressLocality:'Gdańsk'}},url:'https://pl.linkedin.com/jobs/view/magazynier-k-m-n-at-hellmann-worldwide-logistics-4424548382',identifier:{value:'4424548382'},datePosted:'2026-06-05' };
+    const requestedUrls:string[]=[];
     const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
-      requestedUrl = String(input);
-      if (requestedUrl.includes('linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search')) {
+      const requestedUrl=String(input);requestedUrls.push(requestedUrl);
+      if (requestedUrl.includes('linkedin.com/jobs/search/')) {
         return new Response(linkedInGuestHtml, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
       }
+      if(requestedUrl.includes('/jobs/view/'))return new Response(`<script type="application/ld+json">${JSON.stringify(detailPosting)}</script>`,{status:200,headers:{'content-type':'text/html; charset=utf-8'}});
       return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
     };
 
@@ -417,7 +421,9 @@ test('public source ingestion fetches and normalizes LinkedIn jobs via Guest API
     assert.equal(linkedinResult?.fetchedCount, 1);
     assert.equal(linkedinResult?.canonicalCount, 1);
 
-    assert.ok(requestedUrl.includes('seeMoreJobPostings/search'), `Expected Guest API search URL, got: ${requestedUrl}`);
+    const requestedUrl=requestedUrls.find(url=>url.includes('/jobs/search/'))!;
+    assert.ok(requestedUrl);assert.ok(requestedUrls.some(url=>url.includes('/jobs/view/')));
+    assert.ok(requestedUrls.every(url=>!url.includes('jobs-guest')));
     assert.ok(requestedUrl.includes('keywords=magazynier'));
     assert.ok(requestedUrl.includes('location=Gda%C5%84sk'));
     assert.ok(requestedUrl.includes('distance=25'));
@@ -474,6 +480,3 @@ test('linkedin guest parser handles cards and detail markup', async () => {
   assert.match(detail.rawText, /Miejsce pracy: Warszawa/);
   assert.match(detail.rawText, /Opis: Wdrażanie Kubernetes/);
 });
-
-
-
