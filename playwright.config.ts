@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // Archived scenarios describe the retired client; disposition is tracked in docs/faro/BROWSER_ACCEPTANCE_SCOPE.md.
+  testIgnore: '**/historical/**',
+  workers: 1,
   timeout: 30_000,
   expect: { timeout: 7_500 },
   retries: process.env.CI ? 1 : 0,

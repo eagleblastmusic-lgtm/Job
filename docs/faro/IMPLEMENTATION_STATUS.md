@@ -466,3 +466,7 @@ STATUS: DONE for bounded validity correction; full CP10 and master plan PARTIAL.
 NEXT CHECKPOINT: current CI and remaining assessment technical incidents/valid score amendment, skills integration and operational requirements.
 
 CP11-E acceptance DONE: actual remote run37189804326 at9889288 SUCCESS, including all127 Node tests on Ubuntu, historical storage exercise, actual Docker build and isolated production smoke, Node22/24 Canonical/recovery and20 browser checks. This does not certify old historical browser flows or authorize production activation.
+
+### 2026-10-04 — CP11-F default browser scope
+Default browser CI now executes all current Canonical/public specs; the FARO alias uses the same command. Fifteen historical files/22 scenarios are preserved unchanged and individually accounted for in BROWSER_ACCEPTANCE_SCOPE.md. Current registration consent, analytics opt-in/withdrawal with persisted reload, public axe and320px auth reflow are verified against actual APIs. Auth appearance/approved CTA unchanged; no retired path restored or current regression skipped.
+Complete local npm run check PASS:129 Node tests,28 migrations, both real-file recovery drills,26 desktop/mobile browser checks, lint/typecheck; zero skipped Node/browser tests. Original CI retains Docker/full Node and adds Canonical recovery plus stronger existing production smoke. Remote evidence pending for this checkpoint. Earlier1816066 run37192917300 SUCCESS is baseline only. Release and full master plan remain PARTIAL.

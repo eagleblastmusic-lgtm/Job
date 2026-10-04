@@ -2,8 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main, "implementation/**"]
+    branches: [main, "implementation/**", "codex/faro-canonical"]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   quality:
@@ -24,22 +27,22 @@ jobs:
       - run: npm test
       - name: Backup and restore portability exercise
         run: npm run verify:backup-restore
+      - name: Canonical erasure and authority recovery exercise
+        run: node scripts/faro-backup-restore-exercise.mjs
       - name: Install Chromium for browser E2E
         run: npx playwright install --with-deps chromium
-      - name: Browser E2E — mobile and desktop
+      - name: Canonical and retained public browser contracts — mobile and desktop
         run: npm run test:browser
       - name: Build production container
         run: docker build -t job-mvp:${{ github.sha }} .
       - name: Production container smoke test
         run: |
           docker run -d --name job-mvp -p 3000:3000 -e APP_ORIGIN=http://127.0.0.1:3000 job-mvp:${{ github.sha }}
-          trap 'docker rm -f job-mvp >/dev/null 2>&1 || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3000/api/health >/tmp/health.json; then
-              cat /tmp/health.json
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs job-mvp
-          exit 1
+          trap 'docker logs job-mvp; docker rm -f job-mvp >/dev/null 2>&1 || true' EXIT
+          node scripts/faro-container-smoke.mjs --base http://127.0.0.1:3000
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failures
+          path: test-results/
+          retention-days: 7
