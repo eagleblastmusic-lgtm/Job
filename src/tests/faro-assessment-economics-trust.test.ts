@@ -24,6 +24,53 @@ async function assessmentSetup() {
   return { ...f, employer, candidate, admin, org, offer, interest };
 }
 
+test('cohort key correction previews the complete pinned group, fences changes and live attempts, preserves invalid evidence and decisions',async()=>{
+  const f=await assessmentSetup();try {
+    const s=new AssessmentService(f.app.db),d=s.create(f.employer.id,f.offer.id,{title:'Shared key',timeLimitMinutes:5,expectedMinutes:2,rubricVersion:'cohort-r1',tasks:[{prompt:'Q1',options:['A','B'],answer:1,points:2},{prompt:'Q2',options:['C','D'],answer:0,points:3}]});
+    s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const enroll=async(name:string)=>{
+      const u=await f.user(name);await f.request('/api/faro/profile',u.cookie,'PUT',{firstName:name,expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+      const preview=await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation',u.cookie);
+      const p=await f.request<{id:string}>(`/api/faro/offers/${f.offer.id}/interest`,u.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:`cohort-interest-${name}`},201);
+      s.recruitment.change(f.employer.id,p.id,{command:'ADVANCE',expectedVersion:1,nextAction:'Ukończ syntetyczny test',dueAt:new Date(Date.now()+86400000).toISOString(),idempotencyKey:`cohort-advance-${name}`});return {u,p};
+    };
+    const second=await enroll('CohortSecond'),third=await enroll('CohortThird');
+    const invite=(processId:string)=>s.assign(f.employer.id,processId,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:`cohort-assign-${processId}`});
+    const a=invite(f.interest.id),b=invite(second.p.id),c=invite(third.p.id);
+    const finish=(userId:string,id:string,answers:Record<string,number>)=>{s.start(userId,id);s.save(userId,id,{expectedVersion:s.row(id).revision,answers},true);s.finalize(f.employer.id,id,{expectedVersion:s.row(id).revision,processVersion:s.recruitment.row(s.row(id).process_id).revision,confirmed:true,note:'Sprawdzono pierwotny klucz i odpowiedzi.',idempotencyKey:`cohort-finalize-${id}`});};
+    finish(f.candidate.id,a.id,{'task-1':0});
+    const path=`/api/faro/assessments/${d.id}/versions/1/key-correction`,input={acceptedOptions:{'task-1':[0],'task-2':[0]},reason:'Wspólny przegląd poprawia błędny klucz zadania pierwszego.'};
+    for(const acceptedOptions of [{'task-1':[],'task-2':[0]},{'task-1':[0,0],'task-2':[0]},{'task-1':[2],'task-2':[0]},{'task-1':[0.5],'task-2':[0]},{'task-1':[0]},{'task-1':[0],'task-2':[0],extra:[0]}])await f.request(path+'/preview',f.employer.cookie,'POST',{...input,acceptedOptions},400);
+    type Preview=ReturnType<AssessmentService['keyCorrectionPreview']>;
+    const early=await f.request<Preview>(path+'/preview',f.employer.cookie,'POST',input);assert.equal(early.blocked,true);assert.equal(early.attempts.length,3);
+    await f.request(path,f.employer.cookie,'POST',{...input,previewToken:early.token,confirmed:true,idempotencyKey:'cohort-early'},409);
+    finish(second.u.id,b.id,{'task-1':1});finish(third.u.id,c.id,{});
+    s.invalidateResult(f.employer.id,c.id,{expectedVersion:s.row(c.id).revision,processVersion:s.recruitment.row(third.p.id).revision,confirmed:true,reasonCode:'TECHNICAL_INCIDENT',reason:'Potwierdzono odrębny problem techniczny trzeciej próby.',idempotencyKey:'cohort-invalid'});
+    const stale=await f.request<Preview>(path+'/preview',f.employer.cookie,'POST',input);
+    s.amendResult(f.employer.id,a.id,{expectedVersion:s.row(a.id).revision,processVersion:s.recruitment.row(f.interest.id).revision,confirmed:true,reason:'Indywidualnie przyznano punkt w pierwotnym review.',scores:{'task-1':1,'task-2':null},idempotencyKey:'cohort-manual'});
+    await f.request(path,f.employer.cookie,'POST',{...input,previewToken:stale.token,confirmed:true,idempotencyKey:'cohort-stale'},409);
+    const preview=await f.request<Preview>(path+'/preview',f.employer.cookie,'POST',input);assert.equal(preview.affected,2);assert.equal(preview.manualCount,1);assert.equal(preview.blocked,false);assert.equal(preview.attempts.find(x=>x.id===c.id)!.after,null);
+    const body={...input,previewToken:preview.token,confirmed:true,idempotencyKey:'cohort-apply'};
+    for(const cookie of [f.candidate.cookie,f.admin.cookie]) {await f.request(path+'/preview',cookie,'POST',input,404);await f.request(path,cookie,'POST',body,404);}
+    await f.request(path,f.employer.cookie,'POST',body,400);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_key_corrections').get()!.n,0);
+    const originals=[a,b,c].map(x=>({...s.row(x.id)})),processes=[f.interest.id,second.p.id,third.p.id].map(id=>({...s.recruitment.row(id)})),definition={...s.definition(d.id,1)};
+    const command={...body,replaceIndividualAmendments:true},ack=await f.request<{correctionId:string;affected:number}>(path,f.employer.cookie,'POST',command);assert.equal(ack.affected,2);
+    assert.deepEqual(await f.request(path,f.employer.cookie,'POST',command),ack);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_key_corrections').get()!.n,1);
+    [a,b,c].forEach((x,i)=>assert.deepEqual({...s.row(x.id)},{...originals[i],revision:originals[i]!.revision+(i<2?1:0)}));
+    [f.interest.id,second.p.id,third.p.id].forEach((id,i)=>assert.deepEqual({...s.recruitment.row(id)},processes[i]));assert.deepEqual({...s.definition(d.id,1)},definition);
+    assert.equal(s.overview(f.candidate.id,a.id).result!.earned,2);assert.equal(s.overview(second.u.id,b.id).result!.earned,0);assert.equal(s.overview(third.u.id,c.id).result,null);
+    assert.equal(s.overview(f.candidate.id,a.id).result!.scoringRevision,ack.correctionId);assert.equal(s.overview(f.candidate.id,a.id).result!.unanswered,1);assert.equal(s.resultHistory(a.id)[0]!.result.earned,0);assert.equal(s.resultHistory(a.id)[1]!.result.earned,1);
+    assert.doesNotMatch(JSON.stringify(s.overview(f.candidate.id,a.id)),/acceptedOptions|correctOption|actor_id/);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='ASSESSMENT_COHORT_CORRECTED'").get()!.n,2);
+    const fourth=await enroll('CohortFuture');assert.throws(()=>invite(fourth.p.id),/nową zatwierdzoną wersję/);
+    s.recruitment.change(f.candidate.id,f.interest.id,{command:'WITHDRAW',expectedVersion:s.recruitment.row(f.interest.id).revision,idempotencyKey:'cohort-withdraw'});
+    const nextInput={...input,acceptedOptions:{'task-1':[0,1],'task-2':[0]}};const next=s.keyCorrectionPreview(f.employer.id,d.id,1,nextInput);
+    s.correctCohortKey(f.employer.id,d.id,1,{...nextInput,previewToken:next.token,confirmed:true,idempotencyKey:'cohort-second'});assert.equal(s.recruitment.row(f.interest.id).status,'WITHDRAWN');assert.equal(s.overview(second.u.id,b.id).result!.earned,2);
+    f.app.db.db.prepare('DELETE FROM faro_assignments WHERE offer_id=? AND user_id=?').run(f.offer.id,f.employer.id);await f.request(path,f.employer.cookie,'POST',command,404);
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});assert.equal(s.resultHistory(a.id).length,0);assert.equal(f.app.db.db.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{await f.close();}
+});
+
 test('human amendment preserves pinned original evidence, missing answers and terminal decisions with fresh scoped replay',async()=>{
   const f=await assessmentSetup();try {
     const s=new AssessmentService(f.app.db),d=s.create(f.employer.id,f.offer.id,{title:'Manual review',timeLimitMinutes:5,expectedMinutes:2,rubricVersion:'pinned-review',tasks:[{prompt:'Q1',options:['A','B'],answer:1,points:2},{prompt:'Q2',options:['C','D'],answer:0,points:3}]});

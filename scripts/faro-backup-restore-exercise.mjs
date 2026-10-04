@@ -49,10 +49,14 @@ try {
   const resolved=assessments.overview(employer.id,attempt.id);
   const retry=assessments.retry(employer.id,attempt.id,{expectedVersion:resolved.revision,processVersion:resolved.processVersion,idempotencyKey:'backup-retry',deadline:new Date(Date.now()+172800000).toISOString(),reason:'Osobne zaproszenie po potwierdzonym problemie.',confirmed:true});
   assert.equal(retry.retryOf,attempt.id);
-  const retainedAttempt=assessments.assign(employer.id,surviving.id,{assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:r.row(surviving.id).revision,idempotencyKey:'backup-retained-assign'});
+  const retainedDefinition=assessments.create(employer.id,offer.id,{title:'Kopia historii korekt',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'backup-retained-r1',tasks:[{prompt:'Zadanie',options:['A','B'],answer:1,points:2}]});
+  assessments.approve(employer.id,retainedDefinition.id,{version:1,action:'REVIEW'});assessments.approve(employer.id,retainedDefinition.id,{version:1,action:'APPROVE',confirmed:true});
+  const retainedAttempt=assessments.assign(employer.id,surviving.id,{assessmentId:retainedDefinition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:r.row(surviving.id).revision,idempotencyKey:'backup-retained-assign'});
   assessments.start(kept.id,retainedAttempt.id);assessments.save(kept.id,retainedAttempt.id,{expectedVersion:assessments.row(retainedAttempt.id).revision,answers:{'task-1':1}},true);
   assessments.finalize(employer.id,retainedAttempt.id,{expectedVersion:assessments.row(retainedAttempt.id).revision,processVersion:r.row(surviving.id).revision,confirmed:true,note:'Pierwotny przegląd odpowiedzi w kopii.',idempotencyKey:'backup-retained-finalize'});
   assessments.amendResult(employer.id,retainedAttempt.id,{expectedVersion:assessments.row(retainedAttempt.id).revision,processVersion:r.row(surviving.id).revision,confirmed:true,reason:'Indywidualna korekta punktów z zachowaniem pierwotnych dowodów.',scores:{'task-1':1},idempotencyKey:'backup-retained-amend'});
+  const keyInput={acceptedOptions:{'task-1':[0,1]},reason:'Wspólny klucz uznaje obie odpowiedzi zadania w kopii.'},keyPreview=assessments.keyCorrectionPreview(employer.id,retainedDefinition.id,1,keyInput);
+  const keyCorrection=assessments.correctCohortKey(employer.id,retainedDefinition.id,1,{...keyInput,previewToken:keyPreview.token,confirmed:true,replaceIndividualAmendments:true,idempotencyKey:'backup-cohort-key'});
   const interviews=new InterviewService(f.app.db);
   const slot=interviews.propose(employer.id,surviving.id,{expectedVersion:r.row(surviving.id).revision,idempotencyKey:'backup-slot',confirmed:true,startsAt:new Date(Date.now()+2*86400000).toISOString(),endsAt:new Date(Date.now()+2*86400000+3600000).toISOString(),confirmBy:new Date(Date.now()+86400000).toISOString(),timezone:'Europe/Warsaw',location:'Rozmowa online',meetingUrl:'https://example.test/meeting'});
   const before=new ProfileService(f.app.db).projection(kept.id),firstClock=r.row(surviving.id).first_response_at;
@@ -118,7 +122,8 @@ try {
     assert.equal(verifyPassword('Bezpieczne123',passwordHash),false);assert.equal(verifyPassword('OdnowioneBezpieczne123',passwordHash),true);
     assert.equal(new OfferService(restored).version(offer.id,1).salary[0].min,550000);
     const restoredAssessment=new AssessmentService(restored),restoredHistory=restoredAssessment.resultHistory(retainedAttempt.id);
-    assert.equal(restoredHistory.length,2);assert.equal(restoredHistory[0].result.earned,2);assert.equal(restoredHistory[1].result.earned,1);assert.equal(restoredAssessment.overview(kept.id,retainedAttempt.id).result.earned,1);
+    assert.equal(restoredHistory.length,3);assert.equal(restoredHistory[0].result.earned,2);assert.equal(restoredHistory[1].result.earned,1);assert.equal(restoredHistory[2].result.earned,2);assert.equal(restoredAssessment.overview(kept.id,retainedAttempt.id).result.scoringRevision,keyCorrection.correctionId);
+    assert.equal(db.prepare('SELECT actor_id FROM faro_key_corrections WHERE id=?').get(keyCorrection.correctionId).actor_id,null);
     const hash=createHash('sha256').update(gone.id).digest('hex');
     assert.equal(db.prepare('SELECT erased_at FROM faro_erasure_log WHERE subject_hash=?').get(hash).erased_at,ledger.erasures.find(e=>e.subject_hash===hash).erased_at);
     assert.equal(new RecoveryService(restored).reconcile(ledger).erasedSubjects,0);
