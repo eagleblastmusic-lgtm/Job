@@ -55,7 +55,7 @@ export interface Attempt {
   id: string; title: string; state: string; processId: string; taskCount: number; timeLimitMinutes: number; expectedMinutes: number;
   deadline: string; startedAt: string | null; expiresAt: string | null; serverNow: string; revision: number;
   tasks: Array<{ id: string; prompt: string; options: string[]; points: number }>;
-  answers: Record<string, number>; result: { earned: number; possible: number; unanswered: number; review: string; reviewNote?: string } | null;
+  answers: Record<string, number>; result: { earned: number; possible: number; unanswered: number; review: string; reviewNote?: string;breakdown?:Array<{taskId:string;earned:number|null;possible:number}> } | null;
 }
 export interface Interview {
   id:string; processId:string; state:string; revision:number; startsAt:string; endsAt:string; confirmBy:string;

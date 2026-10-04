@@ -204,7 +204,7 @@ export class AssessmentService extends FaroStore {
     return { id, attemptNumber:row.attempt_number,retryOf:row.retry_of,retryReason:row.retry_reason,retryAuthorizedAt:row.retry_authorized_at,retryAttemptId:retryAttempt?.id??null,canRetry:retryRole!==null&&retryRole!=='HIRING_MANAGER'&&row.state==='TECHNICAL_ISSUE'&&this.incident(id)?.resolution==='ISSUE_CONFIRMED'&&process.status==='ACTIVE'&&process.stage==='ACCEPTED_TO_NEXT_STAGE'&&!retryAttempt&&!this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id), incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
       tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
       reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
-      answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? JSON.parse(row.result) as Record<string, unknown> : null };
+      answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? (row.state==='FINALIZED'?history.at(-1)!.result:JSON.parse(row.result) as Record<string, unknown>) : null };
   }
   attempts(userId: string, processId?: string) {
     if (processId) this.recruitment.authorize(userId, processId);
@@ -286,11 +286,34 @@ export class AssessmentService extends FaroStore {
       if(row.state!=='FINALIZED'||!previous||previous.validity!=='VALID')throw new HttpError(409,'Tylko aktualny zatwierdzony wynik można oznaczyć jako nieważny.','RESULT_NOT_VALID');
       if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wycofanie ważności wyniku.','CONFIRMATION_REQUIRED');
       const reasonCode=choice(body.reasonCode,['KEY_ERROR','AMBIGUOUS_TASK','TECHNICAL_INCIDENT'] as const),reason=text(body.reason,1000,10);
-      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'INVALIDATED',?,?,?,?)").run(id,Number(previous.revision)+1,row.result!,reasonCode,reason,this.now());
+      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'INVALIDATED',?,?,?,?)").run(id,Number(previous.revision)+1,JSON.stringify(previous.result),reasonCode,reason,this.now());
       this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
       this.recruitment.event(process,userId,'ASSESSMENT_RESULT_INVALIDATED',{attemptId:id,reasonCode});
       return this.overview(userId,id);
     });
+  }
+  amendResult(userId:string,id:string,body:Record<string,unknown>) {
+    const authorize=()=>this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);
+    authorize();
+    const ack=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_AMEND'},()=>{
+      authorize();const row=this.row(id),process=this.recruitment.row(row.process_id),previous=this.resultHistory(id).at(-1);
+      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
+      if(row.state!=='FINALIZED'||previous?.validity!=='VALID')throw new HttpError(409,'Korekta wymaga aktualnego zatwierdzonego wyniku.','RESULT_NOT_VALID');
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź indywidualną korektę z zachowaniem historii.','CONFIRMATION_REQUIRED');
+      const reason=text(body.reason,1000,10),definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition,answers=JSON.parse(row.answers) as Record<string,number>,scores=object(body.scores);
+      if(Object.keys(scores).length!==definition.tasks.length||Object.keys(scores).some(key=>!definition.tasks.some(t=>t.id===key)))throw new HttpError(400,'Podaj ocenę każdego zadania przypisanej wersji.');
+      const breakdown=definition.tasks.map(task=>{
+        if(answers[task.id]===undefined) {if(scores[task.id]!==null)throw new HttpError(400,'Brak odpowiedzi pozostaje odrębny od zera punktów.');return {taskId:task.id,earned:null,possible:task.points};}
+        return {taskId:task.id,earned:integer(scores[task.id],0,task.points),possible:task.points};
+      });
+      const result={...previous.result,breakdown,earned:breakdown.reduce((sum,t)=>sum+(t.earned??0),0),possible:breakdown.reduce((sum,t)=>sum+t.possible,0),unanswered:breakdown.filter(t=>t.earned===null).length,assessmentVersion:row.assessment_version,rubricVersion:definition.rubricVersion,review:'AMENDED',reviewNote:reason,comparisonStatus:'INDIVIDUAL_HUMAN_AMENDMENT'};
+      if(JSON.stringify(previous.result.breakdown)===JSON.stringify(breakdown))throw new HttpError(409,'Punkty nie zmieniły się.');
+      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'VALID',?,'HUMAN_AMENDMENT',?,?)").run(id,previous.revision+1,JSON.stringify(result),reason,this.now());
+      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
+      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_AMENDED',{attemptId:id,resultRevision:previous.revision+1});
+      return {id};
+    });
+    return this.overview(userId,ack.id);
   }
 
 }

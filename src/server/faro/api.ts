@@ -158,6 +158,8 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     if (attemptReview && method === 'POST') return ok(assessments.finalize(user.id, attemptReview[1]!, body));
     const resultInvalidation=path.match(/^\/api\/faro\/attempts\/([^/]+)\/invalidate-result$/);
     if(resultInvalidation&&method==='POST')return ok(assessments.invalidateResult(user.id,resultInvalidation[1]!,body));
+    const resultAmendment=path.match(/^\/api\/faro\/attempts\/([^/]+)\/amend-result$/);
+    if(resultAmendment&&method==='POST')return ok(assessments.amendResult(user.id,resultAmendment[1]!,body));
     const attemptIncident=path.match(/^\/api\/faro\/attempts\/([^/]+)\/incident$/);
     if(attemptIncident&&method==='POST')return ok(assessments.reportIncident(user.id,attemptIncident[1]!,body),201);
     const incidentResolution=path.match(/^\/api\/faro\/attempts\/([^/]+)\/incident\/resolve$/);
