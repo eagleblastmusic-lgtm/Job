@@ -17,7 +17,7 @@
     "test:browser": "npm run build && playwright test",
     "verify:backup-restore": "npm run build && node scripts/backup-restore-exercise.mjs",
     "verify:faro-recovery": "npm run build && node scripts/faro-backup-restore-exercise.mjs",
-    "check": "npm run lint && npm run typecheck && npm run validate:migrations && npm test && npm run verify:backup-restore && npm run test:browser",
+    "check": "npm run lint && npm run typecheck && npm run validate:migrations && npm test && npm run verify:backup-restore && npm run verify:faro-recovery && npm run test:browser",
     "smoke:staging": "node scripts/staging-smoke.mjs",
     "backup:data": "node scripts/backup.mjs",
     "restore:data": "node scripts/restore.mjs",
@@ -26,7 +26,7 @@
     "start": "node --enable-source-maps dist/server/index.js",
     "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js",
     "test:faro": "npm run build && node --test dist/tests/faro-*.test.js dist/tests/auth-security.test.js dist/tests/admin-security.test.js dist/tests/security.test.js dist/tests/http-proxy-security.test.js dist/tests/consents.test.js dist/tests/config.test.js dist/tests/health.test.js",
-    "test:browser:faro": "npm run build && playwright test e2e/faro.spec.ts e2e/accessibility.spec.ts --workers=1"
+    "test:browser:faro": "npm run test:browser"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

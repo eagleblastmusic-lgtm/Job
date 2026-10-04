@@ -427,3 +427,17 @@ STATUS: DONE for bounded validity correction; full CP10 and master plan PARTIAL.
 NEXT CHECKPOINT: current CI and remaining assessment technical incidents/valid score amendment, skills integration and operational requirements.
 
 CP11-E acceptance DONE: actual remote run37189804326 at9889288 SUCCESS, including all127 Node tests on Ubuntu, historical storage exercise, actual Docker build and isolated production smoke, Node22/24 Canonical/recovery and20 browser checks. This does not certify old historical browser flows or authorize production activation.
+
+## CP11-F — Default Canonical browser acceptance (2026-10-04)
+ID / TITLE: CP11-F, account for historical scenarios and retain consent/public axe in real browser CI.
+GOAL / PURPOSE / CURRENT GAP: default browser/check and original CI expected retired CV/Decision Card/EHV screens; Canonical selection lacked registration/analytics consent and public axe evidence.
+SCOPE / IMPLEMENTATION / FILES: BROWSER_ACCEPTANCE_SCOPE.md per-scenario disposition; 15 original specs archived unchanged; current browser consent/reflow and public axe; Playwright default discovery excludes historical only; package alias/default check; original CI scope/recovery/closed-boundary container smoke and failure artifacts.
+DB CHANGE / MIGRATIONS / API CHANGE / FRONTEND CHANGE: none; auth markup/styles, Canonical runtime and release gates unchanged.
+DEPENDENCIES: CP01 retirement/free-first, CP08 workspace, CP11-A/B data rights/recovery, CP11-D/E actual compatibility/image CI.
+TESTS / TESTED: complete npm run check PASS on local Node24.19.0: lint/typecheck including archive,28 migrations,129/129 Node tests (zero skipped), historical and Canonical real-file restore drills,26/26 browser executions (13 scenarios in desktop/mobile). New targeted6/6 passed before aggregate. All15 archive contents verified byte-for-byte against pre-checkpoint Git blobs. git diff --check PASS; review confirms no public/src delta, no skip/continue-on-error/rule suppression. Current remote CI pending, prior1816066 run37192917300 SUCCESS does not certify this patch.
+ACCEPTANCE CRITERIA: all22 historical scenarios explicitly accounted for; required unchecked consent blocks registration; optional analytics false by default and opt-in/withdrawal persists over reload with actual API; public axe login/register/privacy/terms preserved; real reauthentication/erasure and workspace axe/reflow retained; default and FARO commands share current scope; all retained Node tests/recovery and actual image remain required.
+LEGAL STATUS: synthetic engineering acceptance only; no permission to activate production, scoring, external providers or legal gates.
+RISK / DEFERRED: automated scans cover bounded current surfaces, not complete manual WCAG/usability/offline acceptance. Historical preferences/learning/market/import features are not falsely credited as delivered. Original/full Docker remote result pending; local Docker unavailable. Remaining legal/persistence/assessment/provider gates unchanged.
+ROLLBACK: revert config/scripts/CI and test locations together, preserve explicit disposition and retirement/runtime guards; never enable CV/EHV to satisfy historical assertions.
+STATUS: local acceptance DONE; remote acceptance PENDING; overall CP11/master plan PARTIAL.
+NEXT CHECKPOINT: verify exact remote checkpoint, then explicit private salary constraints with comparable declared units/basis, no tax inference.
