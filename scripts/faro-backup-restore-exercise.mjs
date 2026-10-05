@@ -57,6 +57,16 @@ try {
   assessments.amendResult(employer.id,retainedAttempt.id,{expectedVersion:assessments.row(retainedAttempt.id).revision,processVersion:r.row(surviving.id).revision,confirmed:true,reason:'Indywidualna korekta punktów z zachowaniem pierwotnych dowodów.',scores:{'task-1':1},idempotencyKey:'backup-retained-amend'});
   const keyInput={acceptedOptions:{'task-1':[0,1]},reason:'Wspólny klucz uznaje obie odpowiedzi zadania w kopii.'},keyPreview=assessments.keyCorrectionPreview(employer.id,retainedDefinition.id,1,keyInput);
   const keyCorrection=assessments.correctCohortKey(employer.id,retainedDefinition.id,1,{...keyInput,previewToken:keyPreview.token,confirmed:true,replaceIndividualAmendments:true,idempotencyKey:'backup-cohort-key'});
+  const openOffer=offers.create(employer.id,org.id,offerInput(employer.id));
+  offers.lifecycle(employer.id,openOffer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,openOffer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const openProcess=r.interest(kept.id,openOffer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(kept.id).confirmationToken,idempotencyKey:'backup-open-interest'});
+  r.change(employer.id,openProcess.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'backup-open-advance',nextAction:'Syntetyczne zadanie otwarte.',dueAt:new Date(Date.now()+86400000).toISOString()});
+  const openDefinition=assessments.create(employer.id,openOffer.id,{type:'OPEN_ANSWER',title:'Kopia ręcznej oceny',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'backup-human-r1',tasks:[{prompt:'Opisz krok.',evaluationCriteria:'0: brak kroku; 1: krok; 2: krok z uzasadnieniem.',points:2}]});
+  assessments.approve(employer.id,openDefinition.id,{version:1,action:'REVIEW'});assessments.approve(employer.id,openDefinition.id,{version:1,action:'APPROVE',confirmed:true});
+  const openAttempt=assessments.assign(employer.id,openProcess.id,{assessmentId:openDefinition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'backup-open-assign'});
+  assessments.start(kept.id,openAttempt.id);assessments.save(kept.id,openAttempt.id,{expectedVersion:assessments.row(openAttempt.id).revision,answers:{'task-1':'Syntetyczny krok z uzasadnieniem.'}},true);
+  assessments.finalize(employer.id,openAttempt.id,{expectedVersion:assessments.row(openAttempt.id).revision,processVersion:r.row(openProcess.id).revision,confirmed:true,note:'Ręczny przegląd syntetycznej odpowiedzi według przypisanej rubryki.',scores:{'task-1':2},idempotencyKey:'backup-open-review'});
+  assessments.amendResult(employer.id,openAttempt.id,{expectedVersion:assessments.row(openAttempt.id).revision,processVersion:r.row(openProcess.id).revision,confirmed:true,reason:'Ręczna korekta syntetycznej oceny z zachowaniem historii.',scores:{'task-1':1},idempotencyKey:'backup-open-amend'});
   const interviews=new InterviewService(f.app.db);
   const slot=interviews.propose(employer.id,surviving.id,{expectedVersion:r.row(surviving.id).revision,idempotencyKey:'backup-slot',confirmed:true,startsAt:new Date(Date.now()+2*86400000).toISOString(),endsAt:new Date(Date.now()+2*86400000+3600000).toISOString(),confirmBy:new Date(Date.now()+86400000).toISOString(),timezone:'Europe/Warsaw',location:'Rozmowa online',meetingUrl:'https://example.test/meeting'});
   const before=new ProfileService(f.app.db).projection(kept.id),firstClock=r.row(surviving.id).first_response_at;
@@ -124,6 +134,8 @@ try {
     assert.equal(verifyPassword('Bezpieczne123',passwordHash),false);assert.equal(verifyPassword('OdnowioneBezpieczne123',passwordHash),true);
     assert.equal(new OfferService(restored).version(offer.id,1).salary[0].min,550000);
     const restoredAssessment=new AssessmentService(restored),restoredHistory=restoredAssessment.resultHistory(retainedAttempt.id);
+    const openHistory=restoredAssessment.resultHistory(openAttempt.id),openView=restoredAssessment.overview(kept.id,openAttempt.id);
+    assert.equal(openHistory.length,2);assert.equal(openHistory[0].result.earned,2);assert.equal(openHistory[1].result.earned,1);assert.equal(openView.result.earned,1);assert.equal(openView.answers['task-1'],'Syntetyczny krok z uzasadnieniem.');assert.equal(openView.type,'OPEN_ANSWER');assert.equal(openView.rubricVersion,'backup-human-r1');assert.equal(db.prepare('SELECT reviewer_id FROM faro_attempts WHERE id=?').get(openAttempt.id).reviewer_id,null);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,0);
     assert.equal(restoredHistory.length,3);assert.equal(restoredHistory[0].result.earned,2);assert.equal(restoredHistory[1].result.earned,1);assert.equal(restoredHistory[2].result.earned,2);assert.equal(restoredAssessment.overview(kept.id,retainedAttempt.id).result.scoringRevision,keyCorrection.correctionId);
     assert.equal(db.prepare('SELECT actor_id FROM faro_key_corrections WHERE id=?').get(keyCorrection.correctionId).actor_id,null);

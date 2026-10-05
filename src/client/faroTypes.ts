@@ -50,12 +50,13 @@ export interface Attempt {
   resultValidity:'VALID'|'INVALIDATED'|null;
   resultHistory:Array<{revision:number;validity:'VALID'|'INVALIDATED';reasonCode:string|null;reason:string|null;createdAt:string|null;result:{earned:number;possible:number}}>;
   viewer:'CANDIDATE'|'EMPLOYER';rubricVersion:string;
-  reviewTasks:Array<{id:string;prompt:string;options:string[];points:number;correctOption:number;chosenOption:number|null}>;
+  type:'QUIZ'|'OPEN_ANSWER';scoringMode:'OBJECTIVE'|'HUMAN';
+  reviewTasks:Array<{id:string;prompt:string;options:string[];points:number;correctOption:number|null;chosenOption:number|null;chosenText:string|null;evaluationCriteria?:string}>;
   processVersion:number;
   id: string; title: string; state: string; processId: string; taskCount: number; timeLimitMinutes: number; expectedMinutes: number;
   deadline: string; startedAt: string | null; expiresAt: string | null; serverNow: string; revision: number;
-  tasks: Array<{ id: string; prompt: string; options: string[]; points: number }>;
-  answers: Record<string, number>; result: { earned: number; possible: number; unanswered: number; review: string; reviewNote?: string;breakdown?:Array<{taskId:string;earned:number|null;possible:number}> } | null;
+  tasks: Array<{ id: string; prompt: string; options: string[]; points: number;evaluationCriteria?:string }>;
+  answers: Record<string, number|string>; result: { earned: number|null; possible: number; unanswered: number; review: string; reviewNote?: string;breakdown?:Array<{taskId:string;earned:number|null;possible:number}> } | null;
 }
 export interface Interview {
   id:string; processId:string; state:string; revision:number; startsAt:string; endsAt:string; confirmBy:string;
@@ -68,8 +69,9 @@ export interface Economics {
     basis:string;grossOrInvoiceMin:number;grossOrInvoiceMax:number;units?:{money:string;netPeriod:string;commuteCostPeriod:string;commuteTime:string} };
 }
 export interface AssessmentDefinition {
+  type?:'QUIZ'|'OPEN_ANSWER';
   title:string; timeLimitMinutes:number; expectedMinutes:number; rubricVersion:string;
-  tasks:Array<{prompt:string;options:string[];answer:number;points:number}>;
+  tasks:Array<{prompt:string;options:string[];answer:number;points:number;evaluationCriteria?:string}>;
 }
 
 export interface Reliability {
