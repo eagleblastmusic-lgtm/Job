@@ -7,6 +7,7 @@ const root = $('#appView');
 let user: User | null = null, skills: Skill[] = [], organizations: Organization[] = [];
 let role: 'candidate' | 'employer' = 'candidate', orgId = '', filter = '', modelFilter = '';
 let includeUnknown=false;
+let mfaSetup:{secret:string;expiresAt:string}|null=null,mfaRecoveryCodes:string[]|null=null;
 interface KeyPreview {token:string;blocked:boolean;manualCount:number;affected:number;attempts:Array<{id:string;state:string;validity:string|null;individualAmendment:boolean;before:number|null;after:number|null}>;}
 let keyDraft:{id:string;version:number;reason:string;acceptedOptions:Record<string,number[]>;preview:KeyPreview}|null=null;
 let epoch = 0, controller = new AbortController(), timer: ReturnType<typeof setInterval> | undefined;
@@ -30,8 +31,9 @@ async function api<T>(path: string, method = 'GET', body?: unknown, signal = con
     throw new Error(navigator.onLine ? 'Nie można połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie.' : 'Jesteś offline. Zmiany wymagają połączenia z serwerem.');
   }
   const data = await r.json() as T & { error?: { message?: string; code?: string } };
-  if (r.status === 401 && data.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
-  if (!r.ok) throw new Error(data.error?.message ?? `Błąd ${r.status}`);
+  if (r.status === 401 && data?.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
+  if(data?.error?.code==='MFA_REQUIRED') {keyDraft=null;compared.clear();offers=[];currentOffer=null;currentProcess=null;currentAttempt=null;navigate('security');}
+  if (!r.ok) throw new Error(data?.error?.message ?? `Błąd ${r.status}`);
   return data;
 }
 function interviewView(i:Interview,p:Process) {
@@ -46,6 +48,7 @@ function notify(text: string, error = false) {
   if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
 }
 function loggedOut() { includeUnknown=false;keyDraft=null;
+  mfaSetup=null;mfaRecoveryCodes=null;
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
   user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear(); watchAlerts.clear();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[]; role = 'candidate'; orgId = ''; filter = ''; modelFilter = '';
@@ -56,11 +59,12 @@ function loggedOut() { includeUnknown=false;keyDraft=null;
 function shell() {
   root.className = 'faro'; document.body.classList.add('faro-session'); $('#authView').classList.add('hidden');
   root.innerHTML = `<a class="f-skip" href="#f-content">Przejdź do treści</a><header class="f-header"><a class="f-brand" href="#offers" aria-label="Faro — możliwości"><span aria-hidden="true">↗</span> FARO<span class="f-brand-note">Twój następny krok.</span></a><div class="f-session"><label class="f-role-label">Przestrzeń<select id="f-role"><option value="candidate" ${role === 'candidate' ? 'selected' : ''}>Kandydat</option><option value="employer" ${role === 'employer' ? 'selected' : ''}>Pracodawca</option></select></label>${button('logout', 'Wyloguj')}</div></header>
-  <div class="f-shell"><nav class="f-nav" aria-label="Workspace Faro">${(role === 'candidate' ? [['offers','Możliwości'],['watches','Obserwowane'],['processes','Moje procesy'],['profile','Profil'],['compare','Porównanie'],['attempts','Assessmenty']] : [['employer','Oferty'],['organization','Organizacja']]).concat([['notifications','Dzisiaj'],['cases','Zgłoszenia'],['privacy','Prywatność']]).map(([path,title]) => `<a href="#${path}" ${location.hash.split('/')[0] === `#${path}` ? 'aria-current="page"' : ''}>${title}</a>`).join('')}<p class="f-nav-note">Cała Polska.<br>Kompetencje przede wszystkim.<br><strong>Bezpłatnie.</strong></p></nav><div class="f-main"><p id="f-status" role="status" aria-live="polite"></p><div id="f-content" tabindex="-1" aria-busy="true"><p class="f-loading">Wczytuję Twoją przestrzeń…</p></div></div></div>`;
+  <div class="f-shell"><nav class="f-nav" aria-label="Workspace Faro">${(role === 'candidate' ? [['offers','Możliwości'],['watches','Obserwowane'],['processes','Moje procesy'],['profile','Profil'],['compare','Porównanie'],['attempts','Assessmenty']] : [['employer','Oferty'],['organization','Organizacja']]).concat([['notifications','Dzisiaj'],['cases','Zgłoszenia'],['privacy','Prywatność'],['security','Bezpieczeństwo']]).map(([path,title]) => `<a href="#${path}" ${location.hash.split('/')[0] === `#${path}` ? 'aria-current="page"' : ''}>${title}</a>`).join('')}<p class="f-nav-note">Cała Polska.<br>Kompetencje przede wszystkim.<br><strong>Bezpłatnie.</strong></p></nav><div class="f-main"><p id="f-status" role="status" aria-live="polite"></p><div id="f-content" tabindex="-1" aria-busy="true"><p class="f-loading">Wczytuję Twoją przestrzeń…</p></div></div></div>`;
 }
 function navigate(path: string) { if (location.hash === `#${path}`) void render(); else location.hash = path; }
 async function bootstrap() {
   try {
+
     const me = await api<{ user: User }>('/api/me'); user = me.user;
     await render();
   } catch (e) { if ((e as Error).name !== 'AbortError') { loggedOut(); $('#authMessage').textContent = (e as Error).message; } }
@@ -77,6 +81,12 @@ async function render() {
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[];
   const [page = 'offers', id = '', version = ''] = location.hash.slice(1).split('/');
   try {
+    if(page==='security'){
+      const state=await api<{configured:boolean;enabled:boolean;required:boolean;verified:boolean;pending:boolean;recoveryRemaining:number}>('/security/mfa');
+      if(mine!==epoch)return;
+      $('#f-content').innerHTML=`<h1>Bezpieczeństwo dostępu</h1><section class="f-card"><h2>Drugi składnik</h2><p>${state.enabled?'MFA jest włączone.':'MFA nie jest jeszcze włączone.'} ${state.required?'Dostęp wymaga drugiego składnika.':''} ${state.verified?'Ta sesja ma aktualne potwierdzenie na maksymalnie 5 minut.':''}</p>${!state.configured?'<p role="status">Serwer wymaga chronionego klucza konfiguracji MFA. Skontaktuj się z operatorem.</p>':''}${state.enabled?form('mfa-verify',input('code','Kod z aplikacji uwierzytelniającej','','text','required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"'),'Potwierdź drugi składnik'):''}${state.configured&&(!state.enabled||state.verified)?form('mfa-setup',input('password','Aktualne hasło','','password','required autocomplete="current-password"'),'Rozpocznij konfigurację MFA'):''}${mfaSetup?`<p>Dodaj sekret do aplikacji uwierzytelniającej: <code class="f-mfa-secret">${esc(mfaSetup.secret)}</code>. SHA1, 6 cyfr, 30 sekund. Ważny do ${esc(date(mfaSetup.expiresAt))}. Nie udostępniaj sekretu. Włączenie unieważni pozostałe sesje; nowe kody odzyskiwania zastąpią poprzednie.</p>${form('mfa-confirm',input('code','Kod potwierdzający konfigurację','','text','required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"'),'Włącz MFA')}`:''}${mfaRecoveryCodes?`<section><h2>Zapisz kody odzyskiwania</h2><p>Każdy kod działa raz i wymaga hasła. Pokazujemy je tylko po włączeniu; po opuszczeniu strony nie będą dostępne. Włączenie MFA unieważniło pozostałe sesje.</p><pre class="f-mfa-codes">${esc(mfaRecoveryCodes.join('\n'))}</pre></section>`:''}${state.enabled?`<p>Pozostałe kody odzyskiwania: ${state.recoveryRemaining}.</p>${form('mfa-recover',input('password','Aktualne hasło odzyskiwania','','password','required autocomplete="current-password"')+input('code','Jednorazowy kod odzyskiwania','','text','required autocomplete="off" maxlength="32"'),'Użyj kodu odzyskiwania')}<p>Kod odzyskiwania unieważni pozostałe sesje. Po odzyskaniu skonfiguruj nowy sekret.</p>`:''}<a href="#offers">Wróć do przestrzeni</a></section>`;finish(mine);return;
+    }
+    mfaSetup=null;mfaRecoveryCodes=null;
     const [catalog, orgs] = await Promise.all([api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
     if (mine !== epoch) return;
     skills = catalog.skills; organizations = orgs.organizations;
@@ -265,7 +275,11 @@ root.addEventListener('submit', event => {
   void (async () => {
     try {
       let destination = '';
-      if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model');includeUnknown=f.has('includeUnknown'); }
+      if(action==='mfa-setup')mfaSetup=await api('/security/mfa/setup','POST',{password:String(f.get('password')??'')});
+      else if(action==='mfa-confirm'){const result=await api<{recoveryCodes:string[]}>('/security/mfa/confirm','POST',{code:value(f,'code')});mfaSetup=null;mfaRecoveryCodes=result.recoveryCodes;}
+      else if(action==='mfa-verify')await api('/security/mfa/verify','POST',{code:value(f,'code')});
+      else if(action==='mfa-recover')await api('/security/mfa/recover','POST',{password:String(f.get('password')??''),code:value(f,'code')});
+      else if (action === 'filter') { filter=value(f,'query'); modelFilter=value(f,'model');includeUnknown=f.has('includeUnknown'); }
       else if (action === 'profile') await api('/profile','PUT',{firstName:value(f,'firstName'),phone:value(f,'phone'),expectedVersion:number(f,'version'),availability:{kind:value(f,'availability'),value:value(f,'availabilityValue')}});
       else if(action==='constraints')await api('/profile/constraints','PUT',{expectedVersion:number(f,'expectedVersion'),constraints:{active:f.has('active'),workModels:f.getAll('workModels'),contracts:f.getAll('contracts'),noNights:f.has('noNights'),noWeekends:f.has('noWeekends'),maxCommuteMinutes:f.has('commuteEnabled')?number(f,'maxCommuteMinutes'):null,salaryMinimum:f.has('salaryEnabled')?{amount:Math.round(number(f,'salaryMinimum')*100),currency:'PLN',basis:value(f,'salaryBasis'),period:value(f,'salaryPeriod'),hoursPerPeriod:number(f,'salaryHours'),ftePercent:number(f,'salaryFte')}:null}});
       else if(action==='phone-grant') {await api(`/processes/${id}/phone-grant`,'POST',{phoneConfirmed:f.has('phoneConfirmed'),confirmationToken:f.get('confirmationToken')});el.closest('dialog')?.close();}

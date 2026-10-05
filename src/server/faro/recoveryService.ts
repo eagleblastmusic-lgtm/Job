@@ -9,6 +9,9 @@ export interface RecoveryLedger {
   assignments:Array<{offer_id:string;user_id:string}>;
   /** Sensitive authority snapshot: never log or serialize this input to diagnostics. */
   accounts:Array<{id:string;role:'USER'|'ADMIN';password_hash:string;email:string;name:string}>;
+  mfa?:Array<{user_id:string;active_cipher:string;last_counter:number;activated_at:string}>;
+  mfaRecovery?:Array<{user_id:string;code_hash:string;used_at:string|null}>;
+  mfaLimits?:Array<{user_id:string;failures:number;window_start:string}>;
   organizations:Array<{id:string;verification:'PENDING'|'VERIFIED'|'RESTRICTED'}>;
   restrictions:Array<{id:string;organization_id:string;source_case_id:string|null;source_reporter_id:string|null;source_candidate_id:string|null;scope:string;state:string;reason_code:string;restoration_condition:string|null;created_at:string|null;review_at:string|null;revision:number;appeal:string|null;appealed_at:string|null;appeal_by:string|null;restoration_reason:string|null;restored_at:string|null;restored_by:string|null}>;
 }
@@ -22,6 +25,7 @@ export class RecoveryService extends FaroStore {
       if(hashes.has(item.subject_hash))throw new Error('Powielony wpis rejestru usunięć.');
       hashes.add(item.subject_hash);erasedAt.set(item.subject_hash,item.erased_at);
     }
+    if((!ledger.mfa||!ledger.mfaRecovery||!ledger.mfaLimits)&&Number(this.db.prepare('SELECT COUNT(*) n FROM faro_mfa WHERE active_cipher IS NOT NULL').get()!.n)>0)throw new Error('Brak bieżącego rejestru MFA. Odtworzenie wstrzymane.');
     const owners=new Map<string,string>();
     for(const item of ledger.owners) {
       if(owners.has(item.organization_id)&&owners.get(item.organization_id)!==item.user_id)throw new Error('Niejednoznaczna własność w bieżącym rejestrze.');
@@ -70,6 +74,10 @@ export class RecoveryService extends FaroStore {
       const oldAssignments=this.db.prepare('SELECT offer_id,user_id FROM faro_assignments').all() as Array<{offer_id:string;user_id:string}>;
       for(const old of oldAssignments)if(!assignments.has(JSON.stringify([old.offer_id,old.user_id])))this.db.prepare('DELETE FROM faro_assignments WHERE offer_id=? AND user_id=?').run(old.offer_id,old.user_id);
       const invalidatedSessions=Number(this.db.prepare('DELETE FROM sessions').run().changes);
+      this.db.prepare('DELETE FROM faro_mfa').run();this.db.prepare('DELETE FROM faro_mfa_limits').run();
+      for(const m of ledger.mfa??[])if(this.db.prepare('SELECT id FROM users WHERE id=?').get(m.user_id))this.db.prepare('INSERT INTO faro_mfa(user_id,active_cipher,last_counter,activated_at) VALUES(?,?,?,?)').run(m.user_id,m.active_cipher,m.last_counter,m.activated_at);
+      for(const r of ledger.mfaRecovery??[])if(this.db.prepare('SELECT user_id FROM faro_mfa WHERE user_id=?').get(r.user_id))this.db.prepare('INSERT INTO faro_mfa_recovery(user_id,code_hash,used_at) VALUES(?,?,?)').run(r.user_id,r.code_hash,r.used_at);
+      for(const l of ledger.mfaLimits??[])if(this.db.prepare('SELECT id FROM users WHERE id=?').get(l.user_id))this.db.prepare('INSERT INTO faro_mfa_limits(user_id,failures,window_start) VALUES(?,?,?)').run(l.user_id,l.failures,l.window_start);
       // An old worker reservation is not authority to deliver into a restored database.
       this.db.prepare('UPDATE faro_outbox SET claim_token=NULL,lease_until=NULL WHERE claim_token IS NOT NULL').run();
       this.db.prepare('DELETE FROM faro_invites').run();

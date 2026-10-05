@@ -7,6 +7,8 @@ import { RecruitmentService } from './recruitmentService.js';
 export class PrivacyService extends FaroStore {
   exportOwn(userId: string) {
     const own: Record<string, unknown> = { exportVersion: 'faro-data-rights-v1', exportedAt: this.now() };
+    own.faro_mfa_security=this.db.prepare('SELECT activated_at,pending_until FROM faro_mfa WHERE user_id=?').all(userId);
+    own.faro_mfa_recovery_uses=this.db.prepare('SELECT used_at FROM faro_mfa_recovery WHERE user_id=? ORDER BY used_at').all(userId);
     for (const table of ['faro_profiles','faro_activities','faro_proposals','faro_claims','faro_learning','faro_members'] as const) {
       own[table] = this.db.prepare(`SELECT * FROM ${table} WHERE user_id=?`).all(userId);
     }

@@ -178,3 +178,5 @@ CP11-H draft [#57](https://github.com/eagleblastmusic-lgtm/Job/pull/57): codex/f
 CP02-G draft [#58](https://github.com/eagleblastmusic-lgtm/Job/pull/58): codex/faro-cp02g-sessions base codex/faro-cp11h-session, code44bf3ca. FARO37383213563 SUCCESS; CI37383213360 pending at this observation. All draft/unmerged.
 
 CP07-G draft [#59](https://github.com/eagleblastmusic-lgtm/Job/pull/59): codex/faro-cp07g-gaps base codex/faro-cp02g-sessions, codea81e015. Both37383663019/37383663160 SUCCESS. CP02-G CI37383213360 SUCCESS supersedes pending note. All draft/unmerged.
+
+CP10-K draft [#60](https://github.com/eagleblastmusic-lgtm/Job/pull/60): codex/faro-cp10k-open-answer base codex/faro-cp07g-gaps, code66635b4. Both37384886723/37384886582 SUCCESS. All draft/unmerged.

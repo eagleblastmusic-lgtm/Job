@@ -1,5 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { PrivacyService } from './faro/privacyService.js';
+import { MfaService } from './faro/mfaService.js';
+import type { AppConfig } from './config.js';
+import { HttpError } from './http.js';
 import type { JobDatabase } from './db.js';
 import type {
   ApplicationStatus, CareerExperience, CareerFact, CareerFactStatus, CareerProfile,
@@ -101,6 +104,7 @@ export class AppStore {
   }
 
   deleteSession(tokenHash: string): void { this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash); }
+  requireMfaSession(tokenHash:string,config:AppConfig){const user=this.getUserBySession(tokenHash);if(!user)throw new HttpError(401,'Zaloguj się, aby kontynuować.','UNAUTHENTICATED');new MfaService(this.database,config).assertAccess(user,tokenHash);return user;}
   purgeExpiredSessions(): void { this.db.prepare('DELETE FROM sessions WHERE expires_at<=?').run(now()); }
 
   getProfile(userId: string): CareerProfile {

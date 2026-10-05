@@ -217,7 +217,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'PUT' && pathname === '/api/consents/analytics') {
-    const user = requireUser(req, store); const body = await readJson(req);
+    requireUser(req, store); const body = await readJson(req);
+    const user=store.requireMfaSession(hashSessionToken(parseCookies(req.headers.cookie).job_session??''),config);
     if (typeof body.granted !== 'boolean') throw new HttpError(400, 'Pole granted musi być wartością true albo false.', 'INVALID_CONSENT_VALUE');
     const consent = store.recordConsent(user.id, 'ANALYTICS', body.granted, LEGAL_VERSION);
     sendJson(res, 200, { consent }); return true;
@@ -397,7 +398,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   }
 
   if (method === 'DELETE' && pathname === '/api/account') {
-    const user = requireUser(req, store); enforceRate(rateMap, `account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
+    let user = requireUser(req, store); enforceRate(rateMap, `account-delete:${user.id}`, 5, 15 * 60_000); const body = await readJson(req);
+    user=store.requireMfaSession(hashSessionToken(parseCookies(req.headers.cookie).job_session??''),config);
     const confirmation = boundedStringField(body, 'confirmation', 32) ?? '';
     if (confirmation !== 'USUŃ KONTO') throw new HttpError(400, 'Wpisz dokładnie: USUŃ KONTO');
     const password = stringField(body, 'password', false) ?? '';
