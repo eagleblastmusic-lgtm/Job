@@ -22,9 +22,15 @@ const claim = (f: FormData) => ({ skillId: value(f, 'skillId'), level: value(f, 
 const toDate = (text: string) => { const d = new Date(text); if (!Number.isFinite(d.getTime())) throw new Error('Podaj prawidłowy termin.'); return d.toISOString(); };
 
 async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal): Promise<T> {
-  const r = await fetch(path.startsWith('/api/') ? path : `/api/faro${path}`, { method, signal, credentials: 'same-origin', headers: body === undefined ? {} : { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store' });
+  let r: Response;
+  try {
+    r = await fetch(path.startsWith('/api/') ? path : `/api/faro${path}`, { method, signal, credentials: 'same-origin', headers: body === undefined ? {} : { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store' });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new Error(navigator.onLine ? 'Nie można połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie.' : 'Jesteś offline. Zmiany wymagają połączenia z serwerem.');
+  }
   const data = await r.json() as T & { error?: { message?: string; code?: string } };
-  if (r.status === 401 && data.error?.code !== 'REAUTH_FAILED') { loggedOut(); throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
+  if (r.status === 401 && data.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
   if (!r.ok) throw new Error(data.error?.message ?? `Błąd ${r.status}`);
   return data;
 }
