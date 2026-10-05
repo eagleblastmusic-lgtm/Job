@@ -53,3 +53,5 @@ CP10-G discovery update: new real incident/review journey e2e/faro-incidents.spe
 CP10-H expands existing incident scenario (still14 scenarios/28 executions) with conscious employer same-version retry, candidate separate Start and original-history navigation. Both-role axe/320px evidence retained. Hover-label regression repaired; no historical test restored or current rule skipped.
 
 CP07-E adds one current real restriction/appeal/restoration scenario; default scope15 scenarios/30 desktop/mobile executions. Both-party privacy, manual restoration, paused vacancies/PENDING verification, axe and320px remain required. Historical archive/disposition unchanged.
+
+CP11-H adds real network loss/session-expiry and keyboard/cache boundary journey:16 scenarios/32 executions, default discovery. CP02-G extends it with reauthenticated revoke-all; no historical disposition changed.
