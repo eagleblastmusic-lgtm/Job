@@ -92,7 +92,9 @@ try {
   const leasedId=f.app.db.db.prepare("SELECT id FROM faro_outbox WHERE dedupe_key='restore-lease-proof'").get().id;
   const oldClaim=r.claimOutbox(100,300000).find(claim=>claim.id===leasedId);assert.ok(oldClaim);
   f.app.db.db.prepare("INSERT INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES('stale-canonical-telemetry',?,'FARO_MUTUAL_STAGE_COMPLETED','{}',?)").run(kept.id,new Date().toISOString());
-  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,1);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,2);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED' AND json_extract(properties,'$.stage')='OFFER_ACCEPTED'").get().n,1);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE id='stale-canonical-telemetry'").get().n,1);
   const mfa=new MfaService(f.app.db,f.app.config),mfaUser=f.app.store.getUserById(kept.id),mfaToken=hashSessionToken(kept.cookie.split('=')[1]);
   const enrollment=mfa.setup(mfaUser,mfaToken,{password:'Bezpieczne123'}),mfaSecret=decodeMfa(enrollment.secret);
   const recoveryCodes=mfa.confirm(mfaUser,mfaToken,{code:totp(mfaSecret,Math.floor(Date.now()/30000))}).recoveryCodes;

@@ -56,6 +56,11 @@ test('Canonical optional progression derives mutual completion, dedupes pair/wee
     f.setNow('2026-10-26T13:00:00Z');consent(false);assert.equal(events().length,0);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
     f.setNow('2026-10-26T14:00:00Z');consent(true);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
     complete('fifth','2026-10-27T10:00:00Z','2026-10-27T11:00:00Z','2026-10-27T09:00:00Z','2026-10-27T12:00:00Z');assert.equal(events().length,1);
+    f.app.db.db.prepare("UPDATE analytics_events SET properties=json_set(properties,'$.definitionVersion','faro-mutual-stage-pair-week-v1') WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").run();
+    const sameWeek=f.recruitment.row(f.first),due='2026-10-28T15:00:00Z';
+    f.recruitment.change(f.employer.id,f.first,{command:'OFFER',expectedVersion:sameWeek.revision,idempotencyKey:'analytics-offer',confirmed:true,nextAction:'Potwierdź konkretne warunki współpracy',dueAt:due,offerVersion:1,salaryIndex:0,amount:600000,startsAt:'2026-11-01T08:00:00Z'});
+    const accepted=f.recruitment.row(f.first);f.recruitment.change(f.candidate.id,f.first,{command:'ACCEPT_OFFER',expectedVersion:accepted.revision,idempotencyKey:'analytics-offer-accept',confirmed:true,employmentOfferRevision:accepted.revision});
+    assert.equal(events().length,1);assert.equal(f.app.store.faroOfferAccepted(f.first),false);assert.equal(JSON.parse(String(events()[0]!.properties)).definitionVersion,'faro-mutual-stage-pair-week-v1'); // Different completed stage, same pair/week, no duplicate.
     assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='INTERVIEW_COMPLETE'").get()!.n,10); // Operational facts are separate and not lost without product consent.
     await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});assert.equal(events().length,0);assert.equal(f.app.db.db.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{await f.close();}

@@ -57,3 +57,6 @@ CP07-E adds one current real restriction/appeal/restoration scenario; default sc
 CP11-H adds real network loss/session-expiry and keyboard/cache boundary journey:16 scenarios/32 executions, default discovery. CP02-G extends it with reauthenticated revoke-all; no historical disposition changed.
 
 CP10-K adds actual open-answer author/edit/candidate/human-review journey with escaped text, pinned rubric, missing answers, both-role axe and320px reflow:17 scenarios/34 executions. Historical disposition unchanged.
+
+
+CP02-H adds actual privileged MFA enrollment/verification/one-use recovery and private API gate:18 scenarios/36 executions. CP06-J adds actual employer concrete offer and candidate exact-revision acceptance, both-role axe/320px:19 scenarios/38 desktop/mobile executions. Zero historical scenarios restored; all22 archived dispositions unchanged. CP11-J extends employment scenario with absent optional analytics consent proof; no new scenario or relaxed assertion.
