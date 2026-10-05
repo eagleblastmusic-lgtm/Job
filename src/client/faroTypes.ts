@@ -77,5 +77,5 @@ export interface Reliability {
   exclusions:{withdrawnBeforeOriginalDeadline:number};
   firstResponse:{numerator:number;denominator:number;answered:number;late:number;unanswered:number;rightCensored:number;medianAnsweredHours:number|null;medianSampleSize:number};
   currentWaiting:{count:number;overdue:number;maxOverdueHours:number|null};
-  progression:{processesWithNextStage:number;processesWithAssessmentInvitation:number;processesWithConfirmedInterview:number;processesRejected:number};
+  progression:{processesWithNextStage:number;processesWithAssessmentInvitation:number;processesWithConfirmedInterview:number;processesWithMutuallyCompletedInterview:number;processesRejected:number};
 }

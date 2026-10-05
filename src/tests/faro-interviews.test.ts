@@ -133,6 +133,9 @@ test('interview confirmation reserves participants atomically, scopes API, freez
     assert.equal(own.state,'CONFIRMED');assert.equal(own.candidateCompleted,true);assert.equal(f.recruitment.row(f.first).stage,'INTERVIEW_CONFIRMED');
     const done=f.interviews.change(f.employer.id,first.id,{command:'COMPLETE',confirmed:true,expectedVersion:3,processVersion:5,idempotencyKey:'employer-complete'});
     assert.equal(done.state,'COMPLETED');assert.equal(f.recruitment.row(f.first).stage,'INTERVIEW_COMPLETED');
+    const report=new TrustService(f.app.db,f.clock).reliability(f.employer.id,f.org.id,'2026-10-24T00:00:00Z','2026-10-25T02:00:00Z');
+    assert.equal(report.progression.processesWithMutuallyCompletedInterview,1);assert.equal(report.progression.processesWithConfirmedInterview,1);assert.equal(report.sampleSize,2);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get()!.n,0); // Operational report is not optional product telemetry.
     assert.equal(f.recruitment.row(f.first).stage_due_at,'2026-10-28T02:00:00.000Z');
     assert.throws(()=>f.interviews.propose(f.employer.id,f.first,{...f.proposal,expectedVersion:6,idempotencyKey:'extra-interview'}),code('INTERVIEW_LIMIT'));
   }finally{await f.close();}
