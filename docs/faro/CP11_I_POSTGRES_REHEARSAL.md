@@ -11,3 +11,6 @@ Local source verification PASS70 tables/35 migrations; syntax/lint PASS. Actual 
 Remaining: async production repository/transaction adapter, SQL command semantics and UTC/JSON conversion review, runtime API/browser contract suite on PostgreSQL, current-authority erasure/MFA/outbox reconcile on target, independent backup/restore and rollback/cutover, durable operator environment/persistence and external gates. This is a real staging-data prerequisite, not production PostgreSQL or full CP11/master-plan/release DONE.
 
 Primary sources: [node-postgres transactions](https://node-postgres.com/features/transactions), [parameterized queries](https://node-postgres.com/features/queries), [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
+
+
+First actual PostgreSQL run atfe39731 found pending deferred-FK events preventing post-insert CREATE INDEX (55006). Root cause fixed: create indexes before row loading; validate deferred FKs before trigger DDL. No criteria relaxed; actual rerun pending. This supersedes initial pending observation without labeling failed evidence as external blocker.

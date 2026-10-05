@@ -64,15 +64,16 @@ export async function importSnapshot(client,snapshot,schema){
       group.sort((a,b)=>a.seq-b.seq);const fk=group[0];if(!['CASCADE','SET NULL','RESTRICT','NO ACTION'].includes(fk.on_delete)||!['CASCADE','SET NULL','RESTRICT','NO ACTION'].includes(fk.on_update))throw new Error('Unsupported FK action.');
       await client.query(`ALTER TABLE ${identifier(table.name)} ADD FOREIGN KEY (${group.map(f=>identifier(f.from)).join(',')}) REFERENCES ${identifier(fk.table)} (${group.map(f=>identifier(f.to)).join(',')}) ON DELETE ${fk.on_delete} ON UPDATE ${fk.on_update} DEFERRABLE INITIALLY DEFERRED`);
     }}
+    for(const index of snapshot.indexes)await client.query(normalize(index.sql));
     for(const table of snapshot.tables){const columns=[sourceOrder,...table.columns.map(c=>c.name)];for(const row of table.rows)await client.query(`INSERT INTO ${identifier(table.name)} (${columns.map(identifier).join(',')}) VALUES (${columns.map((_,i)=>`$${i+1}`).join(',')})`,columns.map(c=>row[c]));
       const max=table.rows.at(-1)?.[sourceOrder]??0;await client.query('SELECT setval(pg_get_serial_sequence($1,$2),$3,$4)',[`${identifier(schema)}.${identifier(table.name)}`,sourceOrder,Math.max(1,max),max>0]);
     }
-    for(const index of snapshot.indexes)await client.query(normalize(index.sql));
+    await client.query('SET CONSTRAINTS ALL IMMEDIATE');
     // Preserve historical rows first, then enforce the existing insert-time analytics-consent rule.
     await client.query(`CREATE FUNCTION analytics_requires_consent() RETURNS trigger LANGUAGE plpgsql SET search_path TO ${identifier(schema)} AS $$ BEGIN
       IF COALESCE((SELECT granted FROM consents WHERE user_id=NEW.user_id AND consent_type='ANALYTICS' ORDER BY created_at DESC,${identifier(sourceOrder)} DESC LIMIT 1),0)<>1 THEN RETURN NULL; END IF; RETURN NEW; END $$`);
     await client.query('CREATE TRIGGER trg_analytics_requires_consent BEFORE INSERT ON analytics_events FOR EACH ROW EXECUTE FUNCTION analytics_requires_consent()');
     await client.query('SET CONSTRAINTS ALL IMMEDIATE');const proof=await compare(client,snapshot,schema);await client.query('COMMIT');return proof;
-  } catch(error){if(begun)await client.query('ROLLBACK');const code=typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION';throw new Error(`PostgreSQL rehearsal failed (${code}); destination transaction rolled back.`);}
+  } catch(error){if(begun)await client.query('ROLLBACK');const code=typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION';throw Object.assign(new Error(`PostgreSQL rehearsal failed (${code}); destination transaction rolled back.`),{code});}
 }
 export function clientFromEnvironment(){if(!process.env.FARO_PG_REHEARSAL_URL)throw new Error('FARO_PG_REHEARSAL_URL required for real PostgreSQL acceptance.');return new pg.Client({connectionString:process.env.FARO_PG_REHEARSAL_URL,connectionTimeoutMillis:5000});}
