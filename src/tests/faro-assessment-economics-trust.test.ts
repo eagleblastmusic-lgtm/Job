@@ -24,6 +24,37 @@ async function assessmentSetup() {
   return { ...f, employer, candidate, admin, org, offer, interest };
 }
 
+test('open answer stays unscored until scoped human rubric review, preserves missing answers and pinned evidence through amendments',async()=>{
+  const f=await assessmentSetup();try {
+    const s=new AssessmentService(f.app.db),input={type:'OPEN_ANSWER',title:'Ręczna odpowiedź',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'human-r1',tasks:[{prompt:'Opisz następny krok.',evaluationCriteria:'0: brak uzasadnienia; 1: krok; 2: krok i uzasadnienie.',points:2},{prompt:'Opisz alternatywę.',evaluationCriteria:'0: nieadekwatna; 1: adekwatna alternatywa.',points:1}]};
+    for(const bad of [{...input,type:'CODE'},{...input,scoringMode:'OBJECTIVE'},{...input,tasks:[{...input.tasks[0],evaluationCriteria:''}]},{...input,tasks:[{...input.tasks[0],options:['A','B'],answer:0}]}])assert.throws(()=>s.create(f.employer.id,f.offer.id,bad));
+    const d=s.create(f.employer.id,f.offer.id,input);s.approve(f.employer.id,d.id,{version:1,action:'REVIEW'});s.approve(f.employer.id,d.id,{version:1,action:'APPROVE',confirmed:true});
+    const a=s.assign(f.employer.id,f.interest.id,{assessmentId:d.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'open-assign'});
+    const initial=s.overview(f.candidate.id,a.id);assert.equal(initial.type,'OPEN_ANSWER');assert.equal(initial.scoringMode,'HUMAN');assert.equal(initial.tasks.length,0);
+    s.start(f.candidate.id,a.id);const started=s.row(a.id).expires_at;
+    for(const answers of [{'task-1':0},{'task-1':''},{'task-1':'a'.repeat(5001)},{foreign:'text'}])assert.throws(()=>s.save(f.candidate.id,a.id,{expectedVersion:s.row(a.id).revision,answers},false));
+    const answer='<script>not executable</script> Proponuję krok i jego uzasadnienie.';
+    s.save(f.candidate.id,a.id,{expectedVersion:s.row(a.id).revision,answers:{'task-1':answer}},false);
+    assert.equal(s.overview(f.employer.id,a.id).reviewTasks.length,0);assert.equal(s.row(a.id).expires_at,started);
+    s.save(f.candidate.id,a.id,{expectedVersion:s.row(a.id).revision,answers:{'task-1':answer}},true);
+    const pending=s.overview(f.employer.id,a.id);assert.equal((pending.result as {earned:unknown}).earned,null);assert.equal((pending.result as {unanswered:number}).unanswered,1);assert.equal(pending.reviewTasks[0]!.chosenText,answer);assert.equal(pending.reviewTasks[0]!.correctOption,null);assert.equal(s.overview(f.candidate.id,a.id).result,null);
+    s.edit(f.employer.id,d.id,1,{expectedVersion:1,idempotencyKey:'open-edit',data:{...input,rubricVersion:'human-r2',tasks:input.tasks.map(t=>({...t,evaluationCriteria:'Nowe kryteria przyszłej wersji, nie tej próby.'}))}});
+    assert.equal(s.overview(f.employer.id,a.id).reviewTasks[0]!.evaluationCriteria,input.tasks[0]!.evaluationCriteria);
+    const body={expectedVersion:pending.revision,processVersion:pending.processVersion,confirmed:true,note:'Ręcznie oceniono odpowiedź według przypisanej rubryki.',idempotencyKey:'open-review'};
+    for(const scores of [undefined,{'task-1':2},{'task-1':3,'task-2':null},{'task-1':1.5,'task-2':null},{'task-1':2,'task-2':0}])assert.throws(()=>s.finalize(f.employer.id,a.id,{...body,scores}));
+    await f.request(`/api/faro/attempts/${a.id}/review`,f.candidate.cookie,'POST',{...body,scores:{'task-1':2,'task-2':null}},404);
+    s.finalize(f.employer.id,a.id,{...body,scores:{'task-1':2,'task-2':null}});
+    const final=s.overview(f.candidate.id,a.id);assert.equal((final.result as {earned:number}).earned,2);assert.equal((final.result as {unanswered:number}).unanswered,1);assert.equal(s.row(a.id).answers,JSON.stringify({'task-1':answer}));
+    assert.throws(()=>s.keyCorrectionPreview(f.employer.id,d.id,1,{acceptedOptions:{},reason:'Nie ma obiektywnego klucza odpowiedzi.'}),/ręcznego/);
+    s.amendResult(f.employer.id,a.id,{expectedVersion:final.revision,processVersion:final.processVersion,confirmed:true,reason:'Ręczna korekta zachowuje pierwotną rubrykę i odpowiedź.',scores:{'task-1':1,'task-2':null},idempotencyKey:'open-amend'});
+    const amended=s.overview(f.candidate.id,a.id);assert.equal((amended.result as {earned:number}).earned,1);assert.equal(amended.resultHistory.length,2);assert.equal(s.recruitment.row(f.interest.id).status,'ACTIVE');
+    const original=JSON.parse(s.row(a.id).result!) as {earned:number};assert.equal(original.earned,2);
+    const exported=await f.request('/api/export',f.candidate.cookie);assert.ok(JSON.stringify(exported).includes(answer));
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{password:'Bezpieczne123',confirmation:'USUŃ KONTO'});
+    for(const table of ['faro_attempts','faro_result_history'])assert.equal(f.app.db.db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${table==='faro_attempts'?'id':'attempt_id'}=?`).get(a.id)!.n,0);
+  }finally{await f.close();}
+});
+
 test('cohort key correction previews the complete pinned group, fences changes and live attempts, preserves invalid evidence and decisions',async()=>{
   const f=await assessmentSetup();try {
     const s=new AssessmentService(f.app.db),d=s.create(f.employer.id,f.offer.id,{title:'Shared key',timeLimitMinutes:5,expectedMinutes:2,rubricVersion:'cohort-r1',tasks:[{prompt:'Q1',options:['A','B'],answer:1,points:2},{prompt:'Q2',options:['C','D'],answer:0,points:3}]});

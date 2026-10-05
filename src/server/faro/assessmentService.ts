@@ -5,8 +5,8 @@ import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
 import { text, integer, array, object, choice, date } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
-interface Task { id: string; prompt: string; options: string[]; answer: number; points: number; }
-interface Definition { title: string; type: 'QUIZ'; tasks: Task[]; timeLimitMinutes: number; expectedMinutes: number; rubricVersion: string; scoringMode: 'OBJECTIVE'; }
+interface Task { id: string; prompt: string; options: string[]; answer: number; points: number; evaluationCriteria?:string; }
+interface Definition { title: string; type: 'QUIZ'|'OPEN_ANSWER'; tasks: Task[]; timeLimitMinutes: number; expectedMinutes: number; rubricVersion: string; scoringMode: 'OBJECTIVE'|'HUMAN'; }
 interface DefinitionRow { id: string; version: number; offer_id: string; state: 'DRAFT' | 'IN_REVIEW' | 'APPROVED'; content: string; origin: string; }
 interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; attempt_number:number;retry_of:string|null;retry_reason:string|null;retry_authorized_at:string|null; }
 interface IncidentRow { id:string; category:string; statement:string; reportedAt:string; observedState:string; observedRevision:number; originalDeadline:string; originalStartedAt:string|null; originalExpiresAt:string|null; state:string; revision:number; resolution:string|null; reason:string|null; resolvedAt:string|null; }
@@ -22,6 +22,7 @@ export class AssessmentService extends FaroStore {
   }
   previewKeyCorrection(userId:string,id:string,version:number,body:Record<string,unknown>) {
     const definition=this.read(userId,id,version),content=JSON.parse(definition.content) as Definition;
+    if(content.type!=='QUIZ')throw new HttpError(409,'Odpowiedzi otwarte wymagają indywidualnego ręcznego przeglądu, bez klucza quizu.','NO_OBJECTIVE_KEY');
     if(definition.state!=='APPROVED')throw new HttpError(409,'Korekta dotyczy zatwierdzonej przypisanej wersji.');
     const reason=text(body.reason,1000,10),raw=object(body.acceptedOptions),key:Record<string,number[]>={};
     if(Object.keys(raw).length!==content.tasks.length||Object.keys(raw).some(k=>!content.tasks.some(t=>t.id===k)))throw new HttpError(400,'Podaj wspólny klucz wszystkich zadań.');
@@ -84,14 +85,17 @@ export class AssessmentService extends FaroStore {
     });
   }
   parse(body: Record<string, unknown>): Definition {
+    const type=body.type===undefined?'QUIZ':choice(body.type,['QUIZ','OPEN_ANSWER'] as const);
+    if(body.scoringMode!==undefined&&body.scoringMode!==(type==='QUIZ'?'OBJECTIVE':'HUMAN'))throw new HttpError(400,'Tryb oceny nie pasuje do typu zadania.');
     const tasks = array(body.tasks, 50).map((raw, index) => {
+      if(type==='OPEN_ANSWER') {const task=object(raw);if('options' in task||'answer' in task)throw new HttpError(400,'Zadanie otwarte nie ma klucza wyboru.');return {id:`task-${index+1}`,prompt:text(task.prompt,1500),options:[],answer:0,points:integer(task.points,1,100),evaluationCriteria:text(task.evaluationCriteria,1500,10)};}
       const task = object(raw), options = array(task.options, 8).map(option => text(option, 500));
       if (options.length < 2) throw new HttpError(400, 'Zadanie wymaga przynajmniej dwóch odpowiedzi.');
       return { id: `task-${index + 1}`, prompt: text(task.prompt, 1500), options, answer: integer(task.answer, 0, options.length - 1), points: integer(task.points, 1, 100) };
     });
     if (!tasks.length) throw new HttpError(400, 'Dodaj zadanie.');
     for (const forbidden of ['internetAllowed','aiAllowed','globalSkillExpiry','cumulativeTestTimeLimit']) if (forbidden in body) throw new HttpError(400, 'Pole nie należy do Canonical.');
-    return { title: text(body.title, 150), type: 'QUIZ', tasks, timeLimitMinutes: integer(body.timeLimitMinutes, 1, 480), expectedMinutes: integer(body.expectedMinutes, 1, 480), rubricVersion: text(body.rubricVersion, 80), scoringMode: 'OBJECTIVE' };
+    return { title: text(body.title, 150), type, tasks, timeLimitMinutes: integer(body.timeLimitMinutes, 1, 480), expectedMinutes: integer(body.expectedMinutes, 1, 480), rubricVersion: text(body.rubricVersion, 80), scoringMode: type==='QUIZ'?'OBJECTIVE':'HUMAN' };
   }
   create(userId: string, offerId: string, body: Record<string, unknown>, previousId?: string) {
     const offers = new OfferService(this.database, this.clock), offer = offers.assigned(userId, offerId);
@@ -248,12 +252,12 @@ export class AssessmentService extends FaroStore {
     const candidate = process.candidate_id === userId;
     const history=row.state==='FINALIZED'?this.resultHistory(id):[];
     const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
-    const savedAnswers=JSON.parse(row.answers) as Record<string,number>;
+    const savedAnswers=JSON.parse(row.answers) as Record<string,number|string>;
     const retryAttempt=this.db.prepare('SELECT id FROM faro_attempts WHERE retry_of=?').get(id) as {id:string}|undefined;
     const retryRole=candidate?null:this.member(userId,this.recruitment.offers.get(process.offer_id).organizationId).role;
     return { id, attemptNumber:row.attempt_number,retryOf:row.retry_of,retryReason:row.retry_reason,retryAuthorizedAt:row.retry_authorized_at,retryAttemptId:retryAttempt?.id??null,canRetry:retryRole!==null&&retryRole!=='HIRING_MANAGER'&&row.state==='TECHNICAL_ISSUE'&&this.incident(id)?.resolution==='ISSUE_CONFIRMED'&&process.status==='ACTIVE'&&process.stage==='ACCEPTED_TO_NEXT_STAGE'&&!retryAttempt&&!this.correctedKey(row.assessment_id,row.assessment_version)&&!this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id), incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
-      tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points })) : [],
-      reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:t.answer,chosenOption:savedAnswers[t.id]??null})):[],
+      tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points,evaluationCriteria:task.evaluationCriteria })) : [],
+      reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:content.type==='QUIZ'?t.answer:null,chosenOption:typeof savedAnswers[t.id]==='number'?savedAnswers[t.id]:null,chosenText:typeof savedAnswers[t.id]==='string'?savedAnswers[t.id]:null,evaluationCriteria:t.evaluationCriteria})):[],
       answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? (row.state==='FINALIZED'?history.at(-1)!.result:JSON.parse(row.result) as Record<string, unknown>) : null };
   }
   attempts(userId: string, processId?: string) {
@@ -292,13 +296,13 @@ export class AssessmentService extends FaroStore {
     }
     if (integer(body.expectedVersion, 1) !== row.revision) throw new HttpError(409, 'Odpowiedzi zmieniły się.', 'VERSION_CONFLICT');
     const definition = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
-    const raw = object(body.answers), answers: Record<string, number> = {};
+    const raw = object(body.answers), answers: Record<string, number|string> = {};
     for (const [key, value] of Object.entries(raw)) {
       const task = definition.tasks.find(t => t.id === key); if (!task) throw new HttpError(400, 'Nieznane zadanie.');
-      answers[key] = integer(value, 0, task.options.length - 1);
+      answers[key] = definition.type==='OPEN_ANSWER'?text(value,5000):integer(value, 0, task.options.length - 1);
     }
-    const breakdown = definition.tasks.map(task => ({ taskId: task.id, earned: answers[task.id] === undefined ? null : answers[task.id] === task.answer ? task.points : 0, possible: task.points }));
-    const result = { breakdown, earned: breakdown.reduce((sum, task) => sum + (task.earned ?? 0), 0), possible: breakdown.reduce((sum, task) => sum + task.possible, 0), unanswered: breakdown.filter(task => task.earned === null).length, assessmentVersion: row.assessment_version, rubricVersion: definition.rubricVersion, review: 'PENDING' };
+    const breakdown = definition.tasks.map(task => ({ taskId: task.id, earned: answers[task.id] === undefined||definition.type==='OPEN_ANSWER' ? null : answers[task.id] === task.answer ? task.points : 0, possible: task.points }));
+    const result = { breakdown, earned: definition.type==='OPEN_ANSWER'?null:breakdown.reduce((sum, task) => sum + (task.earned ?? 0), 0), possible: breakdown.reduce((sum, task) => sum + task.possible, 0), unanswered:definition.tasks.filter(t=>answers[t.id]===undefined).length, assessmentVersion: row.assessment_version, rubricVersion: definition.rubricVersion, review: 'PENDING' };
       this.db.prepare('UPDATE faro_attempts SET answers=?,revision=revision+1,state=?,result=? WHERE id=?').run(JSON.stringify(answers), submit ? 'SCORED_PENDING_REVIEW' : 'STARTED', submit ? JSON.stringify(result) : null, id);
       if (submit) {
         const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
@@ -319,6 +323,13 @@ export class AssessmentService extends FaroStore {
       if(this.incident(id)?.state==='OPEN')throw new HttpError(409,'Najpierw rozpatrz zgłoszenie techniczne.','INCIDENT_REVIEW_REQUIRED');
       if(row.state!=='SCORED_PENDING_REVIEW'||!row.result||body.confirmed!==true)throw new HttpError(409,'Wynik wymaga świadomego review.');
       const note=text(body.note,1000,10),result={...JSON.parse(row.result) as Record<string,unknown>,review:'FINALIZED',reviewNote:note};
+      const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition;
+      if(definition.type==='OPEN_ANSWER') {
+        const scores=object(body.scores),answers=JSON.parse(row.answers) as Record<string,string>;
+        if(Object.keys(scores).length!==definition.tasks.length||Object.keys(scores).some(k=>!definition.tasks.some(t=>t.id===k)))throw new HttpError(400,'Oceń każde zadanie przypisanej rubryki.');
+        const breakdown=definition.tasks.map(t=>{if(answers[t.id]===undefined){if(scores[t.id]!==null)throw new HttpError(400,'Brak odpowiedzi pozostaje odrębny od zera.');return {taskId:t.id,earned:null,possible:t.points};}return {taskId:t.id,earned:integer(scores[t.id],0,t.points),possible:t.points};});
+        Object.assign(result,{breakdown,earned:breakdown.reduce((sum,t)=>sum+(t.earned??0),0),comparisonStatus:'HUMAN_RUBRIC_REVIEW'});
+      }
       this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result),userId,this.now(),id);
       this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,created_at) VALUES(?,1,'VALID',?,?)").run(id,JSON.stringify(result),this.now());
       this.audit(userId,'ASSESSMENT_RESULT_REVIEWED',id);
