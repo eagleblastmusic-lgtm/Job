@@ -51,6 +51,21 @@ test('Canonical offline retry and real expired session clear private workspace w
     await expect(page.locator('#loginForm [name=password]')).toHaveValue('');
     expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
     await f.request('/api/faro/profile',candidate.cookie,'GET',undefined,401);
+    await page.locator('#loginForm [name=email]').fill(candidate.email);
+    await page.locator('#loginForm [name=password]').fill('Bezpieczne123');
+    await page.getByRole('button',{name:'Zaloguj się',exact:true}).click();
+    await page.getByRole('link',{name:'Prywatność',exact:true}).click();
+    const revoke=page.locator('[data-form=revoke-sessions]');
+    await revoke.locator('[name=password]').fill('BledneHaslo123');
+    await revoke.locator('[name=confirmed]').check();
+    await revoke.getByRole('button',{name:'Wyloguj wszystkie urządzenia',exact:true}).click();
+    await expect(revoke.locator('.f-form-message')).toContainText('poprawne aktualne hasło');
+    await expect(page.locator('.f-brand')).toBeVisible();
+    await revoke.locator('[name=password]').fill('Bezpieczne123');
+    await revoke.getByRole('button',{name:'Wyloguj wszystkie urządzenia',exact:true}).click();
+    await expect(page.locator('#loginForm')).toBeVisible();
+    await expect(page.locator('#authMessage')).toHaveText('Wszystkie sesje zostały wylogowane.');
+    await expect(page.locator('#appView')).toBeEmpty();
     expect(errors).toEqual([]);
   }finally{await context.setOffline(false);if(!page.isClosed())await page.goto('about:blank');await f.close();}
 });

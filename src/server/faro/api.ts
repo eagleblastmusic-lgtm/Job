@@ -36,6 +36,18 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     }
     const body = method === 'GET' ? {} : await readJson(req);
     const ok = (data: unknown, status = 200) => { sendJson(res, status, data); return true; };
+    if(path==='/api/faro/sessions/revoke-all'&&method==='POST') {
+      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wylogowanie wszystkich sesji.','CONFIRMATION_REQUIRED');
+      if(typeof body.password!=='string'||!body.password||body.password.length>MAX_PASSWORD_LENGTH)throw new HttpError(400,'Podaj aktualne hasło.','VALIDATION_ERROR');
+      const password=body.password;
+      if(!verifyPassword(password,user.passwordHash))throw new HttpError(401,'Podaj poprawne aktualne hasło.','REAUTH_FAILED');
+      profiles.transaction(()=>{
+        db.db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
+        store.audit(user.id,'SESSIONS_REVOKED','user',user.id);
+      });
+      res.setHeader('set-cookie','job_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
+      return ok({ok:true});
+    }
     if (path === '/api/faro/catalog' && method === 'GET') return ok({ skills: SKILL_CATALOG });
     if (path === '/api/faro/profile' && method === 'GET') return ok(profiles.profile(user.id));
     if (path === '/api/faro/profile' && method === 'PUT') return ok(profiles.save(user.id, body));
