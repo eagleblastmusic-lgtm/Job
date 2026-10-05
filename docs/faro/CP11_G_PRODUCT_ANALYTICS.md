@@ -1,0 +1,13 @@
+# CP11-G — Optional Canonical product progression (2026-10-05)
+
+Existing AppStore/analytics_events and latest-consent database trigger remain authoritative. Canonical has one closed event, FARO_MUTUAL_STAGE_COMPLETED, produced only from an actual COMPLETED interview plus its bilateral operational event. Generic analytics refuses FARO_*; no new client event endpoint or arbitrary properties.
+
+The candidate must have a current ANALYTICS grant that predates completion. Invitation, rejection, one-sided completion and later opt-in cannot create/backfill progression. One candidate-offer pair per Monday-UTC week yields one event, including repeated interviews/processes. Payload allowlist: definitionVersion, weekStart, stage. No offer/process/interview IDs, reporter/recruiter, watcher, phone, answers, biography or economics. Opaque deterministic event ID supports dedupe; it remains personal telemetry, not claimed anonymous data.
+
+Definition faro-mutual-stage-pair-week-v1 counts consenting pairs only. Diagnostics exposes an aggregate count of the retained dataset, not whole-product NSM or conversion rate. Weeks are UTC consistently across DST. This narrow interview-completion producer does not claim all possible completed stages are implemented. Security audit and operational facts remain separate and work without product consent.
+
+Withdrawing analytics removes the Canonical product rows; fresh grant does not recover past completions. Account erasure deletes own analytics rather than leaving orphaned personal properties after SET NULL. Recovery removes stale Canonical telemetry and resets optional grant off, never resurrecting consent/telemetry. Existing legal retention/independent authority disaster recovery gates remain open.
+
+Verification: final npm run check PASS145 Node tests,34 migrations,both actual restore drills,30 browser executions,lint/typecheck; zero skips. git diff --check PASS. Exact remote CI pending. New meaningful regression tests live producer, no consent, later consent, bilateral confirmation, replay, duplicate pair/week, next week, exact properties, export scope, revocation/no backfill and erasure. Real restore fixture holds old product telemetry and proves its removal after newer withdrawal. Existing browser covers real registration/optional settings persistence and public axe/locked login unchanged.
+
+Rollback: disable product producer/diagnostic together; keep consent trigger, revocation/erasure/recovery deletion and mandatory audit. No migration/provider/network deployment. Full CP11/master plan/release PARTIAL.

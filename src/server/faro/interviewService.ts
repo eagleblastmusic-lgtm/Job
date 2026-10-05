@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
+import { AppStore } from '../store.js';
 import { HttpError } from '../http.js';
 import { choice, date, integer, text } from './validation.js';
 
@@ -145,6 +146,7 @@ export class InterviewService extends FaroStore {
       this.db.prepare('UPDATE faro_interviews SET state=?,revision=revision+1 WHERE id=?').run(state,id);
       this.db.prepare('UPDATE faro_interests SET stage=?,stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?').run(stage,due,action,p.id);
       this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,caseId,reason:command==='CANCEL'||command==='DISPUTE'?body.reason:null});
+      if(state==='COMPLETED')new AppStore(this.database).faroMutualStageCompleted(id);
       return this.view(userId,id);
     });
   }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { PrivacyService } from './faro/privacyService.js';
 import type { JobDatabase } from './db.js';
 import type {
@@ -279,6 +279,7 @@ export class AppStore {
   recordConsent(userId: string, type: 'TERMS' | 'PRIVACY' | 'ANALYTICS', granted: boolean, version: string): ConsentRecord {
     const createdAt = now();
     this.db.prepare('INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(), userId, type, granted ? 1 : 0, version, createdAt);
+    if(type==='ANALYTICS'&&!granted)this.db.prepare("DELETE FROM analytics_events WHERE user_id=? AND event_name='FARO_MUTUAL_STAGE_COMPLETED'").run(userId);
     this.audit(userId, 'CONSENT_RECORDED', 'consent', type, { granted, version });
     return { type, granted, version, createdAt };
   }
@@ -293,8 +294,21 @@ export class AppStore {
   }
 
   analytics(userId: string | null, eventName: string, properties: Record<string, unknown> = {}): void {
+    if(eventName.startsWith('FARO_'))throw new Error('Canonical product analytics requires its verified event producer.');
     const sanitized = Object.fromEntries(Object.entries(properties).filter(([key]) => !/cv|resume|raw|text|email|name/i.test(key)));
     this.db.prepare('INSERT INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES(?,?,?,?,?)').run(randomUUID(), userId, eventName, json(sanitized), now());
+  }
+  /** Closed Canonical product event: derive proof and payload from actual mutual completion, never client metadata. */
+  faroMutualStageCompleted(interviewId:string):boolean {
+    const source=this.db.prepare("SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id JOIN faro_events e ON e.process_id=p.id WHERE i.id=? AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND e.kind='INTERVIEW_COMPLETE' AND json_extract(e.data,'$.interviewId')=i.id AND json_extract(e.data,'$.state')='COMPLETED' ORDER BY e.occurred_at DESC,e.rowid DESC LIMIT 1").get(interviewId) as {candidate_id:string;offer_id:string;occurred_at:string}|undefined;
+    if(!source)return false;
+    const consent=this.db.prepare("SELECT granted,created_at FROM consents WHERE user_id=? AND consent_type='ANALYTICS' ORDER BY created_at DESC,rowid DESC LIMIT 1").get(source.candidate_id) as {granted:number;created_at:string}|undefined;
+    if(consent?.granted!==1||consent.created_at>source.occurred_at)return false;
+    const week=new Date(source.occurred_at);if(!Number.isFinite(week.getTime()))return false;
+    week.setUTCDate(week.getUTCDate()-(week.getUTCDay()+6)%7);week.setUTCHours(0,0,0,0);
+    const weekStart=week.toISOString(),definitionVersion='faro-mutual-stage-pair-week-v1';
+    const id=createHash('sha256').update(JSON.stringify([definitionVersion,source.candidate_id,source.offer_id,weekStart])).digest('hex');
+    return Number(this.db.prepare("INSERT OR IGNORE INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES(?,?,'FARO_MUTUAL_STAGE_COMPLETED',?,?)").run(id,source.candidate_id,JSON.stringify({definitionVersion,weekStart,stage:'INTERVIEW_COMPLETED'}),source.occurred_at).changes)===1;
   }
 
   audit(userId: string | null, action: string, entityType: string | null, entityId: string | null, metadata: Record<string, unknown> = {}): void {
@@ -336,6 +350,7 @@ export class AppStore {
       outcomes: scalar('SELECT COUNT(*) count FROM outcomes'),
       aiFailures24h: scalar("SELECT COUNT(*) count FROM ai_requests WHERE success=0 AND created_at>=datetime('now','-1 day')"),
       parserFailures24h: 0,
+      faroProductAnalytics:{definitionVersion:'faro-mutual-stage-pair-week-v1',population:'consenting-candidate-offer-pairs-only',weekBoundary:'MONDAY_UTC',completedPairs:Number(this.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get()!.n)},
       featureFlags: this.db.prepare('SELECT key,enabled,rollout_percent FROM feature_flags ORDER BY key').all(),
       generatedAt: now()
     };

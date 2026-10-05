@@ -55,6 +55,7 @@ export class PrivacyService extends FaroStore {
       this.db.prepare('DELETE FROM faro_invites WHERE organization_id=?').run(org.organization_id);
     }
     this.db.prepare('DELETE FROM faro_invites WHERE email=? OR created_by=?').run(user.email,userId);
+    this.db.prepare('DELETE FROM analytics_events WHERE user_id=?').run(userId);
     const meetings=this.db.prepare("SELECT id,process_id FROM faro_interviews WHERE recruiter_id=? AND state IN ('PROPOSED','CONFIRMED')").all(userId) as Array<{id:string;process_id:string}>;
     for(const meeting of meetings) {
       this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE id=?").run(meeting.id);
