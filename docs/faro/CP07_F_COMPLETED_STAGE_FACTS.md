@@ -1,0 +1,7 @@
+# CP07-F — Mutually completed interview facts (2026-10-06)
+
+Existing owner/admin reliability report now distinguishes next-stage acceptance, assessment invitation, confirmed interview and mutually completed interview. response-cohort-v2 retains the original response-clock denominator, sample size, creation cohort window/asOf, unanswered/censored waits and rejection counts.
+
+The server validates INTERVIEW_COMPLETE against the same process's actual COMPLETED interview with both completion flags and matching completion event payload. Domain logic requires this proof flag and counts distinct processes, excluding duplicate meetings/events, future evidence and foreign processes. UI labels the completed-stage counter separately. This operational, own-organization aggregate uses retained process records independently of optional product telemetry; it is not the consenting pair/week NSM or a reputation score.
+
+Targeted counterexample covers invitation/unilateral/future/foreign/deduped evidence. Existing real interview test now proves actual mutual completion appears in the internal report even with no analytics grant. Required full current-input npm run check PASS147 Node/34 migrations/both actual restores/30 browsers/lint/typecheck, zero skips; diff check PASS. Exact remote CI pending. No migration, moderation threshold, automatic restriction, matching/ranking or login change. Full CP07/master plan PARTIAL; broader repeated-pattern policy and research remain open.

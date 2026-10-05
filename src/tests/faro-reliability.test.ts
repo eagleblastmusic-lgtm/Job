@@ -6,6 +6,12 @@ import { ProfileService } from '../server/faro/profileService.js';
 import { OfferService } from '../server/faro/offerService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
 const from='2026-09-01T00:00:00.000Z',to='2026-09-10T00:00:00.000Z';
+test('operational progression counts distinct mutually completed processes only, excluding invitations, unilateral completion and future or foreign evidence',()=>{
+  const rows=['a','b'].map(id=>({id,createdAt:from,responseDueAt:to,firstResponseAt:null,status:'ACTIVE' as const,withdrawnAt:null}));
+  const event=(processId:string,kind:string,mutuallyCompleted=false,createdAt=from)=>({processId,kind,mutuallyCompleted,createdAt});
+  const r=reliabilitySnapshot(rows,[event('a','INTERVIEW_CONFIRM'),event('a','INTERVIEW_COMPLETE'),event('b','INTERVIEW_COMPLETE',true),event('b','INTERVIEW_COMPLETE',true),event('a','INTERVIEW_COMPLETE',true,'2026-09-11T00:00:00Z'),event('foreign','INTERVIEW_COMPLETE',true),event('a','REJECT')],from,to,to);
+  assert.equal(r.progression.processesWithMutuallyCompletedInterview,1);assert.equal(r.progression.processesWithConfirmedInterview,1);assert.equal(r.progression.processesRejected,1);assert.equal(r.sampleSize,2);assert.equal(r.calculationVersion,'response-cohort-v2');
+});
 test('response reliability keeps original deadline denominator, early withdrawals and censored waits separate from median and progression',()=>{
   const row=(id:string,changes:Partial<ReliabilityInterest>={}):ReliabilityInterest=>({id,createdAt:from,responseDueAt:'2026-09-01T06:00:00Z',firstResponseAt:null,status:'INTERESTED',withdrawnAt:null,...changes});
   const rows=[row('a',{firstResponseAt:'2026-09-01T02:00:00Z',status:'ACTIVE'}),row('b',{firstResponseAt:'2026-09-01T05:00:00Z',status:'REJECTED'}),row('c',{firstResponseAt:from,status:'REJECTED'}),row('d',{firstResponseAt:'2026-09-01T08:00:00Z',status:'REJECTED'}),row('e',{responseDueAt:'2026-09-09T20:00:00Z'}),row('f',{status:'WITHDRAWN',withdrawnAt:'2026-09-09T23:00:00Z'}),row('g',{status:'WITHDRAWN',firstResponseAt:'2026-09-01T02:00:00Z',withdrawnAt:'2026-09-01T03:00:00Z'}),row('h',{responseDueAt:'2026-09-09T14:00:00Z'}),row('i',{responseDueAt:'2026-09-11T00:00:00Z'})];
@@ -16,7 +22,7 @@ test('response reliability keeps original deadline denominator, early withdrawal
   assert.equal(result.firstResponse.answered,4);assert.equal(result.firstResponse.late,1);assert.equal(result.firstResponse.unanswered,3);assert.equal(result.firstResponse.rightCensored,3);
   assert.equal(result.firstResponse.medianAnsweredHours,3.5);assert.equal(result.firstResponse.medianSampleSize,4);assert.equal(result.firstResponse.minAnsweredHours,0);assert.equal(result.firstResponse.maxAnsweredHours,8);
   assert.deepEqual(result.currentWaiting,{count:3,overdue:2,maxOverdueHours:10});
-  assert.deepEqual(result.progression,{processesWithNextStage:1,processesWithAssessmentInvitation:0,processesWithConfirmedInterview:0,processesRejected:3});
+  assert.deepEqual(result.progression,{processesWithNextStage:1,processesWithAssessmentInvitation:0,processesWithConfirmedInterview:0,processesWithMutuallyCompletedInterview:0,processesRejected:3});
   assert.equal(result.window.deadline,'ORIGINAL_RESPONSE_DUE_AT');assert.equal('score' in result,false);assert.equal('restriction' in result,false);
   assert.throws(()=>reliabilitySnapshot([row('invalid',{firstResponseAt:'2026-08-31T00:00:00Z'})],[],from,to,to),/chronology/);
   const empty=reliabilitySnapshot([],[],from,to,to);assert.equal(empty.firstResponse.onTimeRate,null);assert.equal(empty.firstResponse.medianAnsweredHours,null);assert.equal(empty.interpretation,'NO_MATURED_DATA');
