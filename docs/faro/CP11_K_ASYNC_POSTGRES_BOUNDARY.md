@@ -1,0 +1,11 @@
+# CP11-K — Async PostgreSQL transaction boundary (2026-10-06)
+
+PgJobDatabase is consumed immediately by the existing real staging import/exercise instead of direct pg.Client transaction commands. No second runtime server, synchronized shadow database, implicit SQLite fallback or release activation. Native parameterized PostgreSQL query/results remain explicit; production repositories still require async conversion and SQL/UTC/JSON semantics work.
+
+One connection serializes independent scopes while AsyncLocalStorage binds every awaited command of a transaction to its owner. Transactions use SERIALIZABLE, bounded lock/statement/idle timeouts, explicit commit and rollback. Nested transactions are rejected (no implicit savepoints), a caught PostgreSQL statement failure cannot turn aborted transaction into reported success, and detached callbacks retaining a finished scope cannot write after commit/rollback. Shutdown drains accepted work, rejects new scopes and cannot close from an active scope. Query failures retain only safe SQLSTATE, without raw database detail/records/connection URL. Serialization failures40001 are returned, never silently retried around potentially external effects.
+
+Real PostgreSQL exercise requires: unchanged70-table staging proof; same-connection concurrent scopes ordered atomically; callback rollback; caught CHECK failure rolls back earlier write; nested scope refusal; detached late write denied; two independent connections with overlapping snapshots yield exactly one committed increment and one40001 without lost update. This tests real transaction semantics, not a mocked pool or check-that-method-was-called test.
+
+Local source-only70 tables/35 migrations, syntax/typecheck/lint PASS. Actual PostgreSQL18 Node22/24 and full new-head CI acceptance pending. Application remains SQLite; production repository rollout/current-authority target recovery/cutover and external acceptance still open. Bounded adapter prerequisite is not full CP11/master-plan/release DONE.
+
+Driver primary references: [same-client transactions](https://node-postgres.com/features/transactions), [parameterized queries](https://node-postgres.com/features/queries). Runtime and typings pinned8.23.1 in lockfile.
