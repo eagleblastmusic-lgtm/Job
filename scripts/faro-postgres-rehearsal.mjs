@@ -1,0 +1,79 @@
+import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
+import { mkdtemp,rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import pg from 'pg';
+import { JobDatabase } from '../dist/server/db.js';
+
+const sourceOrder='__faro_source_rowid';
+export function identifier(value){if(!/^[a-z_][a-z0-9_]*$/.test(value))throw new Error('Unsupported database identifier.');return `"${value}"`;}
+const normalize=sql=>sql.replaceAll('\r\n','\n').trim();
+function fingerprint(schema){return createHash('sha256').update(JSON.stringify(schema.map(row=>[row.type,row.name,row.tbl_name,normalize(row.sql)]))).digest('hex');}
+const schemaQuery="SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type,name";
+export function digest(rows,columns){return createHash('sha256').update(JSON.stringify(rows.map(row=>[row[sourceOrder],...columns.map(c=>row[c.name])]))).digest('hex');}
+/** Only the current migration schema is accepted; this is a staging extractor, not a general SQL translator. */
+export async function extract(source){
+  const root=await mkdtemp(join(tmpdir(),'faro-pg-schema-'));let baseline,db;
+  try {
+    baseline=new JobDatabase(join(root,'expected.sqlite'));const expected=baseline.db.prepare(schemaQuery).all();
+    db=new DatabaseSync(source,{readOnly:true});db.exec('PRAGMA foreign_keys=ON; BEGIN;');
+    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok'||db.prepare('PRAGMA foreign_key_check').all().length)throw new Error('Source integrity failed.');
+    const schema=db.prepare(schemaQuery).all();if(fingerprint(schema)!==fingerprint(expected))throw new Error('Source schema does not match current migrations.');
+    const versions=db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
+    if(versions.length!==35||versions.at(-1).version!=='0035_faro_mfa')throw new Error('Rehearsal supports the reviewed 0035 schema only.');
+    if(JSON.stringify(versions)!==JSON.stringify(baseline.db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()))throw new Error('Source migration ledger mismatch.');
+    const triggers=schema.filter(row=>row.type==='trigger');if(triggers.length!==1||triggers[0].name!=='trg_analytics_requires_consent')throw new Error('Unsupported trigger scope.');
+    const tables=schema.filter(row=>row.type==='table').map(table=>{
+      const columns=db.prepare(`PRAGMA table_info(${identifier(table.name)})`).all();
+      if(columns.some(c=>!['TEXT','INTEGER','REAL'].includes(c.type)||c.name===sourceOrder))throw new Error('Unsupported column shape.');
+      const rows=db.prepare(`SELECT rowid AS ${identifier(sourceOrder)},* FROM ${identifier(table.name)} ORDER BY rowid`).all();
+      for(const row of rows)if(!Number.isSafeInteger(row[sourceOrder]))throw new Error('Unsupported source row order.');
+      for(const row of rows)for(const c of columns)if(typeof row[c.name]==='number'&&(!Number.isFinite(row[c.name])||(c.type==='INTEGER'&&!Number.isSafeInteger(row[c.name]))))throw new Error('Unsupported source number.');
+      return {name:table.name,sql:table.sql,columns,rows,hash:digest(rows,columns),foreignKeys:db.prepare(`PRAGMA foreign_key_list(${identifier(table.name)})`).all()};
+    });
+    return {schemaHash:fingerprint(schema),versions,tables,indexes:schema.filter(row=>row.type==='index')};
+  } finally {if(db){try{db.exec('ROLLBACK');}finally{db.close();}}baseline?.close();await rm(root,{recursive:true,force:true});}
+}
+/** Split table definitions while respecting quoted literals/identifiers and nested CHECK/DEFAULT expressions. */
+export function parts(body){let depth=0,quote='',start=0;const result=[];for(let i=0;i<body.length;i++){const c=body[i];if(quote){if(c===quote){if(body[i+1]===quote)i++;else quote='';}continue;}if(c==="'"||c==='"'){quote=c;continue;}if(c==='(')depth++;if(c===')')depth--;if(c===','&&depth===0){result.push(body.slice(start,i).trim());start=i+1;}if(depth<0)throw new Error('Invalid source definition.');}if(depth||quote)throw new Error('Invalid source definition.');result.push(body.slice(start).trim());return result;}
+export function targetTable(table){
+  const sql=normalize(table.sql),first=sql.indexOf('('),last=sql.lastIndexOf(')');if(first<0||last<first||sql.slice(last+1).trim())throw new Error('Unsupported table suffix.');
+  const definitions=parts(sql.slice(first+1,last)).filter(part=>!/^FOREIGN KEY\s*\(/i.test(part)).map(part=>part
+    .replace(/\s+REFERENCES\s+(?:"[a-z_][a-z0-9_]*"|[a-z_][a-z0-9_]*)\s*\([^)]+\)(?:\s+ON\s+(?:DELETE|UPDATE)\s+(?:CASCADE|SET NULL|RESTRICT|NO ACTION))*/gi,'')
+    .replace(/\bINTEGER\b/g,'BIGINT').replace(/\bREAL\b/g,'DOUBLE PRECISION')
+    .replace(/datetime\('now'\)/g,"to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')"));
+  return `CREATE TABLE ${identifier(table.name)} (${identifier(sourceOrder)} BIGINT GENERATED BY DEFAULT AS IDENTITY UNIQUE,${definitions.join(',')})`;
+}
+function safeNumber(value){const n=Number(value);if(!Number.isSafeInteger(n))throw new Error('PostgreSQL integer outside source range.');return n;}
+export async function compare(client,snapshot,schema){
+  const proof=[];for(const table of snapshot.tables){const result=await client.query(`SELECT * FROM ${identifier(schema)}.${identifier(table.name)} ORDER BY ${identifier(sourceOrder)}`);
+    const rows=result.rows.map(row=>{row[sourceOrder]=safeNumber(row[sourceOrder]);for(const c of table.columns)if(c.type==='INTEGER'&&row[c.name]!==null)row[c.name]=safeNumber(row[c.name]);return row;});
+    if(rows.length!==table.rows.length||digest(rows,table.columns)!==table.hash)throw new Error('PostgreSQL row/hash comparison failed.');proof.push({table:table.name,count:rows.length,hash:table.hash});
+  }return proof;
+}
+/** Caller supplies one connected client. New staging schema only; any error rolls back all DDL/data. */
+export async function importSnapshot(client,snapshot,schema){
+  if(!/^faro_rehearsal_[a-z0-9_]{1,40}$/.test(schema))throw new Error('Isolated rehearsal schema required.');
+  let begun=false;
+  try {
+    await client.query('BEGIN');begun=true;await client.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'; SET LOCAL timezone='UTC'");
+    await client.query(`CREATE SCHEMA ${identifier(schema)}`);await client.query(`SET LOCAL search_path TO ${identifier(schema)}`);
+    for(const table of snapshot.tables)await client.query(targetTable(table));
+    for(const table of snapshot.tables){const groups=new Map();for(const fk of table.foreignKeys){const group=groups.get(fk.id)??[];group.push(fk);groups.set(fk.id,group);}for(const group of groups.values()){
+      group.sort((a,b)=>a.seq-b.seq);const fk=group[0];if(!['CASCADE','SET NULL','RESTRICT','NO ACTION'].includes(fk.on_delete)||!['CASCADE','SET NULL','RESTRICT','NO ACTION'].includes(fk.on_update))throw new Error('Unsupported FK action.');
+      await client.query(`ALTER TABLE ${identifier(table.name)} ADD FOREIGN KEY (${group.map(f=>identifier(f.from)).join(',')}) REFERENCES ${identifier(fk.table)} (${group.map(f=>identifier(f.to)).join(',')}) ON DELETE ${fk.on_delete} ON UPDATE ${fk.on_update} DEFERRABLE INITIALLY DEFERRED`);
+    }}
+    for(const index of snapshot.indexes)await client.query(normalize(index.sql));
+    for(const table of snapshot.tables){const columns=[sourceOrder,...table.columns.map(c=>c.name)];for(const row of table.rows)await client.query(`INSERT INTO ${identifier(table.name)} (${columns.map(identifier).join(',')}) VALUES (${columns.map((_,i)=>`$${i+1}`).join(',')})`,columns.map(c=>row[c]));
+      const max=table.rows.at(-1)?.[sourceOrder]??0;await client.query('SELECT setval(pg_get_serial_sequence($1,$2),$3,$4)',[`${identifier(schema)}.${identifier(table.name)}`,sourceOrder,Math.max(1,max),max>0]);
+    }
+    await client.query('SET CONSTRAINTS ALL IMMEDIATE');
+    // Preserve historical rows first, then enforce the existing insert-time analytics-consent rule.
+    await client.query(`CREATE FUNCTION analytics_requires_consent() RETURNS trigger LANGUAGE plpgsql SET search_path TO ${identifier(schema)} AS $$ BEGIN
+      IF COALESCE((SELECT granted FROM consents WHERE user_id=NEW.user_id AND consent_type='ANALYTICS' ORDER BY created_at DESC,${identifier(sourceOrder)} DESC LIMIT 1),0)<>1 THEN RETURN NULL; END IF; RETURN NEW; END $$`);
+    await client.query('CREATE TRIGGER trg_analytics_requires_consent BEFORE INSERT ON analytics_events FOR EACH ROW EXECUTE FUNCTION analytics_requires_consent()');
+    await client.query('SET CONSTRAINTS ALL IMMEDIATE');const proof=await compare(client,snapshot,schema);await client.query('COMMIT');return proof;
+  } catch(error){if(begun)await client.query('ROLLBACK');const code=typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION';throw Object.assign(new Error(`PostgreSQL rehearsal failed (${code}); destination transaction rolled back.`),{code});}
+}
+export function clientFromEnvironment(){if(!process.env.FARO_PG_REHEARSAL_URL)throw new Error('FARO_PG_REHEARSAL_URL required for real PostgreSQL acceptance.');return new pg.Client({connectionString:process.env.FARO_PG_REHEARSAL_URL,connectionTimeoutMillis:5000});}
