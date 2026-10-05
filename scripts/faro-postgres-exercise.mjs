@@ -45,8 +45,27 @@ try {
     await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3)",['pg-latest',candidate.id,tie]);
     const allowed=await client.query("INSERT INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES($1,$2,'PG_REHEARSAL','{}',$3)",['pg-allowed',candidate.id,tie]);assert.equal(allowed.rowCount,1);
     await client.query('DELETE FROM users WHERE id=$1',[candidate.id]);assert.equal((await client.query('SELECT 1 FROM faro_mfa WHERE user_id=$1',[candidate.id])).rowCount,0);assert.equal((await client.query('SELECT 1 FROM faro_interests WHERE candidate_id=$1',[candidate.id])).rowCount,0);
+    await client.query('CREATE TABLE pg_adapter_evidence(id TEXT PRIMARY KEY,value BIGINT NOT NULL CHECK(value>=0))');
+    const order=[];
+    await Promise.all([
+      client.transaction(async()=>{order.push('first-start');await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['serial-first',1]);await client.query('SELECT pg_sleep(0.05)');order.push('first-end');}),
+      client.transaction(async()=>{order.push('second-start');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['serial-first'])).rows[0].value,'1');await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['serial-second',2]);order.push('second-end');})
+    ]);assert.deepEqual(order,['first-start','first-end','second-start','second-end']);
+    await assert.rejects(()=>client.transaction(async()=>{await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['rollback',1]);throw new Error('Synthetic rollback');}),/Synthetic rollback/);
+    await assert.rejects(()=>client.transaction(async()=>{await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['caught-partial',1]);try{await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['invalid',-1]);}catch(error){assert.equal(error.code,'23514');}return 'must-not-commit';}),error=>error.code==='23514');
+    await assert.rejects(()=>client.transaction(()=>client.transaction(async()=>undefined)),error=>error.code==='PG_NESTED_TRANSACTION');
+    let release,detached;const gate=new Promise(resolve=>release=resolve);
+    await client.transaction(async()=>{detached=(async()=>{await gate;try{await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['late',1]);return 'unexpected-write';}catch(error){return error.code;}})();await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['owned',1]);});
+    release();assert.equal(await detached,'PG_SCOPE_CLOSED');
+    assert.equal((await client.query("SELECT 1 FROM pg_adapter_evidence WHERE id IN ('rollback','caught-partial','invalid','late')")).rowCount,0);
+    await client.query('INSERT INTO pg_adapter_evidence VALUES($1,$2)',['cross-connection',0]);
+    const second=clientFromEnvironment();await second.connect();try{
+      await second.query(`SET search_path TO ${identifier(schema)}`);let arrivals=0,releaseBoth;const both=new Promise(resolve=>releaseBoth=resolve);
+      const increment=db=>db.transaction(async()=>{await db.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection']);if(++arrivals===2)releaseBoth();await both;await db.query('UPDATE pg_adapter_evidence SET value=value+1 WHERE id=$1',['cross-connection']);});
+      const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
+    }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
