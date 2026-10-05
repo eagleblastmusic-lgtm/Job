@@ -10,7 +10,7 @@ test('operational progression counts distinct mutually completed processes only,
   const rows=['a','b'].map(id=>({id,createdAt:from,responseDueAt:to,firstResponseAt:null,status:'ACTIVE' as const,withdrawnAt:null}));
   const event=(processId:string,kind:string,mutuallyCompleted=false,createdAt=from)=>({processId,kind,mutuallyCompleted,createdAt});
   const r=reliabilitySnapshot(rows,[event('a','INTERVIEW_CONFIRM'),event('a','INTERVIEW_COMPLETE'),event('b','INTERVIEW_COMPLETE',true),event('b','INTERVIEW_COMPLETE',true),event('a','INTERVIEW_COMPLETE',true,'2026-09-11T00:00:00Z'),event('foreign','INTERVIEW_COMPLETE',true),event('a','REJECT')],from,to,to);
-  assert.equal(r.progression.processesWithMutuallyCompletedInterview,1);assert.equal(r.progression.processesWithConfirmedInterview,1);assert.equal(r.progression.processesRejected,1);assert.equal(r.sampleSize,2);assert.equal(r.calculationVersion,'response-cohort-v2');
+  assert.equal(r.progression.processesWithMutuallyCompletedInterview,1);assert.equal(r.progression.processesWithConfirmedInterview,1);assert.equal(r.progression.processesRejected,1);assert.equal(r.sampleSize,2);assert.equal(r.calculationVersion,'response-cohort-v3');
 });
 test('response reliability keeps original deadline denominator, early withdrawals and censored waits separate from median and progression',()=>{
   const row=(id:string,changes:Partial<ReliabilityInterest>={}):ReliabilityInterest=>({id,createdAt:from,responseDueAt:'2026-09-01T06:00:00Z',firstResponseAt:null,status:'INTERESTED',withdrawnAt:null,...changes});
@@ -23,6 +23,7 @@ test('response reliability keeps original deadline denominator, early withdrawal
   assert.equal(result.firstResponse.medianAnsweredHours,3.5);assert.equal(result.firstResponse.medianSampleSize,4);assert.equal(result.firstResponse.minAnsweredHours,0);assert.equal(result.firstResponse.maxAnsweredHours,8);
   assert.deepEqual(result.currentWaiting,{count:3,overdue:2,maxOverdueHours:10});
   assert.deepEqual(result.progression,{processesWithNextStage:1,processesWithAssessmentInvitation:0,processesWithConfirmedInterview:0,processesWithMutuallyCompletedInterview:0,processesRejected:3});
+  assert.deepEqual(result.progressionGaps,{processesWithoutRecordedAdvance:8,processesWithoutRecordedConfirmedInterview:9,denominator:9,rule:'ALL_RETAINED_COHORT_INCLUDING_WITHDRAWN_AND_REJECTED'});
   assert.equal(result.window.deadline,'ORIGINAL_RESPONSE_DUE_AT');assert.equal('score' in result,false);assert.equal('restriction' in result,false);
   assert.throws(()=>reliabilitySnapshot([row('invalid',{firstResponseAt:'2026-08-31T00:00:00Z'})],[],from,to,to),/chronology/);
   const empty=reliabilitySnapshot([],[],from,to,to);assert.equal(empty.firstResponse.onTimeRate,null);assert.equal(empty.firstResponse.medianAnsweredHours,null);assert.equal(empty.interpretation,'NO_MATURED_DATA');
@@ -45,6 +46,7 @@ test('reliability API is organization-owner scoped, aggregate only, and read doe
     const before=JSON.stringify(f.app.db.db.prepare('SELECT * FROM faro_offers WHERE id=?').get(offer.id));
     const result=await f.request<ReturnType<typeof reliabilitySnapshot>>(url(org.id),owner.cookie);
     assert.equal(result.sampleSize,1);assert.equal(result.firstResponse.denominator,1);assert.equal(result.firstResponse.unanswered,1);assert.equal(result.firstResponse.medianAnsweredHours,null);
+    assert.equal(result.progressionGaps.processesWithoutRecordedAdvance,1);assert.equal(result.progressionGaps.processesWithoutRecordedConfirmedInterview,1);assert.equal(result.progressionGaps.denominator,1);
     for(const secret of [candidate.id,interest.id,candidate.email,'48500100200','Anna'])assert.ok(!JSON.stringify(result).includes(secret));
     const unrelated=await f.request<ReturnType<typeof reliabilitySnapshot>>(url(foreign.id),other.cookie);assert.equal(unrelated.sampleSize,0);
     await f.request(`/api/faro/organizations/${org.id}/reliability?from=${to}&to=${from}`,owner.cookie,'GET',undefined,400);

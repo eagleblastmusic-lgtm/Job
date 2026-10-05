@@ -24,7 +24,7 @@ export function reliabilitySnapshot(interests:ReliabilityInterest[],events:Relia
   const ids=new Set(cohort.map(p=>p.id)),relevant=events.filter(e=>ids.has(e.processId)&&Date.parse(e.createdAt)<=end);
   const count=(kinds:string[])=>new Set(relevant.filter(e=>kinds.includes(e.kind)).map(e=>e.processId)).size;
   return {
-    calculationVersion:'response-cohort-v2',window:{from,to,asOf,cohortBy:'INTEREST_CREATED_AT',deadline:'ORIGINAL_RESPONSE_DUE_AT',timezone:'UTC'},
+    calculationVersion:'response-cohort-v3',window:{from,to,asOf,cohortBy:'INTEREST_CREATED_AT',deadline:'ORIGINAL_RESPONSE_DUE_AT',timezone:'UTC'},
     coverage:'RETAINED_PROCESS_RECORDS_ONLY',sampleSize:cohort.length,maturedCohort:matured.length,
     exclusions:{withdrawnBeforeOriginalDeadline:early.length,rule:'SEPARATE_NOT_SUCCESS'},
     firstResponse:{numerator:onTime.length,denominator:eligible.length,onTimeRate:eligible.length?onTime.length/eligible.length:null,answered:answered.length,late:answered.length-onTime.length,
@@ -32,6 +32,7 @@ export function reliabilitySnapshot(interests:ReliabilityInterest[],events:Relia
       minAnsweredHours:durations[0]??null,maxAnsweredHours:durations.at(-1)??null},
     currentWaiting:{count:waits.length,overdue:overdue.length,maxOverdueHours:overdue.length?Math.max(...overdue.map(p=>(end-Date.parse(p.responseDueAt))/3600000)):null},
     progression:{processesWithNextStage:count(['ADVANCE']),processesWithAssessmentInvitation:count(['ASSESSMENT_ASSIGNED']),processesWithConfirmedInterview:count(['INTERVIEW_CONFIRM']),processesWithMutuallyCompletedInterview:new Set(relevant.filter(e=>e.kind==='INTERVIEW_COMPLETE'&&e.mutuallyCompleted===true).map(e=>e.processId)).size,processesRejected:count(['REJECT'])},
+    progressionGaps:{processesWithoutRecordedAdvance:cohort.length-count(['ADVANCE']),processesWithoutRecordedConfirmedInterview:cohort.length-count(['INTERVIEW_CONFIRM']),denominator:cohort.length,rule:'ALL_RETAINED_COHORT_INCLUDING_WITHDRAWN_AND_REJECTED'},
     interpretation:eligible.length?'DESCRIPTIVE_ONLY':'NO_MATURED_DATA'
   };
 }
