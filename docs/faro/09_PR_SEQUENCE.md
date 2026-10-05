@@ -164,3 +164,6 @@ Continuation slices (all draft/unmerged):
 | CP07-E independent restriction restoration | [#49](https://github.com/eagleblastmusic-lgtm/Job/pull/49) | codex/faro-cp07e-restoration | codex/faro-cp10h-retry |6be3d1e|
 | CP05-C private commute/unknown listing | [#50](https://github.com/eagleblastmusic-lgtm/Job/pull/50) | codex/faro-cp05c-commute | codex/faro-cp07e-restoration |76dde71|
 These bounded slices have exact successful CI evidence in the checkpoint register. Earlier integration dependencies still require review before main; no merge/deploy/release occurred.
+| CP10-I individual human amendments | [#51](https://github.com/eagleblastmusic-lgtm/Job/pull/51) | codex/faro-cp10i-amendment | codex/faro-cp05c-commute |c250d35|
+| CP10-J previewed cohort key correction | [#52](https://github.com/eagleblastmusic-lgtm/Job/pull/52) | codex/faro-cp10j-cohort | codex/faro-cp10i-amendment |dbfe763|
+Both exact workflow pairs SUCCESS; evidence in checkpoint register. All draft/unmerged; release gates remain open.

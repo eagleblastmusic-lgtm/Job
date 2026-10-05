@@ -9,14 +9,14 @@ import { HttpError } from '../server/http.js';
 import { TrustService } from '../server/faro/trustService.js';
 import { PrivacyService } from '../server/faro/privacyService.js';
 
-async function setup() {
+async function setup(interviewCount=1) {
   const f=await faroFixture(),employer=await f.user('MeetingEmployer'),candidate=await f.user('MeetingCandidate'),other=await f.user('MeetingOther');
   let now=new Date('2026-10-24T08:00:00Z');const clock=()=>now;
   const profiles=new ProfileService(f.app.db,clock),offers=new OfferService(f.app.db,clock),recruitment=new RecruitmentService(f.app.db,clock),interviews=new InterviewService(f.app.db,clock);
   profiles.save(candidate.id,{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
   profiles.save(other.id,{firstName:'Jan',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
   const org=profiles.organization(employer.id,{name:'Rozmowy'});f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
-  const offer=offers.create(employer.id,org.id,{...offerInput(employer.id),closesAt:'2030-01-01T00:00:00Z'});
+  const offer=offers.create(employer.id,org.id,{...offerInput(employer.id),interviewCount,closesAt:'2030-01-01T00:00:00Z'});
   offers.lifecycle(employer.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
   const process=(userId:string,key:string)=>{
     const p=recruitment.interest(userId,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(userId).confirmationToken,idempotencyKey:key});
@@ -27,6 +27,39 @@ async function setup() {
   return {...f,employer,candidate,other,profiles,recruitment,interviews,org,first,second,proposal,clock,setNow:(value:string)=>{now=new Date(value);}};
 }
 const code=(expected:string)=>(error:unknown)=>error instanceof HttpError&&error.code===expected;
+
+test('Canonical optional progression derives mutual completion, dedupes pair/week, excludes invitations and revocation backfill, and erases telemetry',async()=>{
+  const f=await setup(5);try {
+    const events=()=>f.app.db.db.prepare("SELECT * FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").all();
+    const consent=(granted:boolean)=>{f.app.store.recordConsent(f.candidate.id,'ANALYTICS',granted,'synthetic-product-test');f.app.db.db.prepare("UPDATE consents SET created_at=? WHERE id=(SELECT id FROM consents WHERE user_id=? AND consent_type='ANALYTICS' ORDER BY rowid DESC LIMIT 1)").run(f.clock().toISOString(),f.candidate.id);};
+    const complete=(key:string,startsAt:string,endsAt:string,confirmBy:string,completedAt:string)=>{
+      const p=f.recruitment.row(f.first),meeting=f.interviews.propose(f.employer.id,f.first,{...f.proposal,startsAt,endsAt,confirmBy,expectedVersion:p.revision,idempotencyKey:`${key}-propose`});
+      assert.equal(events().length,key==='fourth'?1:key==='third'?1:0);
+      f.interviews.change(f.candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:f.recruitment.row(f.first).revision,idempotencyKey:`${key}-confirm`});
+      f.setNow(completedAt);f.interviews.change(f.candidate.id,meeting.id,{command:'COMPLETE',confirmed:true,expectedVersion:2,processVersion:f.recruitment.row(f.first).revision,idempotencyKey:`${key}-candidate`});
+      assert.equal(f.app.store.faroMutualStageCompleted(meeting.id),false);
+      const body={command:'COMPLETE',confirmed:true,expectedVersion:3,processVersion:f.recruitment.row(f.first).revision,idempotencyKey:`${key}-employer`};
+      f.interviews.change(f.employer.id,meeting.id,body);f.interviews.change(f.employer.id,meeting.id,body);
+      return meeting;
+    };
+    assert.equal(f.app.store.faroMutualStageCompleted('not-an-interview'),false);
+    assert.throws(()=>f.app.store.analytics(f.candidate.id,'FARO_MUTUAL_STAGE_COMPLETED',{phone:'private',answers:'private'}),/verified event producer/);
+    const first=complete('first','2026-10-25T00:30:00Z','2026-10-25T01:30:00Z','2026-10-24T19:00:00Z','2026-10-25T02:00:00Z');assert.equal(events().length,0);
+    f.setNow('2026-10-25T03:00:00Z');consent(true);assert.equal(f.app.store.faroMutualStageCompleted(first.id),false);
+    const second=complete('second','2026-10-25T04:00:00Z','2026-10-25T05:00:00Z','2026-10-25T03:30:00Z','2026-10-25T06:00:00Z');assert.equal(events().length,1);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
+    complete('third','2026-10-25T07:00:00Z','2026-10-25T08:00:00Z','2026-10-25T06:30:00Z','2026-10-25T09:00:00Z');assert.equal(events().length,1);
+    complete('fourth','2026-10-26T10:00:00Z','2026-10-26T11:00:00Z','2026-10-26T09:00:00Z','2026-10-26T12:00:00Z');assert.equal(events().length,2);
+    const properties=events().map(e=>JSON.parse(String(e.properties)) as Record<string,string>);assert.deepEqual(properties.map(p=>p.weekStart).sort(),['2026-10-19T00:00:00.000Z','2026-10-26T00:00:00.000Z']);
+    properties.forEach(p=>assert.deepEqual(Object.keys(p).sort(),['definitionVersion','stage','weekStart']));assert.doesNotMatch(JSON.stringify(properties),new RegExp(`${f.candidate.id}|${f.employer.id}|${f.first}|MeetingCandidate|phone|answers|salary|watch`));
+    const own=await f.request<{analytics_events:unknown[]}>('/api/export',f.candidate.cookie);assert.equal(own.analytics_events.length,2);
+    const other=await f.request<{analytics_events:unknown[]}>('/api/export',f.other.cookie);assert.equal(other.analytics_events.length,0);
+    f.setNow('2026-10-26T13:00:00Z');consent(false);assert.equal(events().length,0);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
+    f.setNow('2026-10-26T14:00:00Z');consent(true);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
+    complete('fifth','2026-10-27T10:00:00Z','2026-10-27T11:00:00Z','2026-10-27T09:00:00Z','2026-10-27T12:00:00Z');assert.equal(events().length,1);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='INTERVIEW_COMPLETE'").get()!.n,10); // Operational facts are separate and not lost without product consent.
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});assert.equal(events().length,0);assert.equal(f.app.db.db.prepare('PRAGMA foreign_key_check').all().length,0);
+  }finally{await f.close();}
+});
 
 test('appointment case gives both parties private explanations, guards grace and stale revisions, supports candidate appeal and cannot punish wrong subject',async()=>{
   const f=await setup();try {

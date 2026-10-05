@@ -72,6 +72,8 @@ try {
   r.enqueue(kept.id,'process',surviving.id,'Syntetyczna aktualizacja odtworzenia.','restore-lease-proof');
   const leasedId=f.app.db.db.prepare("SELECT id FROM faro_outbox WHERE dedupe_key='restore-lease-proof'").get().id;
   const oldClaim=r.claimOutbox(100,300000).find(claim=>claim.id===leasedId);assert.ok(oldClaim);
+  f.app.db.db.prepare("INSERT INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES('stale-canonical-telemetry',?,'FARO_MUTUAL_STAGE_COMPLETED','{}',?)").run(kept.id,new Date().toISOString());
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,1);
   const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
   await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
   // Current source advances after the old snapshot: owner transfer and two erasures.
@@ -122,6 +124,7 @@ try {
     assert.equal(verifyPassword('Bezpieczne123',passwordHash),false);assert.equal(verifyPassword('OdnowioneBezpieczne123',passwordHash),true);
     assert.equal(new OfferService(restored).version(offer.id,1).salary[0].min,550000);
     const restoredAssessment=new AssessmentService(restored),restoredHistory=restoredAssessment.resultHistory(retainedAttempt.id);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,0);
     assert.equal(restoredHistory.length,3);assert.equal(restoredHistory[0].result.earned,2);assert.equal(restoredHistory[1].result.earned,1);assert.equal(restoredHistory[2].result.earned,2);assert.equal(restoredAssessment.overview(kept.id,retainedAttempt.id).result.scoringRevision,keyCorrection.correctionId);
     assert.equal(db.prepare('SELECT actor_id FROM faro_key_corrections WHERE id=?').get(keyCorrection.correctionId).actor_id,null);
     const hash=createHash('sha256').update(gone.id).digest('hex');

@@ -73,6 +73,8 @@ export class RecoveryService extends FaroStore {
       // An old worker reservation is not authority to deliver into a restored database.
       this.db.prepare('UPDATE faro_outbox SET claim_token=NULL,lease_until=NULL WHERE claim_token IS NOT NULL').run();
       this.db.prepare('DELETE FROM faro_invites').run();
+      // Optional Canonical telemetry cannot be resurrected from a stale-consent snapshot.
+      this.db.prepare("DELETE FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").run();
       const revokedPhoneGrants=Number(this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE revoked_at IS NULL').run(this.now()).changes);
       for(const user of users) {
         if(erasedIds.has(user.id))continue;
