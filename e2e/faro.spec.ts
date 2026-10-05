@@ -88,6 +88,16 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.getByRole('button',{name:'Dodaj do porównania'}).click();
     await page.getByRole('link',{name:'Porównanie',exact:true}).click();
     await expect(page.getByRole('table')).toBeVisible();
+    const comparisonRow=(name:string)=>page.getByRole('row').filter({has:page.getByRole('rowheader',{name,exact:true})});
+    await expect(comparisonRow('Godziny pracy')).toContainText('8:00–16:00');
+    await expect(comparisonRow('Praca nocna')).toContainText('Nie');
+    await expect(comparisonRow('Lokalizacja')).toContainText('Cała Polska');
+    await expect(comparisonRow('Źródło prywatnego szacunku')).toContainText('Własny szacunek');
+    await expect(comparisonRow('Wariant prywatnego scenariusza')).toContainText('aktualne warunki');
+    await expect(comparisonRow('Wsparcie nauki')).toContainText('Opiekun');
+    expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+    await page.setViewportSize({width:320,height:720});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.goto(`${f.base}/#offers/${draft.id}`);
     await expect(page.getByRole('heading',{name:'Droga do tej pracy'})).toBeVisible();
     const accessibility = await new AxeBuilder({page}).include('#appView').analyze();
@@ -400,5 +410,19 @@ test('Faro preserves additional salary variants during edit and compares the sel
     await page.getByRole('link',{name:'Porównanie',exact:true}).click();
     await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Brutto / faktura',exact:true})})).toContainText(/75,00.*90,00.*fakturze.*godzinę/);
     await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Dojazd — koszt',exact:true})})).toContainText(/5,00.*godzinę/);
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Aktualne warianty płacy',exact:true})})).toContainText(/fakturze.*godzinę/);
+    const current=await f.request<{revision:number;data:Record<string,unknown>}>(`/api/faro/offers/${offer.id}`,employer.cookie);
+    const changed=await f.request<{revision:number}>(`/api/faro/offers/${offer.id}`,employer.cookie,'PUT',{expectedVersion:current.revision,data:{...current.data,salary:[{...input.salary[0],min:560000},{...second,min:8500,max:10000}]}});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:changed.revision});
+    await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:changed.revision+1,confirmed:true});
+    await page.goto(`${f.base}/#offers/${offer.id}`);
+    await page.reload();
+    await page.getByRole('button',{name:'Dodaj do porównania'}).click();
+    await page.getByRole('link',{name:'Porównanie',exact:true}).click();
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Aktualne warianty płacy',exact:true})})).toContainText(/85,00.*100,00.*fakturze.*godzinę/);
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Brutto / faktura',exact:true})})).toContainText(/75,00.*90,00.*fakturze.*godzinę/);
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Wariant prywatnego scenariusza',exact:true})})).toContainText('wcześniejsze warunki');
+    await expect(page.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Aktualne warianty płacy',exact:true})})).not.toContainText('Scenariusz dotyczy wcześniejszej wersji.');
+    expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
   }finally{await f.close();}
 });
