@@ -3,6 +3,7 @@ export interface SkillConcept {
   readonly id:string;readonly label:string;readonly aliases:readonly string[];
   readonly taxonomyVersion:string;readonly canonicalURI:string|null;readonly licenseRef:string;
   readonly kind:'SKILL'|'CREDENTIAL'|'TOOL'|'LANGUAGE'|'ACTIVITY';readonly family:string;
+  readonly levelGuidance?:{readonly version:string;readonly status:'AUTHOR_DRAFT';readonly BASICS:string;readonly INDEPENDENT:string;readonly FLUENT:string};
 }
 const seed:SkillConcept[]=[
   {"id":"faro:legacy:1","label":"Excel","aliases":["excel","microsoft excel","ms excel"],"taxonomyVersion":"legacy-curated-v1","canonicalURI":null,"licenseRef":"repository-authored; ESCO mapping pending review","kind":"TOOL","family":"accounting"},
@@ -29,4 +30,11 @@ const seed:SkillConcept[]=[
   {"id":"faro:activity:shift-work","label":"Praca zmianowa","aliases":["zmianowa","zmiany","stacji"],"taxonomyVersion":"faro-activities-v1","canonicalURI":null,"licenseRef":"Faro authored task labels; not ESCO certification","kind":"ACTIVITY","family":"cross-occupation"},
   {"id":"faro:activity:conflict-resolution","label":"Rozwiązywanie sytuacji konfliktowych","aliases":["reklamacje","konflikt","stacji"],"taxonomyVersion":"faro-activities-v1","canonicalURI":null,"licenseRef":"Faro authored task labels; not ESCO certification","kind":"ACTIVITY","family":"cross-occupation"}
 ];
-export const SKILL_CATALOG:readonly SkillConcept[]=Object.freeze(seed.map(c=>Object.freeze({...c,aliases:Object.freeze([...c.aliases])})));
+const activityGuidance:Record<string,{BASICS:string;INDEPENDENT:string;FLUENT:string}>={
+  'faro:activity:customer-service':{BASICS:'Z pomocą zbieram potrzeby klienta i przekazuję sprawę właściwej osobie.',INDEPENDENT:'Samodzielnie wyjaśniam typową sprawę klienta według procedury i potwierdzam uzgodniony kolejny krok.',FLUENT:'Rozpoznaję nietypową sprawę, wyjaśniam ograniczenia i dobieram lub eskaluję rozwiązanie w granicach swoich uprawnień.'},
+  'faro:activity:cash-register':{BASICS:'Z pomocą rejestruję zakup i sprawdzam kwotę według instrukcji.',INDEPENDENT:'Samodzielnie obsługuję typowe płatności i sprawdzam zgodność transakcji według procedury.',FLUENT:'Rozpoznaję rozbieżność lub nietypową transakcję, zabezpieczam dokumentację i rozwiązuję lub eskaluję ją zgodnie z uprawnieniami.'},
+  'faro:activity:sales':{BASICS:'Z pomocą przedstawiam podstawowe cechy produktu i zadaję pytania o potrzeby klienta.',INDEPENDENT:'Samodzielnie porównuję dostępne warianty z potrzebami klienta i jasno przedstawiam warunki zakupu.',FLUENT:'Wyjaśniam złożone różnice i ograniczenia oferty, sprawdzam zrozumienie klienta i uzgadniam kolejny krok bez zatajenia warunków.'},
+  'faro:activity:shift-work':{BASICS:'Z pomocą odczytuję grafik i przygotowuję przekazanie podstawowych informacji następnej zmianie.',INDEPENDENT:'Samodzielnie organizuję zadania swojej zmiany i przekazuję stan pracy oraz otwarte sprawy.',FLUENT:'Przy zmianie priorytetów ustalam bezpieczną kolejność zadań i koordynuję przekazanie spraw w granicach swojej roli.'},
+  'faro:activity:conflict-resolution':{BASICS:'Z pomocą opisuję sporne fakty, słucham stron i kieruję sprawę do właściwej osoby.',INDEPENDENT:'Samodzielnie oddzielam fakty od ocen, wyjaśniam dostępne rozwiązania i zapisuję uzgodnienia typowej sprawy.',FLUENT:'W złożonej sprawie wskazuję nierozstrzygnięte kwestie, dobieram bezpieczny sposób dalszego wyjaśnienia i eskaluję poza zakresem swojej roli.'}
+};
+export const SKILL_CATALOG:readonly SkillConcept[]=Object.freeze(seed.map(c=>Object.freeze({...c,aliases:Object.freeze([...c.aliases]),...(activityGuidance[c.id]?{levelGuidance:Object.freeze({version:'faro-authored-activity-guidance-v1',status:'AUTHOR_DRAFT' as const,...activityGuidance[c.id]!})}:{})})));
