@@ -1,0 +1,9 @@
+# CP03-D — Authored activity level guidance (2026-10-06)
+
+Delta extends the existing stable skill catalog: five existing authored ACTIVITY nodes have immutable, versioned BASICS/INDEPENDENT/FLUENT examples of observable tasks. Guidance version faro-authored-activity-guidance-v1 has AUTHOR_DRAFT status. No guessed ESCO URI, external taxonomy import, credential substitution, standardized assessment or validated measurement claim.
+
+Current profile declaration chooser, pending proposal and employer requirement editor display the same catalog guidance with explicit user-validation limits. Guidance is optional help; it does not alter eligibility, matching rules, levels, earlier claims, snapshots or confirmation tokens. Missing guidance for legacy tools/credentials/languages remains absent rather than fabricated. Legal credential eligibility remains separate.
+
+Regression exercises actual catalog/profile/preview APIs: immutable authored nodes, no credential guidance, unchanged stored declaration and allowlisted projection, DECLARED status retained. Existing real candidate browser opens task examples before declaration; axe/reflow and existing employer editor continue. Final current-input npm run check PASS146 Node/34 migrations/both actual restore drills/30 browser executions/lint/typecheck, zero skips; diff check PASS. Exact remote CI pending.
+
+Bounded guidance does not close full skill graph/ESCO mapping, task-anchor validation research or independently reviewed evidence service. All existing release gates remain open. Rollback removes guidance display/catalog extension together without rewriting claims or reassigning IDs.

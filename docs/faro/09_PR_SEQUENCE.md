@@ -167,3 +167,4 @@ These bounded slices have exact successful CI evidence in the checkpoint registe
 | CP10-I individual human amendments | [#51](https://github.com/eagleblastmusic-lgtm/Job/pull/51) | codex/faro-cp10i-amendment | codex/faro-cp05c-commute |c250d35|
 | CP10-J previewed cohort key correction | [#52](https://github.com/eagleblastmusic-lgtm/Job/pull/52) | codex/faro-cp10j-cohort | codex/faro-cp10i-amendment |dbfe763|
 Both exact workflow pairs SUCCESS; evidence in checkpoint register. All draft/unmerged; release gates remain open.
+CP11-G draft [#53](https://github.com/eagleblastmusic-lgtm/Job/pull/53): codex/faro-cp11g-analytics base codex/faro-cp10j-cohort, code ed9b811. FARO37379479424 SUCCESS; original CI37379479463 still in progress at this observation, not accepted yet. All draft/unmerged, production gated.

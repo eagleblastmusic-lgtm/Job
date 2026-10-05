@@ -3,6 +3,22 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync=promisify(execFile);
+import { SKILL_CATALOG } from '../domain/faro/skillCatalog.js';
+import { faroFixture } from './faro-fixture.js';
+
+test('authored task guidance is catalog-only, stable and immutable; it does not rewrite existing declarations or infer credential certification',async()=>{
+  const f=await faroFixture();try {
+    const user=await f.user('GuidanceUser'),guides=SKILL_CATALOG.filter(s=>s.levelGuidance);
+    assert.equal(guides.length,5);assert.ok(guides.every(s=>s.kind==='ACTIVITY'&&s.canonicalURI===null&&s.levelGuidance!.status==='AUTHOR_DRAFT'&&Object.isFrozen(s.levelGuidance)));
+    assert.equal(SKILL_CATALOG.find(s=>s.id==='faro:legacy:7')!.levelGuidance,undefined);
+    await f.request('/api/faro/profile',user.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    await f.request('/api/faro/claims',user.cookie,'POST',{skillId:guides[0]!.id,level:'INDEPENDENT',source:'HOBBY',practice:{quantity:3,unit:'TASKS'},confirmed:true},201);
+    const before=await f.request('/api/faro/profile',user.cookie);
+    const catalog=await f.request<{skills:typeof SKILL_CATALOG}>('/api/faro/catalog',user.cookie);assert.equal(catalog.skills.find(s=>s.id===guides[0]!.id)!.levelGuidance!.INDEPENDENT,guides[0]!.levelGuidance!.INDEPENDENT);
+    assert.deepEqual(await f.request('/api/faro/profile',user.cookie),before);
+    const projection=await f.request<{projection:{skillClaims:Array<{verification:string}>}}>('/api/faro/profile/preview-confirmation',user.cookie);assert.equal(projection.projection.skillClaims[0]!.verification,'DECLARED');assert.doesNotMatch(JSON.stringify(projection),/AUTHOR_DRAFT|levelGuidance|FARO_ASSESSMENT/);
+  }finally{await f.close();}
+});
 
 test('persisted Faro skill IDs retain meaning when historical ontology is reordered or extended',async()=>{
   // Isolated import order proves the original index-based mapping counterexample.

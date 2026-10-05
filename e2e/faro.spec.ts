@@ -31,6 +31,9 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.getByRole('button', { name: 'Zapisz profil', exact: true }).click();
     await expect(page.locator('#f-status')).toHaveText('Zapisano.');
     await page.getByText('Dodaj kompetencję', { exact: true }).click();
+    await page.getByText('Przykłady zadań dla poziomów: Obsługa klienta',{exact:true}).click();
+    await expect(page.getByText('Samodzielnie wyjaśniam typową sprawę klienta według procedury i potwierdzam uzgodniony kolejny krok.',{exact:true})).toBeVisible();
+    await expect(page.getByText(/Autorskie wskazówki FARO do walidacji/).first()).toBeVisible();
     const claim = page.locator('[data-form=claim]');
     await claim.locator('[name=skillId]').selectOption('faro:activity:customer-service');
     await claim.locator('[name=level]').selectOption('INDEPENDENT');
