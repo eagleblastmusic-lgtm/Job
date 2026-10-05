@@ -26,7 +26,9 @@
     "start": "node --enable-source-maps dist/server/index.js",
     "dev": "npm run build && NODE_ENV=development node --watch --enable-source-maps dist/server/index.js",
     "test:faro": "npm run build && node --test dist/tests/faro-*.test.js dist/tests/auth-security.test.js dist/tests/admin-security.test.js dist/tests/security.test.js dist/tests/http-proxy-security.test.js dist/tests/consents.test.js dist/tests/config.test.js dist/tests/health.test.js",
-    "test:browser:faro": "npm run test:browser"
+    "test:browser:faro": "npm run test:browser",
+    "verify:postgres:source": "npm run build && node scripts/faro-postgres-exercise.mjs --source-only",
+    "verify:postgres:rehearsal": "npm run build && node scripts/faro-postgres-exercise.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -34,5 +36,8 @@
     "@types/node": "22.15.0",
     "playwright-core": "1.62.1",
     "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
   }
 }

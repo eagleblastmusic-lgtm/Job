@@ -183,3 +183,6 @@ CP10-K draft [#60](https://github.com/eagleblastmusic-lgtm/Job/pull/60): codex/f
 
 
 CP02-H draft [#61](https://github.com/eagleblastmusic-lgtm/Job/pull/61): codex/faro-cp02h-mfa base codex/faro-cp10k-open-answer, code2f90e5b. Both37387892167/37387892042 SUCCESS. All draft/unmerged.
+
+
+CP06-J draft [#62](https://github.com/eagleblastmusic-lgtm/Job/pull/62): codex/faro-cp06j-employment base codex/faro-cp02h-mfa, code6def302. Both37389049374/37389047911 SUCCESS. All draft/unmerged.

@@ -7,3 +7,6 @@ Acceptance requires current process revision, exact employment-offer revision, e
 Existing candidate export includes event terms; deletion of candidate process cascades event terms. DB backup/current-authority restore exercises retain accepted revision and exact amount, and session/grant/owner safeguards remain in force. Scope is private workflow, not legal contract advice, employment verification, full CP06/master-plan/release completion or external approval.
 
 Validation: full check PASS153 Node/35 migrations/both actual restore drills/38 browser executions/lint/typecheck, zero skips. Final added erasure assertion targeted regression/lint/typecheck PASS. targeted real API/source/amount/expiry/role/revision/replay regression PASS; actual employer proposal and owning-candidate acceptance browser desktop/mobile PASS, both-role axe and reflow320. Full aggregate acceptance PASS; exact remote CI pending.
+
+
+CP06-J exact remote acceptance DONE at6def302: [FARO37389049374](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37389049374) and [CI37389047911](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37389047911) SUCCESS. Draft62 remains dependent/unmerged; full plan/release PARTIAL.
