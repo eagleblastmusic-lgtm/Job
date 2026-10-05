@@ -1,0 +1,10 @@
+# CP07-G — Descriptive retained-cohort progression gaps (2026-10-06)
+
+Extends the existing authorized own-organization reliability report, version response-cohort-v3. Counts processes without a recorded ADVANCE and without recorded INTERVIEW_CONFIRM as exact complements of distinct event counts in the retained interest-created cohort asOf. Denominator is explicitly the whole cohort, including rejection/withdrawal/immature processes. Existing original-response deadline denominators, censoring/median/exclusions and mutual completion facts remain unchanged.
+
+UI labels say recorded facts and explain that missing event does not prove absence of an external interview, fraudulent intake, overdue next stage or intent. No high-interest threshold, similarity/repost cluster, evergreen sanction, score/ranking/public disclosure or automatic case/restriction. Rejected/withdrawn processes are not claimed as stalled active processes. Existing event-window/tenant scopes and aggregate privacy remain.
+
+Regression extends existing domain/API proofs: exact complement under duplicate/foreign events and rejected/withdrawn/immature cohort; explicit n; own-organization authorization, no candidate identity, no offer/case mutation. Final check pending. Full CP07 pattern-policy/human review/legal gates remain PARTIAL.
+
+## CP07-G — Recorded progression gaps, 2026-10-06
+Existing own-organization aggregate report response-cohort-v3 shows exact distinct-process complements for no recorded ADVANCE/no recorded confirmed interview, denominator all retained cohort including rejection/withdrawal/immature cases. UI explicitly distinguishes absence of an event from fraud, missing external interview or overdue next stage. [Scope](CP07_G_PROGRESSION_GAPS.md). Full npm run check PASS148 Node/34 migrations/both actual restores/32 browsers/lint/typecheck, zero skips; diff check PASS. No thresholds, automatic cases/restrictions, public reputation or ranking input. Local bounded acceptance DONE; exact remote pending; full CP07/master plan/release PARTIAL. Next: manual open-answer assessment foundation with pinned rubric, no automatic grading or executable uploads.

@@ -78,4 +78,5 @@ export interface Reliability {
   firstResponse:{numerator:number;denominator:number;answered:number;late:number;unanswered:number;rightCensored:number;medianAnsweredHours:number|null;medianSampleSize:number};
   currentWaiting:{count:number;overdue:number;maxOverdueHours:number|null};
   progression:{processesWithNextStage:number;processesWithAssessmentInvitation:number;processesWithConfirmedInterview:number;processesWithMutuallyCompletedInterview:number;processesRejected:number};
+  progressionGaps:{processesWithoutRecordedAdvance:number;processesWithoutRecordedConfirmedInterview:number;denominator:number;rule:string};
 }
