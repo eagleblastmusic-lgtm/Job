@@ -433,3 +433,42 @@ test('phone consent binds exact number and process; profile changes atomically r
     assert.doesNotMatch(audit,/48500100200|48600200300/);
   }finally{await f.close();}
 });
+
+
+test('concrete employment terms pin published conditions and require owning candidate confirmation of exact unexpired revision',async()=>{
+  const f=await setup();
+  try {
+    const r=new RecruitmentService(f.app.db),profile=new ProfileService(f.app.db),preview=profile.previewConfirmation(f.candidate.id);
+    const p=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'employment-interest'});
+    const dueAt=new Date(Date.now()+86400000).toISOString(),startsAt=new Date(Date.now()+7*86400000).toISOString();
+    r.change(f.employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'employment-advance',nextAction:'Uzgodnienie warunków pracy',dueAt});
+    const body={command:'OFFER',expectedVersion:2,idempotencyKey:'employment-offer',nextAction:'Potwierdź pokazane warunki współpracy',dueAt,offerVersion:1,salaryIndex:0,amount:600000,startsAt,confirmed:true};
+    assert.throws(()=>r.change(f.outsider.id,p.id,body),e=>(e as {status:number}).status===404);
+    assert.throws(()=>r.change(f.employer.id,p.id,{...body,confirmed:false}),e=>(e as {code:string}).code==='CONFIRMATION_REQUIRED');
+    assert.throws(()=>r.change(f.employer.id,p.id,{...body,amount:900000}),e=>(e as {code:string}).code==='SALARY_RANGE');
+    assert.throws(()=>r.change(f.employer.id,p.id,{...body,offerVersion:99}),e=>(e as {code:string}).code==='PUBLICATION_NOT_FOUND');
+    const result=r.change(f.employer.id,p.id,body);assert.deepEqual(r.change(f.employer.id,p.id,body),result);
+    const terms=r.view(f.candidate.id,p.id).employmentOffer!;assert.equal(terms.amount,600000);assert.equal(terms.revision,3);assert.equal(terms.conditions.salary[0]!.min,550000);
+    const original=r.row(p.id);assert.equal(original.status,'OFFERED');
+    // An unpublished new draft cannot replace either participant's promised source or pinned conditions.
+    const offers=new OfferService(f.app.db);offers.edit(f.employer.id,f.offer.id,{data:{...offerInput(f.employer.id),salary:[{...offerInput(f.employer.id).salary[0]!,min:850000,max:900000}]},expectedVersion:f.offer.revision});
+    assert.equal(r.view(f.candidate.id,p.id).employmentSource.version,1);assert.equal(r.view(f.candidate.id,p.id).employmentOffer!.amount,600000);
+    const accept={command:'ACCEPT_OFFER',expectedVersion:3,idempotencyKey:'employment-accept',employmentOfferRevision:3,confirmed:true};
+    assert.throws(()=>r.change(f.employer.id,p.id,accept),e=>(e as {code:string}).code==='INVALID_TRANSITION');
+    assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,confirmed:false}),e=>(e as {code:string}).code==='CONFIRMATION_REQUIRED');
+    assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,employmentOfferRevision:2}),e=>(e as {code:string}).code==='VERSION_CONFLICT');
+    const late=new RecruitmentService(f.app.db,()=>new Date(Date.parse(dueAt)+1));assert.throws(()=>late.change(f.candidate.id,p.id,accept),e=>(e as {code:string}).code==='EMPLOYMENT_OFFER_EXPIRED');
+    await f.request(`/api/faro/processes/${p.id}/commands`,f.candidate.cookie,'POST',accept);
+    assert.equal(r.row(p.id).status,'HIRED');assert.equal(r.row(p.id).first_response_at,original.first_response_at);assert.equal(r.row(p.id).response_due_at,original.response_due_at);
+    assert.deepEqual(r.change(f.candidate.id,p.id,accept),{id:p.id,revision:4});
+    assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,idempotencyKey:'employment-after-terminal',expectedVersion:4}),e=>(e as {code:string}).code==='INVALID_TRANSITION');
+    const exported=await f.request<{canonical:{faro_events:Array<{kind:string;data:string}>}}>('/api/export',f.candidate.cookie);
+    // Export shape is tested through serialized output as well as private process scope.
+    assert.ok(JSON.stringify(exported).includes('employmentOffer'));assert.ok(JSON.stringify(exported).includes('600000'));
+    f.app.db.db.prepare("UPDATE faro_events SET data='{}' WHERE process_id=? AND kind='OFFER'").run(p.id);
+    f.app.db.db.prepare("UPDATE faro_interests SET status='OFFERED',stage='OFFERED' WHERE id=?").run(p.id);
+    assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,idempotencyKey:'employment-legacy',expectedVersion:4}),e=>(e as {code:string}).code==='EMPLOYMENT_TERMS_REQUIRED');
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{password:'Bezpieczne123',confirmation:'USUŃ KONTO'});
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events WHERE process_id=?').get(p.id)!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_interests WHERE id=?').get(p.id)!.n,0);assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  } finally {await f.close();}
+});

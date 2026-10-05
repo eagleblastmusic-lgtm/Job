@@ -22,7 +22,7 @@ export const labels: Record<string, string> = {
   MONTH: 'miesiąc', HOUR: 'godzinę', DAY: 'dzień', YEAR: 'rok', MUST_HAVE: 'Wymagane', NICE_TO_HAVE: 'Mile widziane', WILL_TEACH: 'Firma nauczy',
   SATISFIED: 'deklarujesz wymagany poziom', NOT_DEMONSTRATED: 'brak deklaracji — nie wiemy', KNOWN_NOT_MET: 'poziom do rozwinięcia', NOT_APPLICABLE: 'nauka w firmie',
   DRAFT: 'Szkic', IN_REVIEW: 'Do zatwierdzenia', PUBLISHED: 'Opublikowana', PAUSED: 'Wstrzymana', CLOSED: 'Zamknięta', ARCHIVED: 'Archiwum',
-  INTERESTED: 'Zainteresowanie zgłoszone', ACTIVE: 'W toku', OFFERED: 'Propozycja zatrudnienia', HIRED: 'Zatrudnienie potwierdzone', REJECTED: 'Odmowa', WITHDRAWN: 'Wycofane', CANCELLED: 'Anulowane',
+  INTERESTED: 'Zainteresowanie zgłoszone', ACTIVE: 'W toku', OFFERED: 'Propozycja zatrudnienia', HIRED: 'Przyjęcie oferty potwierdzone', REJECTED: 'Odmowa', WITHDRAWN: 'Wycofane', CANCELLED: 'Anulowane',
   AWAITING_EMPLOYER: 'Czekamy na pracodawcę', CLARIFICATION_REQUESTED: 'Pytanie do kandydata', ACCEPTED_TO_NEXT_STAGE: 'Kolejny etap',
   ASSESSMENT_REQUESTED: 'Zaproszenie do assessmentu', ASSESSMENT_COMPLETED: 'Assessment przesłany', TERMINAL: 'Proces zakończony',
   INVITED: 'Zaproszenie', STARTED: 'Rozpoczęty', SCORED_PENDING_REVIEW: 'Wynik czeka na review', FINALIZED: 'Wynik zatwierdzony', EXPIRED: 'Czas upłynął', APPROVED: 'Zatwierdzony',

@@ -33,6 +33,8 @@ export interface Offer {
 }
 export interface Organization { id: string; name: string; verification: string; role: string; }
 export interface Process {
+  employmentSource:Offer;
+  employmentOffer:{revision:number;sourceVersion:number;salaryIndex:number;amount:number;startsAt:string;responseDueAt:string;conditions:OfferData}|null;
   previousInterestId:string|null;
   availableCommands:string[];
   clarification:{topic:'REQUIREMENT'|'AVAILABILITY';requirementId:string|null;skillId:string|null;previousStage:string}|null;

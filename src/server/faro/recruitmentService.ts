@@ -83,6 +83,8 @@ export class RecruitmentService extends FaroStore {
     return { id, previousInterestId:row.previous_interest_id, offerId: row.offer_id, offerVersion: row.offer_version, role: offer.data.role, company: offer.company, status: row.status, stage: row.stage, revision: row.revision,
       responseDueAt: row.response_due_at, firstResponseAt: row.first_response_at, stageDueAt: row.stage_due_at, nextAction: last?.kind==='ANSWER'?'Kandydat odpowiedział. Firma sprawdzi deklarację i przekaże kolejny krok.':row.next_action,
       clarification:this.clarification(row.id),
+      employmentOffer:this.employmentOffer(row.id),
+      employmentSource:this.offers.published(row.offer_id),
       availableCommands:COMMANDS.filter(command=>transition(row.status,row.stage,candidate?'CANDIDATE':'EMPLOYER',command)||(!candidate&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(row.id))),
       reason: row.reason ? JSON.parse(row.reason) as Record<string, unknown> : null, createdAt: row.created_at,
       projection: JSON.parse(row.snapshot) as ReturnType<typeof employerProjection>, events, contactGrant: grant, viewer: candidate ? 'CANDIDATE' : 'EMPLOYER',
@@ -104,6 +106,7 @@ export class RecruitmentService extends FaroStore {
         ?? (actor==='EMPLOYER'&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(id)?{status:row.status,stage:row.stage,substantive:false}:null);
       if (!next) throw new HttpError(409, 'Ta akcja nie jest dostępna w tym etapie.', 'INVALID_TRANSITION');
       let reason: Record<string, unknown> | null = null, action: string | null = null, due: string | null = null;
+      let employmentOffer:ReturnType<RecruitmentService['employmentOffer']>=null;
       let question:ReturnType<RecruitmentService['clarification']>=null,response:Record<string,unknown>|null=null;
       if (command === 'REJECT') {
         const raw = object(body.reason), code = choice(raw.code, REJECTION_REASONS);
@@ -115,6 +118,24 @@ export class RecruitmentService extends FaroStore {
       if (['ADVANCE','OFFER'].includes(command)) {
         action = text(body.nextAction, 1500, 5); due = date(body.dueAt);
         if (due <= this.now()) throw new HttpError(400, 'Termin musi być w przyszłości.');
+      }
+      if(command==='OFFER') {
+        if(body.confirmed!==true)throw new HttpError(400,'Potwierdź konkretne warunki oferty.','CONFIRMATION_REQUIRED');
+        const sourceVersion=integer(body.offerVersion,1),salaryIndex=integer(body.salaryIndex,0,7);
+        const published=this.db.prepare("SELECT 1 FROM faro_offer_versions WHERE offer_id=? AND version=? AND publication_proof<>'NONE'").get(row.offer_id,sourceVersion);
+        if(!published)throw new HttpError(409,'Wybierz opublikowaną wersję warunków.','PUBLICATION_NOT_FOUND');
+        const conditions=this.offers.version(row.offer_id,sourceVersion),option=conditions.salary[salaryIndex];
+        if(!option)throw new HttpError(400,'Wybierz istniejący wariant wynagrodzenia.');
+        const amount=integer(body.amount,1);if(amount<option.min||amount>option.max)throw new HttpError(400,'Konkretna kwota musi należeć do wybranego przedziału.','SALARY_RANGE');
+        const startsAt=date(body.startsAt);if(startsAt<=this.now())throw new HttpError(400,'Początek współpracy musi być w przyszłości.');
+        employmentOffer={revision:row.revision+1,sourceVersion,salaryIndex,amount,startsAt,responseDueAt:due!,conditions};
+      }
+      if(command==='ACCEPT_OFFER') {
+        employmentOffer=this.employmentOffer(id);
+        if(!employmentOffer)throw new HttpError(409,'Oferta wymaga zapisanych konkretnych warunków.','EMPLOYMENT_TERMS_REQUIRED');
+        if(integer(body.employmentOfferRevision,1)!==employmentOffer.revision)throw new HttpError(409,'Potwierdź właściwą wersję warunków.','VERSION_CONFLICT');
+        if(body.confirmed!==true)throw new HttpError(400,'Potwierdź przyjęcie pokazanych warunków.','CONFIRMATION_REQUIRED');
+        if(employmentOffer.responseDueAt<=this.now())throw new HttpError(409,'Termin przyjęcia oferty minął.','EMPLOYMENT_OFFER_EXPIRED');
       }
       if(command==='CLARIFY') {
         const raw=object(body.question),topic=choice(raw.topic,['REQUIREMENT','AVAILABILITY'] as const);
@@ -143,9 +164,13 @@ export class RecruitmentService extends FaroStore {
       const first = next.substantive ? row.first_response_at ?? this.now() : row.first_response_at;
       this.db.prepare('UPDATE faro_interests SET status=?,stage=?,revision=revision+1,first_response_at=?,stage_due_at=?,next_action=?,reason=? WHERE id=?').run(next.status, next.stage, first, due, action, reason ? JSON.stringify(reason) : null, id);
       if (TERMINAL.includes(next.status)) this.cancelObligations(id);
-      this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action,question,response });
+      this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action,question,response,employmentOffer });
       return { id, revision: row.revision + 1 };
     });
+  }
+  employmentOffer(id:string):{revision:number;sourceVersion:number;salaryIndex:number;amount:number;startsAt:string;responseDueAt:string;conditions:ReturnType<OfferService['version']>}|null {
+    const event=this.db.prepare("SELECT data FROM faro_events WHERE process_id=? AND kind='OFFER' ORDER BY rowid DESC LIMIT 1").get(id) as {data:string}|undefined;
+    return event?(JSON.parse(event.data) as {employmentOffer?:ReturnType<RecruitmentService['employmentOffer']>}).employmentOffer??null:null;
   }
   cancelObligations(id:string) {
     this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(),id);
