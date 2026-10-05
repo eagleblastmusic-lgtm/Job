@@ -453,12 +453,15 @@ test('concrete employment terms pin published conditions and require owning cand
     // An unpublished new draft cannot replace either participant's promised source or pinned conditions.
     const offers=new OfferService(f.app.db);offers.edit(f.employer.id,f.offer.id,{data:{...offerInput(f.employer.id),salary:[{...offerInput(f.employer.id).salary[0]!,min:850000,max:900000}]},expectedVersion:f.offer.revision});
     assert.equal(r.view(f.candidate.id,p.id).employmentSource.version,1);assert.equal(r.view(f.candidate.id,p.id).employmentOffer!.amount,600000);
+    assert.equal(f.app.store.faroOfferAccepted(p.id),false);f.app.store.recordConsent(f.candidate.id,'ANALYTICS',true,'synthetic-offer-stage');
     const accept={command:'ACCEPT_OFFER',expectedVersion:3,idempotencyKey:'employment-accept',employmentOfferRevision:3,confirmed:true};
     assert.throws(()=>r.change(f.employer.id,p.id,accept),e=>(e as {code:string}).code==='INVALID_TRANSITION');
     assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,confirmed:false}),e=>(e as {code:string}).code==='CONFIRMATION_REQUIRED');
     assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,employmentOfferRevision:2}),e=>(e as {code:string}).code==='VERSION_CONFLICT');
     const late=new RecruitmentService(f.app.db,()=>new Date(Date.parse(dueAt)+1));assert.throws(()=>late.change(f.candidate.id,p.id,accept),e=>(e as {code:string}).code==='EMPLOYMENT_OFFER_EXPIRED');
     await f.request(`/api/faro/processes/${p.id}/commands`,f.candidate.cookie,'POST',accept);
+    assert.equal(f.app.store.faroOfferAccepted(p.id),false);
+    const stageEvents=f.app.db.db.prepare("SELECT properties FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED' AND user_id=?").all(f.candidate.id);assert.equal(stageEvents.length,1);assert.equal(JSON.parse(String(stageEvents[0]!.properties)).stage,'OFFER_ACCEPTED');assert.doesNotMatch(String(stageEvents[0]!.properties),/600000|employmentOffer|conditions|salary|Anna|Jan/);
     assert.equal(r.row(p.id).status,'HIRED');assert.equal(r.row(p.id).first_response_at,original.first_response_at);assert.equal(r.row(p.id).response_due_at,original.response_due_at);
     assert.deepEqual(r.change(f.candidate.id,p.id,accept),{id:p.id,revision:4});
     assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,idempotencyKey:'employment-after-terminal',expectedVersion:4}),e=>(e as {code:string}).code==='INVALID_TRANSITION');
@@ -469,6 +472,7 @@ test('concrete employment terms pin published conditions and require owning cand
     f.app.db.db.prepare("UPDATE faro_interests SET status='OFFERED',stage='OFFERED' WHERE id=?").run(p.id);
     assert.throws(()=>r.change(f.candidate.id,p.id,{...accept,idempotencyKey:'employment-legacy',expectedVersion:4}),e=>(e as {code:string}).code==='EMPLOYMENT_TERMS_REQUIRED');
     await f.request('/api/account',f.candidate.cookie,'DELETE',{password:'Bezpieczne123',confirmation:'USUŃ KONTO'});
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get()!.n,0);
     assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events WHERE process_id=?').get(p.id)!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_interests WHERE id=?').get(p.id)!.n,0);assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
   } finally {await f.close();}
 });

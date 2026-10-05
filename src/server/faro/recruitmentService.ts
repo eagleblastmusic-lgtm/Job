@@ -1,3 +1,4 @@
+import { AppStore } from '../store.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { ProfileService } from './profileService.js';
@@ -165,6 +166,7 @@ export class RecruitmentService extends FaroStore {
       this.db.prepare('UPDATE faro_interests SET status=?,stage=?,revision=revision+1,first_response_at=?,stage_due_at=?,next_action=?,reason=? WHERE id=?').run(next.status, next.stage, first, due, action, reason ? JSON.stringify(reason) : null, id);
       if (TERMINAL.includes(next.status)) this.cancelObligations(id);
       this.event(row, userId, command, { previousStage: row.stage, stage: next.stage, previousDueAt: row.stage_due_at, stageDueAt: due, reason, action,question,response,employmentOffer });
+      if(command==='ACCEPT_OFFER')new AppStore(this.database).faroOfferAccepted(id);
       return { id, revision: row.revision + 1 };
     });
   }

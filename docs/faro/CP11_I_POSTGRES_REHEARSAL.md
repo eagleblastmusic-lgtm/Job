@@ -14,3 +14,6 @@ Primary sources: [node-postgres transactions](https://node-postgres.com/features
 
 
 First actual PostgreSQL run atfe39731 found pending deferred-FK events preventing post-insert CREATE INDEX (55006). Root cause fixed: create indexes before row loading; validate deferred FKs before trigger DDL. No criteria relaxed; actual rerun pending. This supersedes initial pending observation without labeling failed evidence as external blocker.
+
+
+CP11-I exact remote acceptance DONE for staging-data scope at7c05f87: [FARO37389939763](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37389939763) and [CI37389940077](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37389940077) SUCCESS. Actual PostgreSQL18 jobs Node22/24 PASS70 tables/35 migrations/counts/hashes/FKs/checks/consent/rollback/source-readonly. Earlierfe39731 failure fixed, no skips or criterion changes. Draft63 dependent/unmerged. Application runtime is SQLite; full CP11/master plan/release PARTIAL.
