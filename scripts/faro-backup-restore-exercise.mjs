@@ -76,6 +76,13 @@ try {
   f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(otherOrg.id);
   const otherOffer=offers.create(kept.id,otherOrg.id,offerInput(kept.id));
   offers.lifecycle(kept.id,otherOffer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(kept.id,otherOffer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const employmentOffer=offers.create(employer.id,org.id,offerInput(employer.id));
+  offers.lifecycle(employer.id,employmentOffer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,employmentOffer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const employment=r.interest(kept.id,employmentOffer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(kept.id).confirmationToken,idempotencyKey:'backup-employment-interest'});
+  const employmentDue=new Date(Date.now()+86400000).toISOString();
+  r.change(employer.id,employment.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'backup-employment-advance',nextAction:'Uzgodnienie konkretnej propozycji',dueAt:employmentDue});
+  r.change(employer.id,employment.id,{command:'OFFER',expectedVersion:2,idempotencyKey:'backup-employment-offer',nextAction:'Potwierdź zapisane warunki współpracy',dueAt:employmentDue,offerVersion:1,salaryIndex:0,amount:600000,startsAt:new Date(Date.now()+7*86400000).toISOString(),confirmed:true});
+  r.change(kept.id,employment.id,{command:'ACCEPT_OFFER',expectedVersion:3,idempotencyKey:'backup-employment-accept',employmentOfferRevision:3,confirmed:true});
   const backup=join(root,'backup');await mkdir(backup);
   const opsOrg=profiles.organization(kept.id,{name:'Historyczne ograniczenie do przeglądu'});
   f.app.db.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(opsOrg.id);
@@ -147,6 +154,7 @@ try {
     const passwordHash=db.prepare('SELECT password_hash FROM users WHERE id=?').get(kept.id).password_hash;
     assert.equal(verifyPassword('Bezpieczne123',passwordHash),false);assert.equal(verifyPassword('OdnowioneBezpieczne123',passwordHash),true);
     assert.equal(new OfferService(restored).version(offer.id,1).salary[0].min,550000);
+    const restoredEmployment=new RecruitmentService(restored);assert.equal(restoredEmployment.row(employment.id).status,'HIRED');assert.equal(restoredEmployment.employmentOffer(employment.id).amount,600000);assert.equal(restoredEmployment.employmentOffer(employment.id).revision,3);
     const restoredAssessment=new AssessmentService(restored),restoredHistory=restoredAssessment.resultHistory(retainedAttempt.id);
     const openHistory=restoredAssessment.resultHistory(openAttempt.id),openView=restoredAssessment.overview(kept.id,openAttempt.id);
     assert.equal(openHistory.length,2);assert.equal(openHistory[0].result.earned,2);assert.equal(openHistory[1].result.earned,1);assert.equal(openView.result.earned,1);assert.equal(openView.answers['task-1'],'Syntetyczny krok z uzasadnieniem.');assert.equal(openView.type,'OPEN_ANSWER');assert.equal(openView.rubricVersion,'backup-human-r1');assert.equal(db.prepare('SELECT reviewer_id FROM faro_attempts WHERE id=?').get(openAttempt.id).reviewer_id,null);
