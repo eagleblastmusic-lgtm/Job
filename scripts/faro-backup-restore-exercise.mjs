@@ -12,11 +12,13 @@ import { AssessmentService } from '../dist/server/faro/assessmentService.js';
 import { InterviewService } from '../dist/server/faro/interviewService.js';
 import { RecoveryService } from '../dist/server/faro/recoveryService.js';
 import { TrustService } from '../dist/server/faro/trustService.js';
-import { hashPassword,verifyPassword } from '../dist/server/auth.js';
+import { hashPassword,verifyPassword,hashSessionToken } from '../dist/server/auth.js';
+import { MfaService,totp } from '../dist/server/faro/mfaService.js';
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
 import { restoreFaro,readLatestLedger } from './restore-faro.mjs';
 
-const root=await mkdtemp(join(tmpdir(),'faro-recovery-')),f=await faroFixture();
+const root=await mkdtemp(join(tmpdir(),'faro-recovery-')),f=await faroFixture({faroMfaEncryptionKey:'33'.repeat(32)});
+function decodeMfa(value){let bits=0,acc=0;const out=[];for(const c of value){acc=(acc<<5)|'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c);bits+=5;if(bits>=8){bits-=8;out.push((acc>>>bits)&255);}}return Buffer.from(out);}
 try {
   const employer=await f.user('RecoveryEmployer'),gone=await f.user('RecoveryErased'),kept=await f.user('RecoveryKept'),successor=await f.user('RecoverySuccessor'),revoked=await f.user('RecoveryRevoked');
   const profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),r=new RecruitmentService(f.app.db);
@@ -84,6 +86,9 @@ try {
   const oldClaim=r.claimOutbox(100,300000).find(claim=>claim.id===leasedId);assert.ok(oldClaim);
   f.app.db.db.prepare("INSERT INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES('stale-canonical-telemetry',?,'FARO_MUTUAL_STAGE_COMPLETED','{}',?)").run(kept.id,new Date().toISOString());
   assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM analytics_events WHERE event_name='FARO_MUTUAL_STAGE_COMPLETED'").get().n,1);
+  const mfa=new MfaService(f.app.db,f.app.config),mfaUser=f.app.store.getUserById(kept.id),mfaToken=hashSessionToken(kept.cookie.split('=')[1]);
+  const enrollment=mfa.setup(mfaUser,mfaToken,{password:'Bezpieczne123'}),mfaSecret=decodeMfa(enrollment.secret);
+  const recoveryCodes=mfa.confirm(mfaUser,mfaToken,{code:totp(mfaSecret,Math.floor(Date.now()/30000))}).recoveryCodes;
   const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
   await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
   // Current source advances after the old snapshot: owner transfer and two erasures.
@@ -92,6 +97,9 @@ try {
   profiles.revokeMember(successor.id,org.id,revoked.id);
   f.app.db.db.prepare("UPDATE users SET role='USER' WHERE id=?").run(revoked.id);
   f.app.db.db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword('OdnowioneBezpieczne123'),kept.id);
+  const afterBackupCounter=Math.floor(Date.now()/30000)+1;
+  new MfaService(f.app.db,f.app.config,()=>new Date(afterBackupCounter*30000)).verify(f.app.store.getUserById(kept.id),mfaToken,{code:totp(mfaSecret,afterBackupCounter)});
+  mfa.recover(f.app.store.getUserById(kept.id),mfaToken,{password:'OdnowioneBezpieczne123',code:recoveryCodes[0]});
   r.grant(kept.id,surviving.id,false);f.app.store.recordConsent(kept.id,'ANALYTICS',false,'synthetic-after-backup');
   f.app.db.db.prepare("UPDATE faro_organizations SET verification='RESTRICTED' WHERE id=?").run(otherOrg.id);
   f.app.db.db.prepare("INSERT INTO faro_restrictions(id,organization_id,source_reporter_id,reason_code) VALUES('recovery-current',?,?,'LEGACY_RESTRICTION_REVIEW_REQUIRED')").run(otherOrg.id,successor.id);
@@ -125,6 +133,12 @@ try {
     assert.equal(db.prepare("SELECT state FROM faro_restrictions WHERE id='recovery-current'").get().state,'ACTIVE');
     assert.throws(()=>new TrustService(restored).restoreRestriction(successor.id,'recovery-current',{expectedVersion:1,idempotencyKey:'restored-conflict',confirmed:true,reason:'Nieuprawniona próba powiązanego moderatora.'}),error=>error.code==='MODERATION_CONFLICT');
     assert.equal(db.prepare('SELECT COUNT(*) n FROM sessions').get().n,0);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_mfa_sessions').get().n,0);
+    const restoredMfa=new MfaService(restored,f.app.config,()=>new Date(afterBackupCounter*30000));
+    assert.equal(restoredMfa.row(kept.id).last_counter,afterBackupCounter);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_mfa_recovery WHERE user_id=? AND used_at IS NULL').get(kept.id).n,7);
+    assert.throws(()=>restoredMfa.verify(f.app.store.getUserById(kept.id),mfaToken,{code:totp(mfaSecret,afterBackupCounter)}),error=>error.code==='UNAUTHENTICATED');
+    assert.throws(()=>restoredMfa.recover(f.app.store.getUserById(kept.id),mfaToken,{password:'OdnowioneBezpieczne123',code:recoveryCodes[0]}),error=>error.code==='UNAUTHENTICATED');
     assert.ok(db.prepare('SELECT revoked_at FROM faro_contact_grants WHERE process_id=?').get(surviving.id).revoked_at);
     assert.equal(db.prepare("SELECT granted FROM consents WHERE user_id=? AND consent_type='ANALYTICS' ORDER BY created_at DESC,rowid DESC LIMIT 1").get(kept.id).granted,0);
     assert.equal(db.prepare('SELECT active FROM faro_members WHERE organization_id=? AND user_id=?').get(org.id,revoked.id).active,0);

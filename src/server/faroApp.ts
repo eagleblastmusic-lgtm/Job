@@ -6,6 +6,9 @@ import { HttpError, sendJson } from './http.js';
 import { createFaroApi } from './faro/api.js';
 import { TrustService } from './faro/trustService.js';
 import { FaroWorker } from './faro/worker.js';
+import { MfaService } from './faro/mfaService.js';
+import { requireExtendedUser } from './extendedAuth.js';
+import { hashSessionToken,parseCookies } from './auth.js';
 
 /** Canonical runtime has an explicit API allowlist. Historical modules are not mounted. */
 export function createFaroApp(overrides: Partial<AppConfig> = {}) {
@@ -24,6 +27,11 @@ export function createFaroApp(overrides: Partial<AppConfig> = {}) {
       catch {throw new HttpError(400,'Nieprawidłowy adres żądania.','INVALID_URL');}
       const allowed = /^\/api\/auth\/(register|login|logout)$/.test(path)
         || ['/api/health', '/api/legal', '/api/me', '/api/consents', '/api/consents/analytics', '/api/account', '/api/export', '/api/admin/diagnostics'].includes(path);
+      if((allowed||path.startsWith('/api/faro/'))&&path.startsWith('/api/')&&!/^\/api\/(auth\/|health$|legal$|faro\/security\/mfa(?:\/|$))/.test(path)){
+        const user=requireExtendedUser(req,app.store),mfa=new MfaService(app.db,app.config),tokenHash=hashSessionToken(parseCookies(req.headers.cookie).job_session!);
+        if(path==='/api/me'&&mfa.required(user)&&!mfa.verified(tokenHash)){sendJson(res,200,{user:{id:user.id,email:user.email,name:user.name,role:user.role,locale:user.locale,timezone:user.timezone},mfaRequired:true});return;}
+        mfa.assertAccess(user,tokenHash);
+      }
       if (!path.startsWith('/api/') || allowed) { original(req, res); return; }
       enforceExtendedOrigin(req, app.config);
       if (await handleFaro(req, res, path)) return;

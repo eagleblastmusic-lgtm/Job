@@ -14,7 +14,8 @@ import { EconomicsService } from './economicsService.js';
 import { TrustService } from './trustService.js';
 import { PrivacyService } from './privacyService.js';
 import { InterviewService } from './interviewService.js';
-import { verifyPassword, MAX_PASSWORD_LENGTH } from '../auth.js';
+import { verifyPassword, MAX_PASSWORD_LENGTH,hashSessionToken,parseCookies } from '../auth.js';
+import { MfaService } from './mfaService.js';
 import type { FaroWorker } from './worker.js';
 
 export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfig, worker: FaroWorker) {
@@ -25,8 +26,9 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
   return async (req: IncomingMessage, res: ServerResponse, path: string) => {
     if (!path.startsWith('/api/faro/')) return false;
     enforceExtendedOrigin(req, config);
-    const user = requireExtendedUser(req, store), method = req.method ?? 'GET';
-    if (config.nodeEnv === 'production') throw new HttpError(503, 'Faro oczekuje na zamknięcie bramek uruchomienia usługi.', 'RELEASE_GATES_OPEN');
+    let user = requireExtendedUser(req, store);const method = req.method ?? 'GET';
+    const mfaPath=path.match(/^\/api\/faro\/security\/mfa(?:\/(setup|confirm|verify|recover))?$/);
+    if (config.nodeEnv === 'production'&&!mfaPath) throw new HttpError(503, 'Faro oczekuje na zamknięcie bramek uruchomienia usługi.', 'RELEASE_GATES_OPEN');
     if (method !== 'GET') {
       const now = Date.now();
       for (const [key, value] of rates) if (value.expires <= now) rates.delete(key);
@@ -35,7 +37,10 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
       if (rate.count > 90) throw new HttpError(429, 'Zbyt wiele zmian. Spróbuj za chwilę.', 'RATE_LIMITED');
     }
     const body = method === 'GET' ? {} : await readJson(req);
+    user=requireExtendedUser(req,store);
+    if(!mfaPath)new MfaService(db,config).assertAccess(user,hashSessionToken(parseCookies(req.headers.cookie).job_session!));
     const ok = (data: unknown, status = 200) => { sendJson(res, status, data); return true; };
+    if(mfaPath){const mfa=new MfaService(db,config),tokenHash=hashSessionToken(parseCookies(req.headers.cookie).job_session!);if(!mfaPath[1]&&method==='GET')return ok(mfa.status(user,tokenHash));if(method==='POST'){const command=mfaPath[1];if(command==='setup')return ok(mfa.setup(user,tokenHash,body));if(command==='confirm')return ok(mfa.confirm(user,tokenHash,body));if(command==='verify')return ok(mfa.verify(user,tokenHash,body));if(command==='recover')return ok(mfa.recover(user,tokenHash,body));}}
     if(path==='/api/faro/sessions/revoke-all'&&method==='POST') {
       if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wylogowanie wszystkich sesji.','CONFIRMATION_REQUIRED');
       if(typeof body.password!=='string'||!body.password||body.password.length>MAX_PASSWORD_LENGTH)throw new HttpError(400,'Podaj aktualne hasło.','VALIDATION_ERROR');
