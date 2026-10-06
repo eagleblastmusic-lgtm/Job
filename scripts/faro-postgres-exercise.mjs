@@ -1,4 +1,4 @@
-import { createOrganization,verifyOrganization } from '../dist/server/faro/organizationWriteModel.js';
+import { createOrganization,verifyOrganization,inviteOrganizationMember,acceptOrganizationInvite,revokeOrganizationMember } from '../dist/server/faro/organizationWriteModel.js';
 import { readMembership,readAffiliation,readOrganizations } from '../dist/server/faro/organizationReadModel.js';
 import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,recordProfileActivity,decideProfileProposal } from '../dist/server/faro/profileWriteModel.js';
 import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
@@ -156,6 +156,23 @@ try {
     await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_org_audit_guard');
     await verifyOrganization(client,candidate.id,targetOrg.id,note,asOf);assert.equal((await client.query('SELECT verification FROM faro_organizations WHERE id=$1',[targetOrg.id])).rows[0].verification,'VERIFIED');assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE entity_id=$1 AND action='ORGANIZATION_VERIFIED'",[targetOrg.id])).rowCount,1);
     await client.query('UPDATE users SET role=$1 WHERE id=$2',[candidateRole,candidate.id]);
+    await assert.rejects(()=>inviteOrganizationMember(client,candidate.id,targetOrg.id,{email:candidate.email,role:'RECRUITER'},asOf),error=>error.code==='NOT_FOUND');
+    await assert.rejects(()=>inviteOrganizationMember(client,employer.id,targetOrg.id,{email:candidate.email,role:'OWNER'},asOf),error=>error.code==='VALIDATION_ERROR');
+    const invitation=await inviteOrganizationMember(client,employer.id,targetOrg.id,{email:candidate.email.toUpperCase(),role:'RECRUITER'},asOf);assert.equal(invitation.expiresInHours,72);
+    const storedInvitation=(await client.query('SELECT token_hash,email FROM faro_invites WHERE organization_id=$1',[targetOrg.id])).rows[0];assert.match(storedInvitation.token_hash,/^[a-f0-9]{64}$/);assert.notEqual(storedInvitation.token_hash,invitation.token);assert.equal(storedInvitation.email,candidate.email);
+    await assert.rejects(()=>acceptOrganizationInvite(client,employer.id,employer.email,invitation.token,asOf),error=>error.status===404);
+    await assert.rejects(()=>acceptOrganizationInvite(client,candidate.id,candidate.email,invitation.token,'2099-01-01T00:00:00.000Z'),error=>error.status===404);
+    assert.deepEqual(await acceptOrganizationInvite(client,candidate.id,candidate.email,invitation.token,asOf),{organizationId:targetOrg.id});assert.equal((await readMembership(client,candidate.id,targetOrg.id)).role,'RECRUITER');
+    await assert.rejects(()=>acceptOrganizationInvite(client,candidate.id,candidate.email,invitation.token,asOf),error=>error.status===404);
+    const ownerInvite=await inviteOrganizationMember(client,employer.id,targetOrg.id,{email:employer.email,role:'RECRUITER'},asOf);
+    await assert.rejects(()=>acceptOrganizationInvite(client,employer.id,employer.email,ownerInvite.token,asOf),error=>error.status===409);assert.equal((await readMembership(client,employer.id,targetOrg.id)).role,'OWNER');
+    await assert.rejects(()=>revokeOrganizationMember(client,candidate.id,targetOrg.id,employer.id,asOf),error=>error.code==='NOT_FOUND');await assert.rejects(()=>revokeOrganizationMember(client,employer.id,targetOrg.id,employer.id,asOf),error=>error.status===409);
+    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_member_audit_guard CHECK(action<>'MEMBERSHIP_REVOKED')");
+    await assert.rejects(()=>revokeOrganizationMember(client,employer.id,targetOrg.id,candidate.id,asOf),error=>error.code==='23514');assert.equal((await readMembership(client,candidate.id,targetOrg.id)).role,'RECRUITER');
+    await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_member_audit_guard');
+    await revokeOrganizationMember(client,employer.id,targetOrg.id,candidate.id,asOf);await assert.rejects(()=>readMembership(client,candidate.id,targetOrg.id),error=>error.code==='NOT_FOUND');assert.equal(await readAffiliation(client,candidate.id,targetOrg.id),true);
+    assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE action='MEMBERSHIP_REVOKED' AND entity_id=$1",[targetOrg.id])).rowCount,1);
+    const reinvite=await inviteOrganizationMember(client,employer.id,targetOrg.id,{email:candidate.email,role:'HIRING_MANAGER'},asOf);await acceptOrganizationInvite(client,candidate.id,candidate.email,reinvite.token,asOf);assert.equal((await readMembership(client,candidate.id,targetOrg.id)).role,'HIRING_MANAGER');
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -183,7 +200,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

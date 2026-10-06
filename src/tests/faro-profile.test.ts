@@ -78,3 +78,17 @@ test('organization verification and private moderation require independence even
     assert.equal((f.app.db.db.prepare('SELECT revision FROM faro_cases WHERE id=?').get(caseId) as {revision:number}).revision,2);
   }finally{await f.close();}
 });
+
+test('membership revocation and audit roll back together at the real API boundary',async()=>{
+  const f=await faroFixture();try{
+    const owner=await f.user('AtomicOwner'),member=await f.user('AtomicMember'),profiles=new ProfileService(f.app.db),org=profiles.organization(owner.id,{name:'Atomic organization'});
+    const invite=profiles.invite(owner.id,org.id,{email:member.email,role:'RECRUITER'});profiles.acceptInvite(member.id,member.email,invite.token);
+    f.app.db.db.exec("CREATE TRIGGER reject_membership_audit BEFORE INSERT ON audit_logs WHEN NEW.action='MEMBERSHIP_REVOKED' BEGIN SELECT RAISE(ABORT,'synthetic audit failure'); END");
+    await f.request(`/api/faro/organizations/${org.id}/members/${member.id}`,owner.cookie,'DELETE',undefined,500);
+    assert.equal(profiles.member(member.id,org.id).role,'RECRUITER');assert.equal((f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='MEMBERSHIP_REVOKED' AND entity_id=?").get(org.id) as {n:number}).n,0);
+    f.app.db.db.exec('DROP TRIGGER reject_membership_audit');
+    await f.request(`/api/faro/organizations/${org.id}/members/${member.id}`,owner.cookie,'DELETE');
+    assert.equal(profiles.organizations(member.id).length,0);assert.equal(profiles.affiliated(member.id,org.id),true);
+    assert.equal((f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='MEMBERSHIP_REVOKED' AND entity_id=?").get(org.id) as {n:number}).n,1);
+  }finally{await f.close();}
+});

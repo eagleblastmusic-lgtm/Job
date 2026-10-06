@@ -590,3 +590,10 @@ Existing create and independent moderator verification share parameterized plans
 CP11-Q exact remote acceptance at6728484: [FARO37443951948](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951948) and [CI37443951915](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951915) SUCCESS. Actual PostgreSQL18 Node22/24 membership/list parity, exact role allowlists, revoked access and retained affiliation proof PASS. Draft71 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-R full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+## CP11-S — Shared invitations and atomic membership revoke, 2026-10-06
+Existing invite/accept/revoke and real PostgreSQL share parameterized plans. Closes actual SQLite revoke-before-audit transaction gap; new real API failure regression PASS. Exact email/unused/expiry, hash-only token, owner protection, approved reactivation and historical affiliation retained. [Scope](CP11_S_PORTABLE_MEMBERSHIP_COMMANDS.md). Source-only70/35 and targeted4 API tests PASS; full application and PostgreSQL acceptance pending. Runtime SQLite; whole CP11/master plan/release PARTIAL. Continue remaining offer/process/assessment/auth/privacy/current-authority repositories after actual acceptance.
+
+CP11-R exact remote acceptance at3e76704: [FARO37444776127](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776127) and [CI37444776137](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776137) SUCCESS. Actual PostgreSQL18 Node22/24 create/FK rollback, independent moderator/historical conflict/restriction and audit rollback proof PASS. Draft72 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-S full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35, targeted4 API tests and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
