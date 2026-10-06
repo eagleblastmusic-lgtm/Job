@@ -1,12 +1,12 @@
 import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment,offerLifecycleAction,offerPublicationOrganizationQuery,requireOfferPublication,offerLifecycleQueries,offerNotificationRecipientsQuery,offerNotificationQueries } from './offerWriteModel.js';
-import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,offerListReadQuery,offerConditionsReadQueries,offerConditionsFromRows,offerConditionsAllow,type OfferRecord } from './offerReadModel.js';
+import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,offerListReadQuery,offerConditionsReadQueries,offerConditionsFromRows,offerConditionsAllow,offerDetailReadQueries,requireOfferDetailAccess,offerDetailFromRows,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { object, text, array, choice, integer, date, nullableBoolean } from './validation.js';
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
-import { explainOffer, sortOffers, type OfferData, type SalaryOption } from '../../domain/faro/offers.js';
+import { sortOffers, type OfferData, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
@@ -65,16 +65,10 @@ export class OfferService extends FaroStore {
     }));
   }
   detail(userId: string, id: string) {
-    const current = this.get(id),assigned=Boolean(this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=? AND m.active=1 WHERE a.offer_id=? AND a.user_id=?').get(current.organizationId,id,userId));
-    if (!this.intake(current)) {
-      const hasInterest = this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=?').get(userId, id);
-      const watched = this.db.prepare('SELECT offer_id FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(userId, id);
-      if (!hasInterest && !watched) this.assigned(userId, id);
-    }
-    const offer=assigned?current:this.published(id);
-    const p = new ProfileService(this.database, this.clock).profile(userId);
-    const ownInterest=this.db.prepare('SELECT id,status FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,id)??null;
-    return { ...offer, ownInterest, acceptingInterest: this.intake(current), explanation: explainOffer(offer.data, p.claims, p.learning),conditionExplanation:assigned?[]:this.conditions(userId,offer) };
+    const current=this.get(id),intake=this.intake(current),rows=offerDetailReadQueries(userId,current).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    requireOfferDetailAccess(rows,intake);
+    const offer=rows[0]?.length?current:this.published(id),profile=new ProfileService(this.database,this.clock).profile(userId);
+    return offerDetailFromRows(offer,rows,intake,profile,rows[0]?.length?[]:this.conditions(userId,offer));
   }
   create(userId: string, orgId: string, raw: Record<string, unknown>) {
     const id=randomUUID();

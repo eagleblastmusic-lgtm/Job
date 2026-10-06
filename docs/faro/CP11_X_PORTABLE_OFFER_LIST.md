@@ -9,3 +9,5 @@ Real PostgreSQL18 Node22/24 must prove exact public and organization wire parity
 Full local application and actual PostgreSQL acceptance pending. Runtime SQLite; remaining detail/process/assessment/auth/privacy repositories, production cutover and external acceptance gates remain open. Not whole plan/release DONE.
 
 CP11-X full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+CP11-X0e9c483 exact acceptance: [FARO37449170085](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37449170085) and [CI37449170043](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37449170043) SUCCESS. Actual PostgreSQL18 Node22/24 public/organization list wire parity, foreign-org refusal, known-failure exclusion and private commute current/stale/unknown proof PASS. Draft78 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
