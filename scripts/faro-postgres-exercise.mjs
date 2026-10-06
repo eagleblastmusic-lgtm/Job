@@ -1,7 +1,7 @@
 import { createOrganization,verifyOrganization,inviteOrganizationMember,acceptOrganizationInvite,revokeOrganizationMember } from '../dist/server/faro/organizationWriteModel.js';
 import { readMembership,readAffiliation,readOrganizations } from '../dist/server/faro/organizationReadModel.js';
 import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,recordProfileActivity,decideProfileProposal } from '../dist/server/faro/profileWriteModel.js';
-import { readPublishedOffer,readOfferList } from '../dist/server/faro/offerReadModel.js';
+import { readPublishedOffer,readOfferList,readOfferDetail } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromEnvironment } from './faro-postgres-rehearsal.mjs';
@@ -53,6 +53,20 @@ try {
     assert.deepEqual(wire(await readOfferList(client,candidate.id,asOf)),wire(listReference.list(candidate.id)));
     assert.deepEqual(wire(await readOfferList(client,employer.id,asOf,org.id)),wire(listReference.list(employer.id,org.id)));
     await assert.rejects(()=>readOfferList(client,candidate.id,asOf,org.id),error=>error.code==='NOT_FOUND');
+    for(const viewer of [candidate.id,employer.id])assert.deepEqual(wire(await readOfferDetail(client,viewer,offer.id,asOf)),wire(listReference.detail(viewer,offer.id)));
+    assert.deepEqual(wire(await readOfferDetail(client,employer.id,edited.id,asOf)),wire(listReference.detail(employer.id,edited.id)));
+    await assert.rejects(()=>readOfferDetail(client,candidate.id,draftOnly.id,asOf),error=>error.code==='NOT_FOUND');
+    await assert.rejects(()=>readOfferDetail(client,candidate.id,edited.id,asOf),error=>error.code==='NOT_FOUND');
+    await client.query('INSERT INTO faro_watches(candidate_id,offer_id,alerts,created_at) VALUES($1,$2,0,$3)',[candidate.id,edited.id,asOf]);
+    const watchedDraft=await readOfferDetail(client,candidate.id,edited.id,asOf);assert.equal(watchedDraft.version,1);assert.equal(watchedDraft.status,'PAUSED');assert.equal(watchedDraft.data.role,offer.data.role);assert.equal(watchedDraft.acceptingInterest,false);
+    await client.query('DELETE FROM faro_watches WHERE candidate_id=$1 AND offer_id=$2',[candidate.id,edited.id]);
+    await client.query('UPDATE faro_members SET active=0 WHERE user_id=$1 AND organization_id=$2',[employer.id,org.id]);
+    await assert.rejects(()=>readOfferDetail(client,employer.id,offer.id,asOf),error=>error.code==='NOT_FOUND');assert.equal((await readOfferDetail(client,candidate.id,offer.id,asOf)).acceptingInterest,false);
+    await client.query('UPDATE faro_members SET active=1 WHERE user_id=$1 AND organization_id=$2',[employer.id,org.id]);
+    const laterProcess=randomBytes(16).toString('hex');
+    await client.query("INSERT INTO faro_interests(id,candidate_id,offer_id,offer_version,snapshot,status,stage,response_due_at,created_at,previous_interest_id) SELECT $1,candidate_id,offer_id,offer_version,snapshot,'WITHDRAWN','TERMINAL',response_due_at,$2,id FROM faro_interests WHERE id=$3",[laterProcess,'2000-01-01T00:00:00.000Z',process.id]);
+    assert.deepEqual((await readOfferDetail(client,candidate.id,offer.id,asOf)).ownInterest,{id:laterProcess,status:'WITHDRAWN'});assert.equal((await readOfferDetail(client,employer.id,offer.id,asOf)).ownInterest,null);
+    await client.query('DELETE FROM faro_interests WHERE id=$1',[laterProcess]);assert.equal((await readOfferDetail(client,candidate.id,offer.id,asOf)).ownInterest.id,process.id);
     const originalPreferences=(await client.query('SELECT preferences FROM faro_profiles WHERE user_id=$1',[candidate.id])).rows[0].preferences;
     const constraints={active:true,workModels:['ONSITE'],contracts:[],noNights:false,noWeekends:false,maxCommuteMinutes:null};
     await client.query('UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2',[JSON.stringify(constraints),candidate.id]);
@@ -264,7 +278,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

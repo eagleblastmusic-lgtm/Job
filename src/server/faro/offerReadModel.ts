@@ -1,4 +1,5 @@
-import { DEFAULT_CONSTRAINTS,explainConditions,sortOffers,type CandidateConstraints,type OfferData,type OfferStatus } from '../../domain/faro/offers.js';
+import { DEFAULT_CONSTRAINTS,explainOffer,explainConditions,sortOffers,type CandidateConstraints,type OfferData,type OfferStatus } from '../../domain/faro/offers.js';
+import { profileReadQueries,profileFromRows } from './profileReadModel.js';
 import { membershipReadQuery,membershipFromRows } from './organizationReadModel.js';
 import { HttpError } from '../http.js';
 export interface OfferRecord {id:string;organizationId:string;company:string;status:OfferStatus;version:number;revision:number;approvedVersion:number|null;confirmedUntil:string|null;createdAt:string;data:OfferData;publishedAt?:string|null;publicationSource?:string;}
@@ -72,5 +73,30 @@ export async function readOfferList(database:OfferReadDatabase,userId:string,asO
       if(offerConditionsAllow(conditions,includeUnknown))result.push({...published,hasUnknownConditions:conditions.some(condition=>condition.state==='UNKNOWN')});
     }
     return sortOffers(result);
+  },{readOnly:true});
+}
+
+export function offerDetailReadQueries(userId:string,offer:OfferRecord,postgres=false) {
+  // Preserve insertion order, including equal/backdated clocks; the reviewed importer initializes this identity.
+  const insertionOrder=postgres?'__faro_source_rowid':'rowid';
+  return [
+    {text:'SELECT a.user_id,m.role FROM faro_assignments a JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=$1 AND m.active=1 WHERE a.offer_id=$2 AND a.user_id=$3',values:[offer.organizationId,offer.id,userId]},
+    {text:`SELECT id,status FROM faro_interests WHERE candidate_id=$1 AND offer_id=$2 ORDER BY ${insertionOrder} DESC LIMIT 1`,values:[userId,offer.id]},
+    {text:'SELECT offer_id FROM faro_watches WHERE candidate_id=$1 AND offer_id=$2',values:[userId,offer.id]}
+  ];
+}
+export function requireOfferDetailAccess(rows:Record<string,unknown>[][],accepting:boolean) {
+  if(!accepting&&!rows[1]?.length&&!rows[2]?.length)membershipFromRows(rows[0]??[]);
+}
+export function offerDetailFromRows(offer:OfferRecord,rows:Record<string,unknown>[][],accepting:boolean,profile:ReturnType<typeof profileFromRows>,conditions:ReturnType<typeof offerConditionsFromRows>) {
+  return {...offer,ownInterest:rows[1]?.[0]??null,acceptingInterest:accepting,explanation:explainOffer(offer.data,profile.claims,profile.learning),conditionExplanation:rows[0]?.length?[]:conditions};
+}
+export async function readOfferDetail(database:OfferReadDatabase,userId:string,id:string,asOf:string) {
+  return database.transaction(async()=>{
+    const current=offerFromRows((await database.readBatch([offerReadQuery(id)]))[0]??[]),intake=intakeFromRows(current,await database.readBatch(intakeReadQueries(current)),asOf);
+    const access=await database.readBatch(offerDetailReadQueries(userId,current,true));requireOfferDetailAccess(access,intake);
+    const offer=access[0]?.length?current:publishedFromRows(current,(await database.readBatch([publishedReadQuery(id)]))[0]??[],intake);
+    const profile=profileFromRows(await database.readBatch(profileReadQueries(userId)),asOf),conditions=access[0]?.length?[]:offerConditionsFromRows(offer,await database.readBatch(offerConditionsReadQueries(userId,id)),asOf);
+    return offerDetailFromRows(offer,access,intake,profile,conditions);
   },{readOnly:true});
 }

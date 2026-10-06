@@ -1,0 +1,11 @@
+# CP11-Y — Shared private offer detail/history read (2026-10-06)
+
+Existing OfferService.detail and actual PostgreSQL consume shared explicit active assignment/own latest process/private watch queries, access check and response map. Candidate responses retain proven publication and own private conditions/native competence explanation. Assigned active members retain current draft visibility. Closed intake still permits own process/watch context; an unassociated viewer is refused opaquely. Revoked assignment membership never grants draft access. Unpublished watched drafts still require an existing proven publication.
+
+Latest own process keeps insertion-order semantics rather than switching to created_at: equal or backdated clocks cannot make an old process look newest. SQLite uses native rowid; PostgreSQL staging uses the existing reviewed importer __faro_source_rowid identity, initialized above imported maximum. The closed backend choice is internal, never a user-provided identifier. Only id/status are selected; target order metadata never reaches wire responses. This continues the current staging schema, not a production schema/cutover claim.
+
+PostgreSQL owns one SERIALIZABLE READ ONLY snapshot for offer, current authority, publication, own process/watch, profile and private conditions. Real PostgreSQL18 Node22/24 must prove exact candidate/member detail wire parity, current draft for assigned member, foreign unpublished refusal, watch showing only published v1 under draft v2, revoked member refusal while own candidate history stays available, and new backdated process chosen by insertion order without exposing it to employer. Temporary fixtures are removed before remaining retained proofs. All earlier70-table hashes/constraints/rollback/command proof remains required.
+
+Full local application and real PostgreSQL acceptance pending. Runtime SQLite; remaining process/assessment/auth/privacy/current-authority work and external acceptance gates remain open. Locked login and release refusal unchanged; not whole plan or release DONE.
+
+CP11-Y full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
