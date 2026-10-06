@@ -1,7 +1,7 @@
 import { createOrganization,verifyOrganization,inviteOrganizationMember,acceptOrganizationInvite,revokeOrganizationMember } from '../dist/server/faro/organizationWriteModel.js';
 import { readMembership,readAffiliation,readOrganizations } from '../dist/server/faro/organizationReadModel.js';
 import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,recordProfileActivity,decideProfileProposal } from '../dist/server/faro/profileWriteModel.js';
-import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
+import { readPublishedOffer,readOfferList } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromEnvironment } from './faro-postgres-rehearsal.mjs';
@@ -49,6 +49,23 @@ try {
     assert.equal((await readProfile(client,candidate.id,asOf)).version,reference.profile(candidate.id).version);
     await assert.rejects(()=>client.readBatch([{text:'SELECT 9007199254740993::bigint AS unsafe',values:[]}]),error=>error.code==='22003');
     await client.transaction(async()=>assert.equal((await readProfile(client,candidate.id,asOf)).version,1));
+    const listReference=new OfferService(f.app.db,()=>new Date(asOf));
+    assert.deepEqual(wire(await readOfferList(client,candidate.id,asOf)),wire(listReference.list(candidate.id)));
+    assert.deepEqual(wire(await readOfferList(client,employer.id,asOf,org.id)),wire(listReference.list(employer.id,org.id)));
+    await assert.rejects(()=>readOfferList(client,candidate.id,asOf,org.id),error=>error.code==='NOT_FOUND');
+    const originalPreferences=(await client.query('SELECT preferences FROM faro_profiles WHERE user_id=$1',[candidate.id])).rows[0].preferences;
+    const constraints={active:true,workModels:['ONSITE'],contracts:[],noNights:false,noWeekends:false,maxCommuteMinutes:null};
+    await client.query('UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2',[JSON.stringify(constraints),candidate.id]);
+    assert.equal((await readOfferList(client,candidate.id,asOf,undefined,true)).length,0);
+    constraints.workModels=[];constraints.maxCommuteMinutes=30;
+    await client.query('UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2',[JSON.stringify(constraints),candidate.id]);
+    assert.equal((await readOfferList(client,candidate.id,asOf)).length,0);
+    const unknownList=await readOfferList(client,candidate.id,asOf,undefined,true);assert.equal(unknownList.length,1);assert.equal(unknownList[0].id,offer.id);assert.equal(unknownList[0].hasUnknownConditions,true);
+    const economics={commuteTimeMinutes:20,source:'synthetic manual estimate',sourceDate:asOf,units:{commuteTime:'ROUND_TRIP_MINUTES_PER_WORK_DAY'}};
+    await client.query("INSERT INTO faro_economics(candidate_id,offer_id,offer_version,scenario,result,updated_at) VALUES($1,$2,$3,'{}',$4,$5)",[candidate.id,offer.id,1,JSON.stringify(economics),asOf]);
+    assert.equal((await readOfferList(client,candidate.id,asOf)).length,1);
+    await client.query('UPDATE faro_economics SET offer_version=2 WHERE candidate_id=$1 AND offer_id=$2',[candidate.id,offer.id]);assert.equal((await readOfferList(client,candidate.id,asOf)).length,0);
+    await client.query('DELETE FROM faro_economics WHERE candidate_id=$1 AND offer_id=$2',[candidate.id,offer.id]);await client.query('UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2',[originalPreferences,candidate.id]);
     for(const id of [offer.id,edited.id]){
       const actual=await readPublishedOffer(client,id,asOf);
       assert.deepEqual(wire(actual.current),wire(offers.get(id)));assert.deepEqual(wire(actual.published),wire(offers.published(id)));assert.equal(actual.acceptingInterest,offers.intake(offers.get(id)));
@@ -247,7 +264,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

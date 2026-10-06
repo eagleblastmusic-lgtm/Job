@@ -1,4 +1,5 @@
-import type { OfferData,OfferStatus } from '../../domain/faro/offers.js';
+import { DEFAULT_CONSTRAINTS,explainConditions,sortOffers,type CandidateConstraints,type OfferData,type OfferStatus } from '../../domain/faro/offers.js';
+import { membershipReadQuery,membershipFromRows } from './organizationReadModel.js';
 import { HttpError } from '../http.js';
 export interface OfferRecord {id:string;organizationId:string;company:string;status:OfferStatus;version:number;revision:number;approvedVersion:number|null;confirmedUntil:string|null;createdAt:string;data:OfferData;publishedAt?:string|null;publicationSource?:string;}
 export function offerReadQuery(id:string) {
@@ -37,5 +38,39 @@ export async function readPublishedOffer(database:OfferReadDatabase,id:string,as
     const rows=await database.readBatch([publishedReadQuery(id),...intakeReadQueries(current)]);
     const acceptingInterest=intakeFromRows(current,rows.slice(1),asOf);
     return {current,published:publishedFromRows(current,rows[0]??[],acceptingInterest),acceptingInterest};
+  },{readOnly:true});
+}
+
+export function offerListReadQuery(organizationId?:string) {
+  return organizationId?{text:'SELECT id FROM faro_offers WHERE organization_id=$1',values:[organizationId]}:{text:"SELECT id FROM faro_offers WHERE status='PUBLISHED'",values:[]};
+}
+export function offerConditionsReadQueries(userId:string,id:string) {
+  return [
+    {text:'SELECT preferences FROM faro_profiles WHERE user_id=$1',values:[userId]},
+    {text:'SELECT result,offer_version FROM faro_economics WHERE candidate_id=$1 AND offer_id=$2',values:[userId,id]}
+  ];
+}
+export function offerConditionsFromRows(offer:OfferRecord,rows:Record<string,unknown>[][],asOf:string) {
+  const preferences=rows[0]?.[0]?.preferences as string|undefined,constraints={...DEFAULT_CONSTRAINTS,...(preferences?JSON.parse(preferences) as Partial<CandidateConstraints>:{})};
+  const saved=rows[1]?.[0] as {result:string;offer_version:number}|undefined;
+  const estimate=saved?JSON.parse(saved.result) as {commuteTimeMinutes:number|null;source:string;sourceDate:string;units?:{commuteTime:string}}:null;
+  return explainConditions(offer.data,constraints,estimate&&saved?{minutes:estimate.commuteTimeMinutes,source:estimate.source,observedAt:estimate.sourceDate,asOf,currentVersion:saved.offer_version===offer.version,basis:estimate.units?.commuteTime??''}:undefined);
+}
+export function offerConditionsAllow(conditions:ReturnType<typeof offerConditionsFromRows>,includeUnknown:boolean) {
+  return conditions.every(condition=>condition.state==='SATISFIED'||includeUnknown&&condition.state==='UNKNOWN');
+}
+export async function readOfferList(database:OfferReadDatabase,userId:string,asOf:string,organizationId?:string,includeUnknown=false) {
+  return database.transaction(async()=>{
+    if(organizationId)membershipFromRows((await database.readBatch([membershipReadQuery(userId,organizationId)]))[0]??[]);
+    const ids=(await database.readBatch([offerListReadQuery(organizationId)]))[0]??[],result:Array<OfferRecord & {hasUnknownConditions?:boolean}>=[];
+    for(const row of ids){
+      const current=offerFromRows((await database.readBatch([offerReadQuery(row.id as string)]))[0]??[]);
+      if(organizationId){result.push(current);continue;}
+      const publication=await database.readBatch([publishedReadQuery(current.id),...intakeReadQueries(current)]);
+      if(!intakeFromRows(current,publication.slice(1),asOf))continue;
+      const published=publishedFromRows(current,publication[0]??[],true),conditions=offerConditionsFromRows(published,await database.readBatch(offerConditionsReadQueries(userId,current.id)),asOf);
+      if(offerConditionsAllow(conditions,includeUnknown))result.push({...published,hasUnknownConditions:conditions.some(condition=>condition.state==='UNKNOWN')});
+    }
+    return sortOffers(result);
   },{readOnly:true});
 }
