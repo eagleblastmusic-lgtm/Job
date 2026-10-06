@@ -1,3 +1,4 @@
+import { saveProfile } from '../dist/server/faro/profileWriteModel.js';
 import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -72,6 +73,26 @@ try {
     assert.equal((await client.query('SELECT 1 FROM pg_namespace WHERE nspname=$1',[badSchema])).rowCount,0);
     await assert.rejects(()=>client.query('UPDATE faro_mfa SET last_counter=-2 WHERE user_id=$1',[candidate.id]),e=>e.code==='23514');
     await assert.rejects(()=>client.query('INSERT INTO faro_mfa(user_id) VALUES($1)',['missing-parent']),e=>e.code==='23503');
+    // Writes are exercised only in the isolated target; the offline source remains immutable.
+    await client.query('INSERT INTO faro_contact_grants(process_id,candidate_id,organization_id,granted_at) VALUES($1,$2,$3,$4)',[process.id,candidate.id,org.id,asOf]);
+    const originalProfile=await readProfile(client,candidate.id,asOf);
+    const changed=await saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:1,phone:'+48500100200',availability:{kind:'ON_DATE',value:'2026-11-01'}},asOf);
+    assert.equal(changed.version,2);assert.equal(changed.firstName,'Anna');assert.equal(changed.phone,'+48500100200');assert.deepEqual(changed.claims,originalProfile.claims);assert.deepEqual(changed.learning,originalProfile.learning);assert.deepEqual(changed.preferences,originalProfile.preferences);
+    assert.equal((await client.query('SELECT revoked_at FROM faro_contact_grants WHERE process_id=$1',[process.id])).rows[0].revoked_at,asOf);
+    assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
+    await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:1,availability:{kind:'IMMEDIATE'}},asOf),error=>error.code==='VERSION_CONFLICT');
+    await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Anna Kowalska',expectedVersion:2,availability:{kind:'IMMEDIATE'}},asOf),error=>error.code==='FIRST_NAME_ONLY');
+    await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:2,availability:{kind:'ON_DATE',value:'2026-02-30'}},asOf),error=>error.status===400&&error.code==='REQUEST_ERROR');
+    assert.deepEqual(await readProfile(client,candidate.id,asOf),changed);
+    await client.query("UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2",[JSON.stringify({active:true,noNights:true}),candidate.id]);
+    const unchangedPhone=await saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:2,phone:'+48500100200',availability:{kind:'IMMEDIATE'}},asOf);
+    assert.equal(unchangedPhone.version,3);assert.deepEqual(unchangedPhone.preferences,{active:true,noNights:true});assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
+    // A real database failure after grant revocation must roll back revocation and audit together.
+    await client.query('UPDATE faro_contact_grants SET revoked_at=NULL WHERE process_id=$1',[process.id]);
+    await client.query("ALTER TABLE faro_profiles ADD CONSTRAINT pg_profile_write_guard CHECK(first_name<>'Blocked')");
+    await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Blocked',expectedVersion:3,phone:'+48500100201',availability:{kind:'IMMEDIATE'}},asOf),error=>error.code==='23514');
+    assert.equal((await client.query('SELECT revoked_at FROM faro_contact_grants WHERE process_id=$1',[process.id])).rows[0].revoked_at,null);assert.deepEqual(await readProfile(client,candidate.id,asOf),unchangedPhone);assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
+    const initial=await saveProfile(client,employer.id,{firstName:'Jan',expectedVersion:0,availability:{kind:'UNKNOWN'}},asOf);assert.equal(initial.version,1);assert.equal(initial.phone,null);
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -99,7 +120,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
