@@ -29,17 +29,33 @@ export class PgJobDatabase {
     if(!this.ready||this.closing)throw misuse('PG_CONNECTION_STATE');
     return this.serialize(()=>this.scope.run({active:true,transaction:false},async()=>{const owned=this.scope.getStore()!;try{return await work();}finally{owned.active=false;}}));
   }
-  async transaction<T>(work:()=>T|Promise<T>):Promise<T> {
+  async transaction<T>(work:()=>T|Promise<T>,options:{readOnly?:boolean}={}):Promise<T> {
     return this.session(async()=>{
       const owned=this.scope.getStore()!;if(owned.transaction)throw misuse('PG_NESTED_TRANSACTION');owned.transaction=true;owned.failure=undefined;let begun=false;
       try {
-        await this.query('BEGIN ISOLATION LEVEL SERIALIZABLE');begun=true;
+        await this.query(options.readOnly?'BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY':'BEGIN ISOLATION LEVEL SERIALIZABLE');begun=true;
         await this.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'; SET LOCAL idle_in_transaction_session_timeout='30s'; SET LOCAL timezone='UTC'");
         const result=await work();if(owned.failure)throw Object.assign(new Error('PostgreSQL transaction failed.'),{code:owned.failure});
         const committed=await this.query('COMMIT');if(committed.command!=='COMMIT')throw misuse('PG_COMMIT_FAILED');return result;
       } catch(error){if(begun){try{await this.query('ROLLBACK');}catch{this.ready=false;this.closing=true;await this.client.end().catch(()=>undefined);}}throw error;}
       finally {owned.transaction=false;owned.failure=undefined;}
     });
+  }
+  async readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]> {
+    const work=async()=>{
+      const results=await Promise.all(queries.map(query=>this.query(query.text,query.values)));
+      return results.map(result=>result.rows.map(row=>{
+        const copy:Record<string,unknown>={...row};
+        for(const field of result.fields)if(field.dataTypeID===20&&copy[field.name]!==null){
+          const value=Number(copy[field.name]);
+          if(!Number.isSafeInteger(value))throw Object.assign(new Error('PostgreSQL integer outside domain range.'),{code:'22003'});
+          copy[field.name]=value;
+        }
+        return copy;
+      }));
+    };
+    const current=this.scope.getStore();
+    return current?.active&&current.transaction?work():this.transaction(work,{readOnly:true});
   }
   async end():Promise<void>{if(this.scope.getStore()?.active)throw misuse('PG_CLOSE_IN_SCOPE');if(this.closing)return;this.closing=true;await this.serialize(async()=>{this.ready=false;await this.client.end();});}
 }

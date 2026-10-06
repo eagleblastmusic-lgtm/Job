@@ -189,3 +189,8 @@ CP06-J draft [#62](https://github.com/eagleblastmusic-lgtm/Job/pull/62): codex/f
 
 
 CP11-I draft [#63](https://github.com/eagleblastmusic-lgtm/Job/pull/63): codex/faro-cp11i-postgres base codex/faro-cp06j-employment, codefe39731 + fix7c05f87. Both37389939763/37389940077 SUCCESS at7c05f87; real PostgreSQL18 Node22/24 PASS. All draft/unmerged.
+
+
+CP11-J exact remote acceptance at01e33b6: [FARO37391162935](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37391162935) and [CI37391162982](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37391162982) SUCCESS. CP11-K exact remote acceptance atbd8b141: [FARO37391574567](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37391574567) and [CI37391574640](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37391574640) SUCCESS, including real PostgreSQL18 Node22/24 transaction/scope/conflict proof. Draft64/65 remain dependent/unmerged. Full plan/release PARTIAL.
+
+CP11-J draft [#64](https://github.com/eagleblastmusic-lgtm/Job/pull/64): codex/faro-cp11j-offer-analytics base codex/faro-cp11i-postgres, code01e33b6. CP11-K draft [#65](https://github.com/eagleblastmusic-lgtm/Job/pull/65): codex/faro-cp11k-pg-boundary base codex/faro-cp11j-offer-analytics, codebd8b141. Both exact remote checks SUCCESS above; drafts unmerged.
