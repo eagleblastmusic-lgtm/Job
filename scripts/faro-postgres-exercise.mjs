@@ -8,7 +8,7 @@ import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromE
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
 import { readProfile } from '../dist/server/faro/profileReadModel.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
-import { createOfferDraft,editOfferDraft } from '../dist/server/faro/offerWriteModel.js';
+import { createOfferDraft,editOfferDraft,changeOfferLifecycle } from '../dist/server/faro/offerWriteModel.js';
 import { OfferService,parseOffer } from '../dist/server/faro/offerService.js';
 import { RecruitmentService } from '../dist/server/faro/recruitmentService.js';
 import { AssessmentService } from '../dist/server/faro/assessmentService.js';
@@ -195,6 +195,22 @@ try {
     assert.equal((await client.query('SELECT current_version FROM faro_offers WHERE id=$1',[targetDraft.id])).rows[0].current_version,'2');assert.equal((await client.query('SELECT 1 FROM faro_offer_versions WHERE offer_id=$1 AND version=3',[targetDraft.id])).rowCount,0);
     await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_edit_audit_guard');
     const revisedPublished=await editOfferDraft(client,employer.id,offer.id,{expectedVersion:3,data:{...offers.get(offer.id).data,role:'Draft after retained publication'}},asOf,parseOffer);assert.equal(revisedPublished.version,2);assert.equal(revisedPublished.approvedVersion,null);const retainedPublished=await readPublishedOffer(client,offer.id,asOf);assert.equal(retainedPublished.published.version,1);assert.equal(retainedPublished.published.status,'PAUSED');assert.equal(retainedPublished.acceptingInterest,false);
+    await assert.rejects(()=>changeOfferLifecycle(client,candidate.id,offer.id,{action:'REVIEW',expectedVersion:revisedPublished.revision},asOf),error=>error.code==='NOT_FOUND');
+    await assert.rejects(()=>changeOfferLifecycle(client,employer.id,offer.id,{action:'REVIEW',expectedVersion:1},asOf),error=>error.code==='VERSION_CONFLICT');
+    const reviewed=await changeOfferLifecycle(client,employer.id,offer.id,{action:'REVIEW',expectedVersion:revisedPublished.revision},asOf);assert.equal(reviewed.status,'IN_REVIEW');assert.equal(reviewed.approvedVersion,null);
+    await assert.rejects(()=>changeOfferLifecycle(client,employer.id,offer.id,{action:'PUBLISH',expectedVersion:reviewed.revision},asOf),error=>error.status===400);
+    await client.query("UPDATE faro_organizations SET verification='PENDING' WHERE id=$1",[org.id]);await assert.rejects(()=>changeOfferLifecycle(client,employer.id,offer.id,{action:'PUBLISH',expectedVersion:reviewed.revision,confirmed:true},asOf),error=>error.code==='ORGANIZATION_NOT_VERIFIED');await client.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);
+    await client.query("ALTER TABLE faro_outbox ADD CONSTRAINT pg_offer_delivery_guard CHECK(entity_type<>'offer') NOT VALID");
+    await assert.rejects(()=>changeOfferLifecycle(client,employer.id,offer.id,{action:'PUBLISH',expectedVersion:reviewed.revision,confirmed:true},asOf),error=>error.code==='23514');assert.equal((await client.query('SELECT status FROM faro_offers WHERE id=$1',[offer.id])).rows[0].status,'IN_REVIEW');assert.equal((await client.query('SELECT publication_proof FROM faro_offer_versions WHERE offer_id=$1 AND version=2',[offer.id])).rows[0].publication_proof,'NONE');
+    await client.query('ALTER TABLE faro_outbox DROP CONSTRAINT pg_offer_delivery_guard');
+    const publishedAgain=await changeOfferLifecycle(client,employer.id,offer.id,{action:'PUBLISH',expectedVersion:reviewed.revision,confirmed:true},asOf);assert.equal(publishedAgain.version,2);assert.equal(publishedAgain.approvedVersion,2);assert.equal((await readPublishedOffer(client,offer.id,asOf)).acceptingInterest,true);
+    assert.equal((await client.query('SELECT 1 FROM faro_outbox WHERE recipient_id=$1 AND dedupe_key=$2',[candidate.id,`offer:${offer.id}:2:PUBLISH`])).rowCount,1);
+    const laterConfirmation='2026-10-06T01:00:00.000Z',confirmedAgain=await changeOfferLifecycle(client,employer.id,offer.id,{action:'RECONFIRM',expectedVersion:publishedAgain.revision,confirmed:true},laterConfirmation);
+    assert.equal((await client.query('SELECT published_at FROM faro_offer_versions WHERE offer_id=$1 AND version=2',[offer.id])).rows[0].published_at,asOf);assert.equal((await client.query('SELECT confirmed_at FROM faro_offers WHERE id=$1',[offer.id])).rows[0].confirmed_at,laterConfirmation);
+    const reConfirmedAgain=await changeOfferLifecycle(client,employer.id,offer.id,{action:'RECONFIRM',expectedVersion:confirmedAgain.revision,confirmed:true},asOf);assert.equal((await client.query('SELECT 1 FROM faro_outbox WHERE recipient_id=$1 AND dedupe_key=$2',[candidate.id,`offer:${offer.id}:2:RECONFIRM`])).rowCount,1);
+    const closed=await changeOfferLifecycle(client,employer.id,offer.id,{action:'CLOSE',expectedVersion:reConfirmedAgain.revision},asOf);assert.equal(closed.status,'CLOSED');assert.equal((await readPublishedOffer(client,offer.id,asOf)).acceptingInterest,false);assert.equal((await client.query('SELECT 1 FROM faro_outbox WHERE recipient_id=$1 AND dedupe_key=$2',[candidate.id,`offer:${offer.id}:2:CLOSE`])).rowCount,1);
+    await assert.rejects(()=>changeOfferLifecycle(client,employer.id,offer.id,{action:'PUBLISH',expectedVersion:closed.revision,confirmed:true},asOf),error=>error.code==='INVALID_TRANSITION');
+    const archived=await changeOfferLifecycle(client,employer.id,offer.id,{action:'ARCHIVE',expectedVersion:closed.revision},asOf);assert.equal(archived.status,'ARCHIVED');
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -231,7 +247,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
