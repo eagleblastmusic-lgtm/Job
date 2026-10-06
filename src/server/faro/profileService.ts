@@ -1,9 +1,9 @@
-import { parseProfileSave,profileSaveQueries,profileAvailability } from './profileWriteModel.js';
+import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows } from './profileReadModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
-import { object, text, choice, integer, array } from './validation.js';
-import { DEFAULT_CONSTRAINTS,type CandidateConstraints, type SalaryMinimum } from '../../domain/faro/offers.js';
+import { object, text, choice, integer } from './validation.js';
+import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
 import { LEVELS, SOURCES, skillById, suggestSkills, employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
 
@@ -14,30 +14,14 @@ export class ProfileService extends FaroStore {
     return {...DEFAULT_CONSTRAINTS,...preferences} as CandidateConstraints;
   }
   saveConstraints(userId:string,body:Record<string,unknown>) {
-    const raw=object(body.constraints);
-    for(const key of ['active','noNights','noWeekends'])if(typeof raw[key]!=='boolean')throw new HttpError(400,'Wybierz jawnie granice warunków.');
-    const constraints:CandidateConstraints={active:raw.active as boolean,noNights:raw.noNights as boolean,noWeekends:raw.noWeekends as boolean,
-      workModels:[...new Set(array(raw.workModels,3).map(v=>choice(v,['ONSITE','HYBRID','REMOTE'] as const)))],
-      contracts:[...new Set(array(raw.contracts,3).map(v=>choice(v,['UOP','CIVIL','B2B'] as const)))]};
+    const parsed=parseProfileConstraints(body);
     return this.transaction(()=>{
-      const current=this.profile(userId);
-      if(!current.version)throw new HttpError(409,'Najpierw zapisz swój profil.','PROFILE_REQUIRED');
-      if(integer(body.expectedVersion,1)!==current.version)throw new HttpError(409,'Odśwież profil.','VERSION_CONFLICT');
-      // Older callers omitting this field do not silently erase an existing private minimum.
-      const salaryRaw=raw.salaryMinimum===undefined?this.constraints(userId).salaryMinimum:raw.salaryMinimum;
-      const commuteRaw=raw.maxCommuteMinutes===undefined?this.constraints(userId).maxCommuteMinutes:raw.maxCommuteMinutes;
-      constraints.maxCommuteMinutes=commuteRaw===null||commuteRaw===undefined?null:integer(commuteRaw,0,1440);
-      if(salaryRaw===null||salaryRaw===undefined)constraints.salaryMinimum=null;
-      else {
-        const s=object(salaryRaw);
-        constraints.salaryMinimum={amount:integer(s.amount,1),currency:choice(s.currency,['PLN'] as const),
-          basis:choice(s.basis,['GROSS_EMPLOYMENT','GROSS_CIVIL','B2B_NET_INVOICE_EXCL_VAT'] as const),
-          period:choice(s.period,['HOUR','DAY','MONTH','YEAR'] as const),hoursPerPeriod:integer(s.hoursPerPeriod,1,9000),ftePercent:integer(s.ftePercent,1,100)} satisfies SalaryMinimum;
-      }
-      this.db.prepare('UPDATE faro_profiles SET preferences=?,version=version+1,updated_at=? WHERE user_id=?').run(JSON.stringify(constraints),this.now(),userId);
+      const query=profileConstraintsQuery(userId,body,this.profile(userId),parsed,this.now());
+      this.db.prepare(query.text).run({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!});
       return this.profile(userId);
     });
   }
+
   profile(userId: string) {
     const rows=profileReadQueries(userId).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
     return profileFromRows(rows,this.now());

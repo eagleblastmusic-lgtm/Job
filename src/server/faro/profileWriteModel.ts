@@ -1,7 +1,8 @@
+import { DEFAULT_CONSTRAINTS,type CandidateConstraints,type SalaryMinimum } from '../../domain/faro/offers.js';
 import { randomUUID } from 'node:crypto';
 import type { Availability } from '../../domain/faro/skills.js';
 import { HttpError } from '../http.js';
-import { object,text,choice,integer } from './validation.js';
+import { object,text,choice,integer,array } from './validation.js';
 import { readProfile } from './profileReadModel.js';
 export function profileAvailability(input:unknown,asOf:string):Availability {
   const raw=object(input),kind=choice(raw.kind,['UNKNOWN','IMMEDIATE','AFTER_PERIOD','ON_DATE'] as const);
@@ -36,6 +37,34 @@ export async function saveProfile(database:ProfileWriteDatabase,userId:string,bo
   return database.transaction(async()=>{
     const current=await readProfile(database,userId,asOf);
     for(const query of profileSaveQueries(userId,body,current,parsed,asOf))await database.query(query.text,query.values);
+    return readProfile(database,userId,asOf);
+  });
+}
+
+export function parseProfileConstraints(body:Record<string,unknown>) {
+  const raw=object(body.constraints);
+  for(const key of ['active','noNights','noWeekends'])if(typeof raw[key]!=='boolean')throw new HttpError(400,'Wybierz jawnie granice warunków.');
+  const constraints:CandidateConstraints={active:raw.active as boolean,noNights:raw.noNights as boolean,noWeekends:raw.noWeekends as boolean,workModels:[...new Set(array(raw.workModels,3).map(value=>choice(value,['ONSITE','HYBRID','REMOTE'] as const)))],contracts:[...new Set(array(raw.contracts,3).map(value=>choice(value,['UOP','CIVIL','B2B'] as const)))]};
+  return {raw,constraints};
+}
+export function profileConstraintsQuery(userId:string,body:Record<string,unknown>,current:{version:number;preferences:Record<string,unknown>},parsed:ReturnType<typeof parseProfileConstraints>,asOf:string) {
+  if(!current.version)throw new HttpError(409,'Najpierw zapisz swój profil.','PROFILE_REQUIRED');
+  if(integer(body.expectedVersion,1)!==current.version)throw new HttpError(409,'Odśwież profil.','VERSION_CONFLICT');
+  const {raw}=parsed,constraints={...parsed.constraints},previous={...DEFAULT_CONSTRAINTS,...current.preferences} as CandidateConstraints;
+  const salaryRaw=raw.salaryMinimum===undefined?previous.salaryMinimum:raw.salaryMinimum,commuteRaw=raw.maxCommuteMinutes===undefined?previous.maxCommuteMinutes:raw.maxCommuteMinutes;
+  constraints.maxCommuteMinutes=commuteRaw===null||commuteRaw===undefined?null:integer(commuteRaw,0,1440);
+  if(salaryRaw===null||salaryRaw===undefined)constraints.salaryMinimum=null;
+  else {
+    const salary=object(salaryRaw);
+    constraints.salaryMinimum={amount:integer(salary.amount,1),currency:choice(salary.currency,['PLN'] as const),basis:choice(salary.basis,['GROSS_EMPLOYMENT','GROSS_CIVIL','B2B_NET_INVOICE_EXCL_VAT'] as const),period:choice(salary.period,['HOUR','DAY','MONTH','YEAR'] as const),hoursPerPeriod:integer(salary.hoursPerPeriod,1,9000),ftePercent:integer(salary.ftePercent,1,100)} satisfies SalaryMinimum;
+  }
+  return {text:'UPDATE faro_profiles SET preferences=$1,version=version+1,updated_at=$2 WHERE user_id=$3',values:[JSON.stringify(constraints),asOf,userId]};
+}
+export async function saveProfileConstraints(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
+  const parsed=parseProfileConstraints(body);
+  return database.transaction(async()=>{
+    const current=await readProfile(database,userId,asOf),query=profileConstraintsQuery(userId,body,current,parsed,asOf);
+    await database.query(query.text,query.values);
     return readProfile(database,userId,asOf);
   });
 }
