@@ -476,3 +476,22 @@ test('concrete employment terms pin published conditions and require owning cand
     assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events WHERE process_id=?').get(p.id)!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_interests WHERE id=?').get(p.id)!.n,0);assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
   } finally {await f.close();}
 });
+
+
+test('interest notification integrity failure rolls back process, projection, event, audit and journal at the real API',async()=>{
+  const f=await setup();try{
+    const profiles=new ProfileService(f.app.db),url=`/api/faro/offers/${f.offer.id}/interest`,body={offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'atomic-interest'};
+    f.app.db.db.exec("CREATE TRIGGER reject_interest_delivery BEFORE INSERT ON faro_outbox WHEN NEW.entity_type='process' BEGIN SELECT RAISE(ABORT,'synthetic delivery failure'); END");
+    await f.request(url,f.candidate.cookie,'POST',body,500);
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_interests WHERE offer_id=?').get(f.offer.id)!.n,0);
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events').get()!.n,0);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='INTEREST_CREATED'").get()!.n,0);
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.candidate.id,body.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER reject_interest_delivery');
+    const result=await f.request<{id:string}>(url,f.candidate.cookie,'POST',body,201);assert.deepEqual(await f.request(url,f.candidate.cookie,'POST',body,201),result);
+    const row=new RecruitmentService(f.app.db).row(result.id);assert.deepEqual(JSON.parse(row.snapshot),{...profiles.projection(f.candidate.id),processId:result.id});
+    assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events WHERE process_id=?').get(result.id)!.n,1);
+    assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE entity_type='process' AND entity_id=?").get(result.id)!.n,2);
+    assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});

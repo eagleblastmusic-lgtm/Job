@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { HttpError } from '../http.js';
+import { employerProjection } from '../../domain/faro/skills.js';
 import type { Claim,Learning,Practice,Availability } from '../../domain/faro/skills.js';
 export function profileReadQueries(userId:string) {
   return [
@@ -16,4 +19,13 @@ export function profileFromRows(rows:Record<string,unknown>[][],asOf:string) {
 }
 export async function readProfile(database:{readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>},userId:string,asOf:string) {
   return profileFromRows(await database.readBatch(profileReadQueries(userId)),asOf);
+}
+
+export function profileProjection(profile:ReturnType<typeof profileFromRows>,processId='preview') {
+  if(!profile.firstName)throw new HttpError(400,'Najpierw zapisz swoje imię w profilu.','PROFILE_REQUIRED');
+  return employerProjection(processId,profile.firstName,profile.claims,profile.learning,profile.availability);
+}
+export function profilePreview(userId:string,profile:ReturnType<typeof profileFromRows>) {
+  const projection=profileProjection(profile),confirmationToken=createHash('sha256').update(JSON.stringify({userId,projection})).digest('hex');
+  return {projection,confirmationToken};
 }

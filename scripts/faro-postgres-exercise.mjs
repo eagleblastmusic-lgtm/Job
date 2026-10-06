@@ -1,3 +1,4 @@
+import { submitInterest } from '../dist/server/faro/interestWriteModel.js';
 import { runCommandOnce } from '../dist/server/faro/commandJournal.js';
 import { createOrganization,verifyOrganization,inviteOrganizationMember,acceptOrganizationInvite,revokeOrganizationMember } from '../dist/server/faro/organizationWriteModel.js';
 import { readMembership,readAffiliation,readOrganizations } from '../dist/server/faro/organizationReadModel.js';
@@ -7,7 +8,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromEnvironment } from './faro-postgres-rehearsal.mjs';
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
-import { readProfile } from '../dist/server/faro/profileReadModel.js';
+import { readProfile,profilePreview } from '../dist/server/faro/profileReadModel.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
 import { createOfferDraft,editOfferDraft,changeOfferLifecycle } from '../dist/server/faro/offerWriteModel.js';
 import { OfferService,parseOffer } from '../dist/server/faro/offerService.js';
@@ -229,6 +230,25 @@ try {
     await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_audit_guard CHECK(action<>'OFFER_DRAFT_CREATED') NOT VALID");
     await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(employer.id),asOf,parseOffer),error=>error.code==='23514');assert.equal((await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n,draftCount);
     await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_audit_guard');
+    const interestDraft=await createOfferDraft(client,employer.id,targetOrg.id,offerInput(employer.id),asOf,parseOffer),interestReview=await changeOfferLifecycle(client,employer.id,interestDraft.id,{action:'REVIEW',expectedVersion:1},asOf),interestOffer=await changeOfferLifecycle(client,employer.id,interestDraft.id,{action:'PUBLISH',expectedVersion:interestReview.revision,confirmed:true},asOf);
+    const interestPreview=profilePreview(candidate.id,await readProfile(client,candidate.id,asOf)),interestBody={offerVersion:1,projectionConfirmed:true,confirmationToken:interestPreview.confirmationToken,idempotencyKey:'pg-native-interest'};
+    const candidateAuthority=async()=>assert.equal((await client.readBatch([{text:'SELECT id FROM users WHERE id=$1',values:[candidate.id]}]))[0]?.[0]?.id,candidate.id);
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,{...interestBody,offerVersion:2,idempotencyKey:'pg-interest-stale'},asOf,candidateAuthority),error=>error.code==='OFFER_CHANGED');
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,{...interestBody,projectionConfirmed:false,idempotencyKey:'pg-interest-unconfirmed'},asOf,candidateAuthority),error=>error.status===400);
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,{...interestBody,confirmationToken:'stale',idempotencyKey:'pg-interest-profile-stale'},asOf,candidateAuthority),error=>error.code==='PROFILE_CHANGED');
+    await client.query("ALTER TABLE faro_outbox ADD CONSTRAINT pg_interest_delivery_guard CHECK(entity_type<>'process') NOT VALID");
+    const interestEventsBefore=(await client.query('SELECT count(*) AS n FROM faro_events')).rows[0].n,interestAuditsBefore=(await client.query("SELECT count(*) AS n FROM audit_logs WHERE action='INTEREST_CREATED'")).rows[0].n;
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,interestBody,asOf,candidateAuthority),error=>error.code==='23514');
+    assert.equal((await client.query('SELECT 1 FROM faro_interests WHERE offer_id=$1',[interestOffer.id])).rowCount,0);assert.equal((await client.query('SELECT count(*) AS n FROM faro_events')).rows[0].n,interestEventsBefore);assert.equal((await client.query("SELECT count(*) AS n FROM audit_logs WHERE action='INTEREST_CREATED'")).rows[0].n,interestAuditsBefore);assert.equal((await client.query('SELECT 1 FROM faro_commands WHERE user_id=$1 AND command_key=$2',[candidate.id,interestBody.idempotencyKey])).rowCount,0);
+    await client.query('ALTER TABLE faro_outbox DROP CONSTRAINT pg_interest_delivery_guard');
+    const nativeInterest=await submitInterest(client,candidate.id,interestOffer.id,interestBody,asOf,candidateAuthority);assert.deepEqual(await submitInterest(client,candidate.id,interestOffer.id,interestBody,asOf,candidateAuthority),nativeInterest);
+    const nativeRow=(await client.query('SELECT snapshot,status,stage,response_due_at FROM faro_interests WHERE id=$1',[nativeInterest.id])).rows[0],nativeSnapshot=JSON.parse(nativeRow.snapshot);assert.deepEqual(nativeSnapshot,{...interestPreview.projection,processId:nativeInterest.id});assert.equal(nativeRow.status,'INTERESTED');assert.equal(nativeRow.stage,'AWAITING_EMPLOYER');assert.equal(nativeRow.response_due_at,new Date(Date.parse(asOf)+interestOffer.data.responseHours*3600000).toISOString());
+    for(const privateField of ['phone','preferences','activities','candidate_id'])assert.equal(Object.hasOwn(nativeSnapshot,privateField),false);assert.equal(JSON.stringify(nativeSnapshot).includes(candidate.id),false);
+    assert.equal((await client.query('SELECT 1 FROM faro_events WHERE process_id=$1',[nativeInterest.id])).rowCount,1);assert.equal((await client.query('SELECT 1 FROM faro_outbox WHERE entity_type=$1 AND entity_id=$2',['process',nativeInterest.id])).rowCount,2);
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,{...interestBody,idempotencyKey:'pg-interest-active'},asOf,candidateAuthority),error=>error.code==='ACTIVE_INTEREST_EXISTS');
+    await client.query("UPDATE faro_interests SET status='WITHDRAWN',stage='TERMINAL' WHERE id=$1",[nativeInterest.id]);
+    await assert.rejects(()=>submitInterest(client,candidate.id,interestOffer.id,{...interestBody,idempotencyKey:'pg-interest-renew-unconfirmed'},asOf,candidateAuthority),error=>error.code==='RENEWAL_CONFIRMATION_REQUIRED');
+    const renewedInterest=await submitInterest(client,candidate.id,interestOffer.id,{...interestBody,idempotencyKey:'pg-interest-renewed',previousInterestId:nativeInterest.id,renewalConfirmed:true},asOf,candidateAuthority);assert.notEqual(renewedInterest.id,nativeInterest.id);assert.equal((await client.query('SELECT previous_interest_id FROM faro_interests WHERE id=$1',[renewedInterest.id])).rows[0].previous_interest_id,nativeInterest.id);assert.equal((await client.query('SELECT snapshot FROM faro_interests WHERE id=$1',[nativeInterest.id])).rows[0].snapshot,nativeRow.snapshot);
     const targetEdited=await editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:1,data:{...targetDraft.data,role:'New private draft role'}},asOf,parseOffer);assert.equal(targetEdited.version,2);assert.equal(targetEdited.revision,2);assert.equal(targetEdited.status,'DRAFT');assert.equal(targetEdited.approvedVersion,null);
     assert.deepEqual(JSON.parse((await client.query('SELECT content FROM faro_offer_versions WHERE offer_id=$1 AND version=1',[targetDraft.id])).rows[0].content),targetDraft.data);
     assert.deepEqual(await editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:2,data:targetEdited.data},asOf,parseOffer),targetEdited);
@@ -292,7 +312,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order/command-journal-rollback-current-authority PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order/command-journal-rollback-current-authority/native-interest-projection-history-outbox-rollback PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
