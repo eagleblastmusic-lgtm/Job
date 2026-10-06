@@ -555,3 +555,10 @@ Existing offer producer and PostgreSQL staging share explicit current/published 
 CP11-L exact remote acceptance at207adcd: [FARO37440425309](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37440425309) and [CI37440425276](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37440425276) SUCCESS. Actual PostgreSQL18 Node22/24 profile-wire/read-only-batch/safe-integer and preceding staging proof PASS. Draft66 remains dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-M full local npm run check PASS153 Node/35 migrations/both actual restores/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Actual PostgreSQL and exact remote acceptance pending.
+
+## CP11-N — Shared profile save command, 2026-10-06
+Existing synchronous profile save and real async PostgreSQL staging share validation/parameterized write plan, guarded revision and atomic phone-grant revocation/audit. Structured clarification keeps existing availability parser semantics. [Scope](CP11_N_PORTABLE_PROFILE_WRITE.md). Source-only70/35 PASS; full application and actual PostgreSQL acceptance pending. Runtime remains SQLite; whole CP11/master plan/release PARTIAL. Continue with actual database errors if any, then remaining command/current-authority conversion.
+
+CP11-M exact remote acceptance at9beab73: [FARO37441227370](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441227370) and [CI37441227307](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441227307) SUCCESS. Actual PostgreSQL18 Node22/24 published/current wire parity, unpublished draft isolation and intake proof regressions PASS. Draft67 remains dependent/unmerged; runtime SQLite, whole plan/release PARTIAL.
+
+CP11-N full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.

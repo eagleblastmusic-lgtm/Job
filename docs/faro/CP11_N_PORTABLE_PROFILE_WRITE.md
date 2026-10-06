@@ -1,0 +1,11 @@
+# CP11-N — Shared profile save command (2026-10-06)
+
+The existing SQLite ProfileService.save and actual asynchronous PostgreSQL staging consume the same profile validation and parameterized write plan. Availability parsing is also reused by the existing structured clarification producer. Profile writes retain first-name-only rules, exact expected revision, phone format, availability date validation, existing preferences/claims/learning, and the existing versioned upsert. SQLite commands remain synchronous inside their existing transaction; PostgreSQL commands await every statement and result within an owned SERIALIZABLE transaction. No sync worker bridge or separate application server.
+
+Phone changes revoke all active own contact grants and write a minimal audit before saving the new version, in the same transaction. Repeating the same phone does not revoke or generate another change audit. PostgreSQL snapshot reads use the existing read model; no raw driver integer strings reach the domain version comparison. Foreign-key or CHECK errors roll back the profile/grant/audit together, with safe SQLSTATE; no automatic retry of effects.
+
+Real PostgreSQL18 Node22/24 regression requirements: first save, changed name/phone/date and preserved claims/learning/preferences; exact version increment; grant revocation and one minimal audit; stale revision and invalid name/date leave data unchanged; same-phone update preserves preferences and adds no audit; actual CHECK failure after revocation rolls back grant, audit and profile together. All earlier70-table import/hash/constraint/consent/transaction/read proofs remain required. Local source-only70/35 PASS; full application and actual PostgreSQL acceptance pending.
+
+Production runtime still uses SQLite. Auth/organization/other profile commands, remaining repositories, current-authority target recovery, operator cutover and external acceptance gates remain open. This is a bounded write-portability prerequisite, not full CP11/master-plan or release DONE.
+
+CP11-N full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
