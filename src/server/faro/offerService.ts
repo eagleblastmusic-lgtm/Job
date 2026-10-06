@@ -1,4 +1,4 @@
-import { offerCreateQueries } from './offerWriteModel.js';
+import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment } from './offerWriteModel.js';
 import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +6,7 @@ import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { object, text, array, choice, integer, date, nullableBoolean } from './validation.js';
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
-import { materialDiff, explainOffer, explainConditions, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
+import { explainOffer, explainConditions, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
@@ -44,7 +44,7 @@ export class OfferService extends FaroStore {
 
   assigned(userId: string, offerId: string) {
     const offer = this.get(offerId); this.member(userId, offer.organizationId);
-    if (!this.db.prepare('SELECT user_id FROM faro_assignments WHERE user_id=? AND offer_id=?').get(userId, offerId)) throw new HttpError(404, 'Nie znaleziono rekrutacji.', 'NOT_FOUND');
+    const query=offerAssignedReadQuery(userId,offerId);requireOfferAssignment(this.db.prepare(query.text).all({$1:userId,$2:offerId}));
     return offer;
   }
   intake(offer: OfferRecord) {
@@ -88,19 +88,14 @@ export class OfferService extends FaroStore {
   }
 
   edit(userId: string, id: string, body: Record<string, unknown>) {
-    const offer = this.assigned(userId, id); this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
-    const data = parseOffer(object(body.data)); this.member(data.recruiterId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
-    if (integer(body.expectedVersion, 1) !== offer.revision) throw new HttpError(409, 'Oferta zmieniła się.', 'VERSION_CONFLICT');
-    if (['CLOSED','ARCHIVED','REMOVED'].includes(offer.status)) throw new HttpError(409, 'Ta oferta jest zakończona.');
-    const diff = materialDiff(offer.data, data); if (!diff.length) return offer;
-    this.transaction(() => {
-      if(this.get(id).revision!==offer.revision)throw new HttpError(409,'Oferta zmieniła się.','VERSION_CONFLICT');
-      this.db.prepare('INSERT INTO faro_offer_versions(offer_id,version,content,author_id,created_at) VALUES(?,?,?,?,?)').run(id, offer.version + 1, JSON.stringify(data), userId, this.now());
-      this.db.prepare("UPDATE faro_offers SET current_version=current_version+1,revision=revision+1,approved_version=NULL,status='DRAFT' WHERE id=?").run(id);
-      this.db.prepare('INSERT OR IGNORE INTO faro_assignments(offer_id,user_id) VALUES(?,?)').run(id, data.recruiterId);
-      this.audit(userId, 'OFFER_VERSION_CREATED', id);
-    }); return this.get(id);
+    return this.transaction(()=>{
+      const offer=this.assigned(userId,id);this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);
+      const data=parseOffer(object(body.data));this.member(data.recruiterId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);
+      for(const query of offerEditQueries(userId,offer,body,data,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      return this.get(id);
+    });
   }
+
   lifecycle(userId: string, id: string, body: Record<string, unknown>) {
     const offer = this.assigned(userId, id); this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
     if (integer(body.expectedVersion, 1) !== offer.revision) throw new HttpError(409, 'Oferta zmieniła się.', 'VERSION_CONFLICT');
