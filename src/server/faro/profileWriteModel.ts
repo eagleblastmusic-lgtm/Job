@@ -1,6 +1,6 @@
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints,type SalaryMinimum } from '../../domain/faro/offers.js';
 import { randomUUID } from 'node:crypto';
-import type { Availability } from '../../domain/faro/skills.js';
+import { LEVELS,SOURCES,skillById,suggestSkills,type Practice,type Availability } from '../../domain/faro/skills.js';
 import { HttpError } from '../http.js';
 import { object,text,choice,integer,array } from './validation.js';
 import { readProfile } from './profileReadModel.js';
@@ -65,6 +65,69 @@ export async function saveProfileConstraints(database:ProfileWriteDatabase,userI
   return database.transaction(async()=>{
     const current=await readProfile(database,userId,asOf),query=profileConstraintsQuery(userId,body,current,parsed,asOf);
     await database.query(query.text,query.values);
+    return readProfile(database,userId,asOf);
+  });
+}
+
+function profileAuditQuery(userId:string,action:string,entityId:string,asOf:string) {
+  return {text:'INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)',values:[randomUUID(),userId,action,'faro',entityId,'{}',asOf]};
+}
+export function profilePractice(input:unknown):Practice {
+  const practice=object(input);
+  return {quantity:practice.quantity===null?null:integer(practice.quantity,0,10000),unit:choice(practice.unit,['MONTHS','PROJECTS','TASKS'] as const)};
+}
+export function profileClaimQueries(userId:string,body:Record<string,unknown>,asOf:string) {
+  const skillId=text(body.skillId,100);
+  if(!skillById(skillId))throw new HttpError(400,'Wybierz znaną kompetencję.');
+  const level=choice(body.level,LEVELS),source=choice(body.source,SOURCES),practice=profilePractice(body.practice);
+  if(body.confirmed!==true)throw new HttpError(400,'Potwierdź własną deklarację.','CONFIRMATION_REQUIRED');
+  return [
+    {text:'UPDATE faro_claims SET revoked_at=$1 WHERE user_id=$2 AND skill_id=$3 AND revoked_at IS NULL',values:[asOf,userId,skillId]},
+    {text:'INSERT INTO faro_claims(id,user_id,skill_id,level,source,practice,version,confirmed_at) SELECT $1,$2,$3,$4,$5,$6,COALESCE(MAX(version),0)+1,$7 FROM faro_claims WHERE user_id=$2 AND skill_id=$3',values:[randomUUID(),userId,skillId,level,source,JSON.stringify(practice),asOf]},
+    profileAuditQuery(userId,'SKILL_DECLARED',skillId,asOf)
+  ];
+}
+export function profileRevokeQuery(userId:string,id:string,asOf:string) {
+  return {text:'UPDATE faro_claims SET revoked_at=$1 WHERE id=$2 AND user_id=$3 AND revoked_at IS NULL RETURNING id',values:[asOf,id,userId]};
+}
+export function profileLearningQuery(userId:string,body:Record<string,unknown>) {
+  const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
+  return {text:'INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice',values:[userId,skillId,choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const),JSON.stringify(profilePractice(body.practice))]};
+}
+export function profileActivityQueries(userId:string,body:Record<string,unknown>,asOf:string) {
+  const description=text(body.description,3000),source=choice(body.source,SOURCES),id=randomUUID();
+  return [
+    {text:'INSERT INTO faro_activities(id,user_id,description,source,created_at) VALUES($1,$2,$3,$4,$5)',values:[id,userId,description,source,asOf]},
+    ...suggestSkills(description).map(proposal=>({text:'INSERT INTO faro_proposals(id,user_id,activity_id,skill_id,rationale,model_version,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)',values:[randomUUID(),userId,id,proposal.skillId,proposal.rationale,proposal.modelVersion,asOf]})),
+    profileAuditQuery(userId,'ACTIVITY_RECORDED',id,asOf)
+  ];
+}
+export function profileProposalQuery(userId:string,id:string) {return {text:'SELECT skill_id,status FROM faro_proposals WHERE id=$1 AND user_id=$2',values:[id,userId]};}
+export function profileProposalDecisionQueries(userId:string,id:string,body:Record<string,unknown>,row:Record<string,unknown>|undefined,asOf:string) {
+  if(!row)throw new HttpError(404,'Nie znaleziono propozycji.');
+  if(row.status!=='PENDING')throw new HttpError(409,'Propozycja została już rozpatrzona.');
+  const status=choice(body.status,['ACCEPTED','REJECTED'] as const);
+  return [...(status==='ACCEPTED'?profileClaimQueries(userId,{...body,skillId:row.skill_id},asOf):[]),{text:"UPDATE faro_proposals SET status=$1,decided_at=$2 WHERE id=$3 AND user_id=$4 AND status='PENDING'",values:[status,asOf,id,userId]}];
+}
+export async function addProfileClaim(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
+  const queries=profileClaimQueries(userId,body,asOf);
+  return database.transaction(async()=>{for(const query of queries)await database.query(query.text,query.values);return readProfile(database,userId,asOf);});
+}
+export async function revokeProfileClaim(database:ProfileWriteDatabase,userId:string,id:string,asOf:string) {
+  return database.transaction(async()=>{const query=profileRevokeQuery(userId,id,asOf);const rows=await database.readBatch([query]);if(!rows[0]?.length)throw new HttpError(404,'Nie znaleziono deklaracji.');});
+}
+export async function saveProfileLearning(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
+  const query=profileLearningQuery(userId,body);
+  return database.transaction(async()=>{await database.query(query.text,query.values);return readProfile(database,userId,asOf);});
+}
+export async function recordProfileActivity(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
+  const queries=profileActivityQueries(userId,body,asOf);
+  return database.transaction(async()=>{for(const query of queries)await database.query(query.text,query.values);return readProfile(database,userId,asOf);});
+}
+export async function decideProfileProposal(database:ProfileWriteDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string) {
+  return database.transaction(async()=>{
+    const query=profileProposalQuery(userId,id),rows=await database.readBatch([query]);
+    for(const command of profileProposalDecisionQueries(userId,id,body,rows[0]?.[0],asOf))await database.query(command.text,command.values);
     return readProfile(database,userId,asOf);
   });
 }

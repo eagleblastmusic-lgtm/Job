@@ -1,4 +1,4 @@
-import { saveProfile,saveProfileConstraints } from '../dist/server/faro/profileWriteModel.js';
+import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,recordProfileActivity,decideProfileProposal } from '../dist/server/faro/profileWriteModel.js';
 import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -103,6 +103,26 @@ try {
     await assert.rejects(()=>saveProfileConstraints(client,candidate.id,{expectedVersion:5,constraints:{...limits,salaryMinimum:{...limits.salaryMinimum,amount:-1}}},asOf),error=>error.code==='VALIDATION_ERROR');
     assert.deepEqual(await readProfile(client,candidate.id,asOf),preservedLimits);
     const removedLimits=await saveProfileConstraints(client,candidate.id,{expectedVersion:5,constraints:{...limits,salaryMinimum:null,maxCommuteMinutes:null}},asOf);assert.equal(removedLimits.version,6);assert.equal(removedLimits.preferences.salaryMinimum,null);assert.equal(removedLimits.preferences.maxCommuteMinutes,null);
+    const declaration={skillId:'faro:activity:customer-service',level:'INDEPENDENT',source:'WORK',practice:{quantity:4,unit:'TASKS'},confirmed:true};
+    const declared=await addProfileClaim(client,candidate.id,declaration,asOf);assert.equal(declared.claims.length,1);assert.equal(declared.claims[0].version,2);assert.equal(declared.claims[0].verification,'DECLARED');assert.equal((await client.query('SELECT revoked_at FROM faro_claims WHERE id=$1',[originalProfile.claims[0].id])).rows[0].revoked_at,asOf);
+    await assert.rejects(()=>addProfileClaim(client,candidate.id,{...declaration,confirmed:false},asOf),error=>error.code==='CONFIRMATION_REQUIRED');assert.deepEqual((await readProfile(client,candidate.id,asOf)).claims,declared.claims);
+    await assert.rejects(()=>revokeProfileClaim(client,employer.id,declared.claims[0].id,asOf),error=>error.status===404);
+    await revokeProfileClaim(client,candidate.id,declared.claims[0].id,asOf);await assert.rejects(()=>revokeProfileClaim(client,candidate.id,declared.claims[0].id,asOf),error=>error.status===404);
+    const redeclared=await addProfileClaim(client,candidate.id,declaration,asOf);assert.equal(redeclared.claims[0].version,3);
+    const learning=await saveProfileLearning(client,candidate.id,{skillId:declaration.skillId,mode:'SELF_DEVELOPING',practice:{quantity:null,unit:'MONTHS'}},asOf);assert.equal(learning.learning.length,2);
+    const updatedLearning=await saveProfileLearning(client,candidate.id,{skillId:declaration.skillId,mode:'SELF_DEVELOPING',practice:{quantity:2,unit:'MONTHS'}},asOf);assert.equal(updatedLearning.learning.length,2);assert.equal(updatedLearning.learning.find(item=>item.mode==='SELF_DEVELOPING').practice.quantity,2);
+    await assert.rejects(()=>saveProfileLearning(client,candidate.id,{skillId:'unknown',mode:'SELF_DEVELOPING',practice:{quantity:1,unit:'TASKS'}},asOf),error=>error.status===400);
+    const privateActivity="Obsługa klienta — <script>prywatny tekst</script> 'quoted'";
+    const recorded=await recordProfileActivity(client,candidate.id,{description:privateActivity,source:'WORK'},asOf);assert.deepEqual(recorded.claims,redeclared.claims);assert.ok(recorded.activities.some(item=>item.description===privateActivity));
+    const proposal=recorded.proposals.find(item=>!originalProfile.proposals.some(previous=>previous.id===item.id)&&item.skill_id===declaration.skillId);assert.ok(proposal);assert.equal(proposal.status,'PENDING');assert.equal(proposal.model_version,'local-question-rules-v1');
+    await assert.rejects(()=>decideProfileProposal(client,employer.id,proposal.id,{status:'REJECTED'},asOf),error=>error.status===404);
+    await assert.rejects(()=>decideProfileProposal(client,candidate.id,proposal.id,{...declaration,status:'ACCEPTED',confirmed:false},asOf),error=>error.code==='CONFIRMATION_REQUIRED');
+    assert.equal((await readProfile(client,candidate.id,asOf)).proposals.find(item=>item.id===proposal.id).status,'PENDING');
+    await client.query("ALTER TABLE faro_claims ADD CONSTRAINT pg_claim_write_guard CHECK(level<>'FLUENT')");
+    await assert.rejects(()=>decideProfileProposal(client,candidate.id,proposal.id,{...declaration,status:'ACCEPTED',level:'FLUENT'},asOf),error=>error.code==='23514');
+    assert.deepEqual((await readProfile(client,candidate.id,asOf)).claims,redeclared.claims);assert.equal((await readProfile(client,candidate.id,asOf)).proposals.find(item=>item.id===proposal.id).status,'PENDING');
+    const accepted=await decideProfileProposal(client,candidate.id,proposal.id,{...declaration,skillId:'client-cannot-replace-pinned-skill',status:'ACCEPTED'},asOf);assert.equal(accepted.claims[0].version,4);assert.equal(accepted.claims[0].skillId,declaration.skillId);assert.equal(accepted.claims[0].verification,'DECLARED');assert.equal(accepted.proposals.find(item=>item.id===proposal.id).status,'ACCEPTED');
+    await assert.rejects(()=>decideProfileProposal(client,candidate.id,proposal.id,{status:'REJECTED'},asOf),error=>error.status===409);assert.deepEqual(await readProfile(client,candidate.id,asOf),accepted);
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -130,7 +150,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
