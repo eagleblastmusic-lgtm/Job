@@ -1,6 +1,6 @@
+import { membershipReadQuery,membershipFromRows,affiliationReadQuery } from './organizationReadModel.js';
 import { randomUUID } from 'node:crypto';
 import type { JobDatabase } from '../db.js';
-import { HttpError } from '../http.js';
 export class FaroStore {
   constructor(readonly database: JobDatabase, readonly clock: () => Date = () => new Date()) {}
   get db() { return this.database.db; }
@@ -11,14 +11,15 @@ export class FaroStore {
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   member(userId: string, orgId: string, roles = ['OWNER', 'ADMIN', 'RECRUITER', 'HIRING_MANAGER']) {
-    const row = this.db.prepare('SELECT role FROM faro_members WHERE user_id=? AND organization_id=? AND active=1').get(userId, orgId) as { role: string } | undefined;
-    if (!row || !roles.includes(row.role)) throw new HttpError(404, 'Nie znaleziono zasobu.', 'NOT_FOUND');
-    return row;
+    const query=membershipReadQuery(userId,orgId);
+    return membershipFromRows(this.db.prepare(query.text).all({$1:userId,$2:orgId}),roles);
   }
   affiliated(userId:string,orgId:string) {
-    // Revocation removes access, not the conflict of interest from prior affiliation.
-    return Boolean(this.db.prepare('SELECT user_id FROM faro_members WHERE user_id=? AND organization_id=?').get(userId,orgId));
+    // Revocation removes access, not historical conflicts of interest.
+    const query=affiliationReadQuery(userId,orgId);
+    return Boolean(this.db.prepare(query.text).get({$1:userId,$2:orgId}));
   }
+
   audit(actor: string | null, action: string, entityId: string) {
     this.db.prepare('INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), actor, action, 'faro', entityId, '{}', this.now());
   }

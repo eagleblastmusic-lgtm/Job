@@ -11,3 +11,5 @@ Runtime remains SQLite. Organization/auth/offer/process/assessment/privacy repos
 Additional actual PostgreSQL regressions require a real claim CHECK failure after revocation to roll back retained live claim and pending proposal, and a client skillId override to leave the proposal pinned skill authoritative.
 
 CP11-P full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; final source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+CP11-P exact remote acceptance at951682f: [FARO37443239641](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239641) and [CI37443239626](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239626) SUCCESS. Actual PostgreSQL18 Node22/24 private claims/learning/activity/proposal history, ownership, confirmation, pinned-skill and rollback regressions PASS. Draft70 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
