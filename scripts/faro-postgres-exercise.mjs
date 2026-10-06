@@ -1,3 +1,4 @@
+import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromEnvironment } from './faro-postgres-rehearsal.mjs';
@@ -20,6 +21,9 @@ try {
   profiles.learn(candidate.id,{skillId:'faro:activity:customer-service',mode:'WANTS_TO_LEARN',practice:{quantity:2,unit:'TASKS'}});
   const org=profiles.organization(employer.id,{name:'Syntetyczna organizacja PostgreSQL'});f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
   const offer=offers.create(employer.id,org.id,{...offerInput(employer.id),responsibilities:["Pomoc klientom — Łódź; 'quoted' <script>tekst</script>"]});offers.lifecycle(employer.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const draftOnly=offers.create(employer.id,org.id,offerInput(employer.id));
+  const edited=offers.create(employer.id,org.id,offerInput(employer.id));offers.lifecycle(employer.id,edited.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,edited.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  offers.edit(employer.id,edited.id,{expectedVersion:3,data:{...edited.data,role:'Unpublished private draft'}});
   const process=r.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(candidate.id).confirmationToken,idempotencyKey:'pg-interest'});
   r.change(employer.id,process.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'pg-advance',nextAction:'Uzgodnienie następnego kroku',dueAt:new Date(Date.now()+86400000).toISOString()});r.watch(candidate.id,offer.id,true);
   const definition=a.create(employer.id,offer.id,{title:'Syntetyczna próba importu',type:'OPEN_ANSWER',scoringMode:'HUMAN',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'pg-r1',tasks:[{prompt:'Opisz krok',evaluationCriteria:'Uzasadniona kolejność',points:2}]});
@@ -41,6 +45,27 @@ try {
     assert.equal((await readProfile(client,candidate.id,asOf)).version,reference.profile(candidate.id).version);
     await assert.rejects(()=>client.readBatch([{text:'SELECT 9007199254740993::bigint AS unsafe',values:[]}]),error=>error.code==='22003');
     await client.transaction(async()=>assert.equal((await readProfile(client,candidate.id,asOf)).version,1));
+    for(const id of [offer.id,edited.id]){
+      const actual=await readPublishedOffer(client,id,asOf);
+      assert.deepEqual(wire(actual.current),wire(offers.get(id)));assert.deepEqual(wire(actual.published),wire(offers.published(id)));assert.equal(actual.acceptingInterest,offers.intake(offers.get(id)));
+    }
+    assert.equal((await readPublishedOffer(client,edited.id,asOf)).published.version,1);
+    assert.equal((await readPublishedOffer(client,edited.id,asOf)).published.status,'PAUSED');
+    await assert.rejects(()=>readPublishedOffer(client,draftOnly.id,asOf),error=>error.code==='PUBLICATION_NOT_FOUND');
+    await assert.rejects(()=>readPublishedOffer(client,'absent-offer',asOf),error=>error.code==='NOT_FOUND');
+    assert.equal((await readPublishedOffer(client,offer.id,'2099-01-01T00:00:00.000Z')).acceptingInterest,false);
+    await client.query("UPDATE faro_organizations SET verification='PENDING' WHERE id=$1",[org.id]);
+    assert.equal((await readPublishedOffer(client,offer.id,asOf)).acceptingInterest,false);
+    await client.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);
+    await client.query('UPDATE faro_members SET active=0 WHERE user_id=$1 AND organization_id=$2',[employer.id,org.id]);
+    assert.equal((await readPublishedOffer(client,offer.id,asOf)).acceptingInterest,false);
+    await client.query('UPDATE faro_members SET active=1 WHERE user_id=$1 AND organization_id=$2',[employer.id,org.id]);
+    await client.query('UPDATE faro_offers SET approved_version=NULL WHERE id=$1',[offer.id]);
+    assert.equal((await readPublishedOffer(client,offer.id,asOf)).published.status,'PAUSED');
+    await client.query('UPDATE faro_offers SET approved_version=1 WHERE id=$1',[offer.id]);
+    await client.query("UPDATE faro_offer_versions SET publication_proof='NONE' WHERE offer_id=$1",[offer.id]);
+    await assert.rejects(()=>readPublishedOffer(client,offer.id,asOf),error=>error.code==='PUBLICATION_NOT_FOUND');
+    await client.query("UPDATE faro_offer_versions SET publication_proof='EXPLICIT' WHERE offer_id=$1",[offer.id]);
     await assert.rejects(()=>importSnapshot(client,snapshot,schema),/rolled back/);await compare(client,snapshot,schema);
     const invalid=structuredClone(snapshot),target=invalid.tables.find(t=>t.name==='faro_mfa');target.rows[0].last_counter=-2;
     const badSchema=`${schema}_bad`;await assert.rejects(()=>importSnapshot(client,invalid,badSchema),/rolled back/);
@@ -74,7 +99,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

@@ -1,3 +1,5 @@
+import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,type OfferRecord } from './offerReadModel.js';
+export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
@@ -5,7 +7,6 @@ import { object, text, array, choice, integer, date, nullableBoolean } from './v
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
 import { materialDiff, explainOffer, explainConditions, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
-export interface OfferRecord { id: string; organizationId: string; company: string; status: OfferStatus; version: number; revision: number; approvedVersion: number | null; confirmedUntil: string | null; createdAt: string; data: OfferData; publishedAt?:string|null; publicationSource?:string; }
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
     const s = object(raw), contract = choice(s.contract, ['UOP','CIVIL','B2B'] as const);
@@ -27,32 +28,29 @@ export function parseOffer(body: Record<string, unknown>): OfferData {
 }
 export class OfferService extends FaroStore {
   get(id: string): OfferRecord {
-    const row = this.db.prepare('SELECT o.*,g.name company,v.content FROM faro_offers o JOIN faro_organizations g ON g.id=o.organization_id JOIN faro_offer_versions v ON v.offer_id=o.id AND v.version=o.current_version WHERE o.id=?').get(id) as { id: string; organization_id: string; company: string; status: OfferStatus; current_version: number; revision: number; approved_version: number | null; confirmed_until: string | null; created_at: string; content: string } | undefined;
-    if (!row) throw new HttpError(404, 'Nie znaleziono oferty.', 'NOT_FOUND');
-    return { id: row.id, organizationId: row.organization_id, company: row.company, status: row.status, version: row.current_version, revision: row.revision, approvedVersion: row.approved_version, confirmedUntil: row.confirmed_until, createdAt: row.created_at, data: JSON.parse(row.content) as OfferData };
+    const query=offerReadQuery(id);
+    return offerFromRows(this.db.prepare(query.text).all({$1:id}));
   }
+
   version(id: string, version: number): OfferData {
     const row = this.db.prepare('SELECT content FROM faro_offer_versions WHERE offer_id=? AND version=?').get(id, version) as { content: string } | undefined;
     if (!row) throw new HttpError(404, 'Nie znaleziono wersji.'); return JSON.parse(row.content) as OfferData;
   }
   published(id:string):OfferRecord {
-    const offer=this.get(id);
-    const version=this.db.prepare("SELECT version,content,published_at,publication_proof FROM faro_offer_versions WHERE offer_id=? AND publication_proof<>'NONE' ORDER BY version DESC LIMIT 1").get(id) as {version:number;content:string;published_at:string|null;publication_proof:string}|undefined;
-    if(!version)throw new HttpError(404,'Nie znaleziono potwierdzonej publikacji oferty.','PUBLICATION_NOT_FOUND');
-    return {...offer,version:version.version,data:JSON.parse(version.content) as OfferData,publishedAt:version.published_at,publicationSource:version.publication_proof,
-      status:['DRAFT','IN_REVIEW'].includes(offer.status)||(offer.status==='PUBLISHED'&&!this.intake(offer))?'PAUSED':offer.status};
+    const offer=this.get(id),query=publishedReadQuery(id);
+    return publishedFromRows(offer,this.db.prepare(query.text).all({$1:id}),this.intake(offer));
   }
+
   assigned(userId: string, offerId: string) {
     const offer = this.get(offerId); this.member(userId, offer.organizationId);
     if (!this.db.prepare('SELECT user_id FROM faro_assignments WHERE user_id=? AND offer_id=?').get(userId, offerId)) throw new HttpError(404, 'Nie znaleziono rekrutacji.', 'NOT_FOUND');
     return offer;
   }
   intake(offer: OfferRecord) {
-    const org = this.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(offer.organizationId) as { verification: string };
-    const recruiter=this.db.prepare("SELECT m.user_id FROM faro_members m JOIN faro_assignments a ON a.user_id=m.user_id AND a.offer_id=? WHERE m.organization_id=? AND m.user_id=? AND m.active=1 AND m.role IN ('OWNER','ADMIN','RECRUITER')").get(offer.id,offer.organizationId,offer.data.recruiterId);
-    const publication=this.db.prepare("SELECT version FROM faro_offer_versions WHERE offer_id=? AND version=? AND publication_proof<>'NONE'").get(offer.id,offer.version);
-    return offer.status === 'PUBLISHED' && offer.approvedVersion === offer.version && org.verification === 'VERIFIED' && Boolean(recruiter&&publication) && Boolean(offer.confirmedUntil && offer.confirmedUntil > this.now()) && offer.data.closesAt > this.now();
+    const rows=intakeReadQueries(offer).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    return intakeFromRows(offer,rows,this.now());
   }
+
   private conditions(userId:string,offer:OfferRecord) {
     const saved=this.db.prepare('SELECT result,offer_version FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(userId,offer.id) as {result:string;offer_version:number}|undefined;
     const e=saved?JSON.parse(saved.result) as {commuteTimeMinutes:number|null;source:string;sourceDate:string;units?:{commuteTime:string}}:null;
