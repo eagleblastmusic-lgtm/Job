@@ -1,0 +1,7 @@
+# CP11-T — Controlled PostgreSQL connection loss (2026-10-06)
+
+The consumed PgJobDatabase now handles driver error/end events, marks the connection unavailable and retains only sanitized SQLSTATE. Independent queued work rechecks connection readiness when executed. An idle backend failure cannot become an unhandled EventEmitter error or let queued scopes continue on a dead connection. No transparent reconnection, transaction replay, SQLite fallback or production cutover.
+
+Actual PostgreSQL18 Node22/24 exercise terminates a separate idle synthetic backend with pg_terminate_backend(pid,5000), requires termination confirmation, controlled query/transaction/reconnect refusal, disposal and continued healthy main connection. Existing full70-table import/hash/constraints/consent/async scope/read/profile/organization/membership proofs remain required. Primary reference: [node-postgres client error/end events](https://node-postgres.com/apis/client#events).
+
+Local source-only70 tables/35 migrations, typecheck/lint/diff-check PASS. Application runtime is unchanged SQLite; previous CP11-S full154 Node/both restores/38 browsers proof remains relevant. Exact new-head real PostgreSQL and broader remote acceptance pending. Full CP11/master-plan/release PARTIAL.

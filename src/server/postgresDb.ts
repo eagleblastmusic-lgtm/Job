@@ -14,20 +14,25 @@ export class PgJobDatabase {
   private ready=false;
   private opening=false;
   private closing=false;
-  constructor(options:ClientConfig){this.client=new Client({...options,connectionTimeoutMillis:options.connectionTimeoutMillis??5000});}
+  private transportFailure:(Error&{code:string})|undefined;
+  constructor(options:ClientConfig){
+    this.client=new Client({...options,connectionTimeoutMillis:options.connectionTimeoutMillis??5000});
+    this.client.on('error',error=>{this.transportFailure=databaseError(error);this.ready=false;});
+    this.client.on('end',()=>{this.ready=false;});
+  }
   private serialize<T>(work:()=>Promise<T>):Promise<T>{const result=this.tail.then(work);this.tail=result.then(()=>undefined,()=>undefined);return result;}
   async connect():Promise<void>{if(this.ready||this.closing||this.opening)throw misuse('PG_CONNECTION_STATE');this.opening=true;await this.serialize(async()=>{try{await this.client.connect();this.ready=true;}catch(error){this.closing=true;await this.client.end().catch(()=>undefined);throw databaseError(error);}finally{this.opening=false;}});}
   async query<T extends QueryResultRow=QueryResultRow>(text:string,values:readonly unknown[]=[]):Promise<QueryResult<T>> {
     const current=this.scope.getStore();
     if(current&&!current.active)throw misuse('PG_SCOPE_CLOSED');
     if(!this.ready||(this.closing&&!current))throw misuse('PG_CONNECTION_STATE');
-    const work=async()=>{try{return await this.client.query<T>(text,[...values]);}catch(error){const safe=databaseError(error);if(current?.transaction)current.failure=safe.code;throw safe;}};
+    const work=async()=>{if(!this.ready)throw this.transportFailure??misuse('PG_CONNECTION_STATE');try{return await this.client.query<T>(text,[...values]);}catch(error){const safe=databaseError(error);if(current?.transaction)current.failure=safe.code;throw safe;}};
     return current?work():this.serialize(work);
   }
   async session<T>(work:()=>T|Promise<T>):Promise<T> {
     const current=this.scope.getStore();if(current){if(!current.active)throw misuse('PG_SCOPE_CLOSED');return await work();}
     if(!this.ready||this.closing)throw misuse('PG_CONNECTION_STATE');
-    return this.serialize(()=>this.scope.run({active:true,transaction:false},async()=>{const owned=this.scope.getStore()!;try{return await work();}finally{owned.active=false;}}));
+    return this.serialize(()=>{if(!this.ready)throw this.transportFailure??misuse('PG_CONNECTION_STATE');return this.scope.run({active:true,transaction:false},async()=>{const owned=this.scope.getStore()!;try{return await work();}finally{owned.active=false;}});});
   }
   async transaction<T>(work:()=>T|Promise<T>,options:{readOnly?:boolean}={}):Promise<T> {
     return this.session(async()=>{

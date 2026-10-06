@@ -199,8 +199,17 @@ try {
       const increment=db=>db.transaction(async()=>{await db.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection']);if(++arrivals===2)releaseBoth();await both;await db.query('UPDATE pg_adapter_evidence SET value=value+1 WHERE id=$1',['cross-connection']);});
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
+    // A backend terminated while idle must not raise an unhandled driver error or resurrect writes.
+    const victim=clientFromEnvironment();await victim.connect();try{
+      const pid=(await victim.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      const stopped=await client.query('SELECT pg_terminate_backend($1,5000) AS stopped',[pid]);assert.equal(stopped.rows[0].stopped,true);
+      await assert.rejects(()=>victim.query('SELECT 1'),error=>['57P01','08006','PG_CONNECTION_STATE'].includes(error.code));
+      await assert.rejects(()=>victim.transaction(()=>victim.query('SELECT 1')),error=>error.code==='PG_CONNECTION_STATE');
+      await assert.rejects(()=>victim.connect(),error=>['PG_CONNECTION_STATE','08006'].includes(error.code));
+    }finally{await victim.end();}
+    assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
