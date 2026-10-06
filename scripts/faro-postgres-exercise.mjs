@@ -8,7 +8,7 @@ import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromE
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
 import { readProfile } from '../dist/server/faro/profileReadModel.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
-import { createOfferDraft } from '../dist/server/faro/offerWriteModel.js';
+import { createOfferDraft,editOfferDraft } from '../dist/server/faro/offerWriteModel.js';
 import { OfferService,parseOffer } from '../dist/server/faro/offerService.js';
 import { RecruitmentService } from '../dist/server/faro/recruitmentService.js';
 import { AssessmentService } from '../dist/server/faro/assessmentService.js';
@@ -184,6 +184,17 @@ try {
     await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_audit_guard CHECK(action<>'OFFER_DRAFT_CREATED') NOT VALID");
     await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(employer.id),asOf,parseOffer),error=>error.code==='23514');assert.equal((await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n,draftCount);
     await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_audit_guard');
+    const targetEdited=await editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:1,data:{...targetDraft.data,role:'New private draft role'}},asOf,parseOffer);assert.equal(targetEdited.version,2);assert.equal(targetEdited.revision,2);assert.equal(targetEdited.status,'DRAFT');assert.equal(targetEdited.approvedVersion,null);
+    assert.deepEqual(JSON.parse((await client.query('SELECT content FROM faro_offer_versions WHERE offer_id=$1 AND version=1',[targetDraft.id])).rows[0].content),targetDraft.data);
+    assert.deepEqual(await editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:2,data:targetEdited.data},asOf,parseOffer),targetEdited);
+    await assert.rejects(()=>editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:1,data:targetDraft.data},asOf,parseOffer),error=>error.code==='VERSION_CONFLICT');
+    await assert.rejects(()=>editOfferDraft(client,candidate.id,targetDraft.id,{expectedVersion:2,data:targetDraft.data},asOf,parseOffer),error=>error.code==='NOT_FOUND');
+    await client.query("UPDATE faro_offers SET status='CLOSED' WHERE id=$1",[targetDraft.id]);await assert.rejects(()=>editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:2,data:targetDraft.data},asOf,parseOffer),error=>error.status===409);await client.query("UPDATE faro_offers SET status='DRAFT' WHERE id=$1",[targetDraft.id]);
+    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_edit_audit_guard CHECK(action<>'OFFER_VERSION_CREATED') NOT VALID");
+    await assert.rejects(()=>editOfferDraft(client,employer.id,targetDraft.id,{expectedVersion:2,data:targetDraft.data},asOf,parseOffer),error=>error.code==='23514');assert.deepEqual((await readPublishedOffer(client,edited.id,asOf)).current.data,offers.get(edited.id).data);
+    assert.equal((await client.query('SELECT current_version FROM faro_offers WHERE id=$1',[targetDraft.id])).rows[0].current_version,'2');assert.equal((await client.query('SELECT 1 FROM faro_offer_versions WHERE offer_id=$1 AND version=3',[targetDraft.id])).rowCount,0);
+    await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_edit_audit_guard');
+    const revisedPublished=await editOfferDraft(client,employer.id,offer.id,{expectedVersion:3,data:{...offers.get(offer.id).data,role:'Draft after retained publication'}},asOf,parseOffer);assert.equal(revisedPublished.version,2);assert.equal(revisedPublished.approvedVersion,null);const retainedPublished=await readPublishedOffer(client,offer.id,asOf);assert.equal(retainedPublished.published.version,1);assert.equal(retainedPublished.published.status,'PAUSED');assert.equal(retainedPublished.acceptingInterest,false);
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -220,7 +231,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
