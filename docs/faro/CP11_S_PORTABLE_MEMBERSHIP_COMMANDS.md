@@ -1,0 +1,11 @@
+# CP11-S — Shared invitations and atomic membership revocation (2026-10-06)
+
+Existing ProfileService invite/accept/revoke and actual PostgreSQL staging consume the same parameterized plans. Invitation requires current organization OWNER/ADMIN, only ADMIN/RECRUITER/HIRING_MANAGER roles, normalized email and the existing72-hour expiry. Only the random token hash is stored. Acceptance requires exact email/token, unexpired unused invitation, protects even an existing inactive OWNER from downgrade, and atomically updates/reactivates membership, consumes invitation and writes minimal audit. No email delivery/provider call or ownership transfer added.
+
+Closes a concrete current-runtime gap: revokeMember previously wrote active=0 and then audited outside a transaction. It now owns the authorization/update/audit transaction in SQLite and PostgreSQL. A failing audit cannot silently leave revoked access behind. Actor role allowlist, owner-transfer refusal and retained historical affiliation are unchanged.
+
+New actual API regression injects a SQLite audit failure, expects500 with membership still active and no revocation audit, then retries after removing the injected failure and proves revoked access, retained affiliation and one audit. Actual PostgreSQL18 Node22/24 must additionally prove foreign/disallowed invite refusal, hash-only persistence, normalized email, expiry/wrong-email/replay refusal, owner downgrade protection, role-scoped revoke refusal, real audit CHECK rollback and approved reinvite/reactivation. Previous full staging/private-profile/offer/organization proofs remain required. Source-only70/35 and targeted4 profile/API tests PASS; full application and exact remote acceptance pending.
+
+Runtime remains SQLite. Remaining offer/process/assessment/auth/privacy repositories, current-authority PostgreSQL recovery, operator cutover and external gates remain open. No full CP11/master plan or release DONE.
+
+CP11-S full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35, targeted4 API tests and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.

@@ -9,3 +9,5 @@ Actual PostgreSQL18 Node22/24 must prove owner creation, rollback of the organiz
 Runtime remains SQLite. Invites/membership/auth/remaining repositories, current-authority target recovery, operator cutover and external gates remain open. This bounded command-portability prerequisite is not full CP11/master plan or release DONE.
 
 CP11-R full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+CP11-R exact remote acceptance at3e76704: [FARO37444776127](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776127) and [CI37444776137](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776137) SUCCESS. Actual PostgreSQL18 Node22/24 create/FK rollback, independent moderator/historical conflict/restriction and audit rollback proof PASS. Draft72 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.

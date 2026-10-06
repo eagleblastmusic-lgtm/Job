@@ -218,3 +218,7 @@ CP11-P draft [#70](https://github.com/eagleblastmusic-lgtm/Job/pull/70): codex/f
 CP11-Q exact remote acceptance at6728484: [FARO37443951948](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951948) and [CI37443951915](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951915) SUCCESS. Actual PostgreSQL18 Node22/24 membership/list parity, exact role allowlists, revoked access and retained affiliation proof PASS. Draft71 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-Q draft [#71](https://github.com/eagleblastmusic-lgtm/Job/pull/71): codex/faro-cp11q-organization-access base codex/faro-cp11p-profile-evidence, code6728484. Both exact remote checks SUCCESS above; unmerged.
+
+CP11-R exact remote acceptance at3e76704: [FARO37444776127](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776127) and [CI37444776137](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37444776137) SUCCESS. Actual PostgreSQL18 Node22/24 create/FK rollback, independent moderator/historical conflict/restriction and audit rollback proof PASS. Draft72 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-R draft [#72](https://github.com/eagleblastmusic-lgtm/Job/pull/72): codex/faro-cp11r-organization-verification base codex/faro-cp11q-organization-access, code3e76704. Both exact remote checks SUCCESS above; unmerged.

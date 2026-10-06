@@ -1,10 +1,9 @@
-import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries } from './organizationWriteModel.js';
+import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries,organizationInvitePlan,organizationInviteReadQuery,organizationInviteFromRows,organizationExistingMemberQuery,organizationInviteAcceptPlan,organizationRevokeQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
 import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows } from './profileReadModel.js';
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
-import { text, choice } from './validation.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
 import { employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
@@ -83,32 +82,23 @@ export class ProfileService extends FaroStore {
     });
   }
 
-  invite(userId: string, orgId: string, body: Record<string, unknown>) {
-    this.member(userId, orgId, ['OWNER','ADMIN']);
-    const token = randomUUID() + randomUUID(), hash = createHash('sha256').update(token).digest('hex');
-    const email = text(body.email, 254).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'Nieprawidłowy e-mail.');
-    this.db.prepare('INSERT INTO faro_invites(token_hash,organization_id,role,email,expires_at,created_by) VALUES(?,?,?,?,?,?)').run(hash, orgId, choice(body.role, ['ADMIN','RECRUITER','HIRING_MANAGER'] as const), email, new Date(this.clock().getTime() + 72 * 3600000).toISOString(), userId);
-    return { token, expiresInHours: 72 };
-  }
-  acceptInvite(userId: string, email: string, token: string) {
-    return this.transaction(() => {
-      const hash = createHash('sha256').update(token).digest('hex');
-      const row = this.db.prepare('SELECT organization_id,role FROM faro_invites WHERE token_hash=? AND email=? AND expires_at>? AND accepted_at IS NULL').get(hash, email, this.now()) as { organization_id: string; role: string } | undefined;
-      if (!row) throw new HttpError(404, 'Zaproszenie jest niedostępne.');
-      const existing = this.db.prepare('SELECT role FROM faro_members WHERE organization_id=? AND user_id=?').get(row.organization_id, userId) as { role: string } | undefined;
-      if (existing?.role === 'OWNER') throw new HttpError(409, 'Właściciel ma już dostęp.');
-      this.db.prepare('INSERT INTO faro_members(organization_id,user_id,role) VALUES(?,?,?) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,active=1').run(row.organization_id, userId, row.role);
-      this.db.prepare('UPDATE faro_invites SET accepted_at=? WHERE token_hash=?').run(this.now(), hash);
-      this.audit(userId, 'MEMBERSHIP_ACCEPTED', row.organization_id);
-      return { organizationId: row.organization_id };
+  invite(userId:string,orgId:string,body:Record<string,unknown>) {
+    return this.transaction(()=>{
+      this.member(userId,orgId,['OWNER','ADMIN']);const plan=organizationInvitePlan(userId,orgId,body,this.now());
+      this.runQueries([plan.query]);return plan.record;
     });
   }
-  revokeMember(userId: string, orgId: string, memberId: string) {
-    this.member(userId, orgId, ['OWNER','ADMIN']);
-    const member = this.member(memberId, orgId);
-    if (member.role === 'OWNER') throw new HttpError(409, 'Najpierw przenieś własność organizacji.');
-    this.db.prepare('UPDATE faro_members SET active=0 WHERE organization_id=? AND user_id=?').run(orgId, memberId);
-    this.audit(userId, 'MEMBERSHIP_REVOKED', orgId);
+  acceptInvite(userId:string,email:string,token:string) {
+    return this.transaction(()=>{
+      const asOf=this.now(),query=organizationInviteReadQuery(email,token,asOf),row=organizationInviteFromRows(this.db.prepare(query.text).all({$1:query.values[0]!,$2:email,$3:asOf}));
+      const existingQuery=organizationExistingMemberQuery(userId,row.organization_id),existing=this.db.prepare(existingQuery.text).get({$1:row.organization_id,$2:userId});
+      const plan=organizationInviteAcceptPlan(userId,query.values[0]!,row,existing,asOf);this.runQueries(plan.queries);return plan.record;
+    });
+  }
+  revokeMember(userId:string,orgId:string,memberId:string) {
+    return this.transaction(()=>{
+      this.member(userId,orgId,['OWNER','ADMIN']);const member=this.member(memberId,orgId);
+      this.runQueries(organizationRevokeQueries(userId,orgId,memberId,member,this.now()));
+    });
   }
 }
