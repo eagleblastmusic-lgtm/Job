@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromEnvironment } from './faro-postgres-rehearsal.mjs';
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
+import { readProfile } from '../dist/server/faro/profileReadModel.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
 import { OfferService } from '../dist/server/faro/offerService.js';
 import { RecruitmentService } from '../dist/server/faro/recruitmentService.js';
@@ -15,6 +16,8 @@ try {
   const employer=await f.user('PgEmployer'),candidate=await f.user('PgCandidate'),profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),r=new RecruitmentService(f.app.db),a=new AssessmentService(f.app.db);
   profiles.save(candidate.id,{firstName:"Anna-Łucja",expectedVersion:0,availability:{kind:'IMMEDIATE'}});
   profiles.addClaim(candidate.id,{skillId:'faro:activity:customer-service',level:'BASICS',source:'HOBBY',practice:{quantity:3,unit:'TASKS'},confirmed:true});
+  profiles.activity(candidate.id,{description:"Obsługiwałam klientów — 'tekst' <script>przykład</script>",source:'WORK'});
+  profiles.learn(candidate.id,{skillId:'faro:activity:customer-service',mode:'WANTS_TO_LEARN',practice:{quantity:2,unit:'TASKS'}});
   const org=profiles.organization(employer.id,{name:'Syntetyczna organizacja PostgreSQL'});f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
   const offer=offers.create(employer.id,org.id,{...offerInput(employer.id),responsibilities:["Pomoc klientom — Łódź; 'quoted' <script>tekst</script>"]});offers.lifecycle(employer.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(employer.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
   const process=r.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(candidate.id).confirmationToken,idempotencyKey:'pg-interest'});
@@ -32,6 +35,12 @@ try {
   if(sourceOnly){console.log(`FARO_POSTGRES_SOURCE_VALIDATED tables=${snapshot.tables.length} migrations=${snapshot.versions.length}; real PostgreSQL not exercised.`);}else{
     client=clientFromEnvironment();await client.connect();connected=true;const proof=await importSnapshot(client,snapshot,schema);created=true;assert.equal(proof.length,snapshot.tables.length);
     await compare(client,snapshot,schema);await client.query(`SET search_path TO ${identifier(schema)}`);
+    const asOf='2026-10-06T00:00:00.000Z',reference=new ProfileService(f.app.db,()=>new Date(asOf)),wire=value=>JSON.parse(JSON.stringify(value));
+    for(const owner of [candidate.id,employer.id])assert.deepEqual(wire(await readProfile(client,owner,asOf)),wire(reference.profile(owner)));
+    await assert.rejects(()=>client.readBatch([{text:'UPDATE faro_profiles SET version=version+1 WHERE user_id=$1',values:[candidate.id]}]),error=>error.code==='25006');
+    assert.equal((await readProfile(client,candidate.id,asOf)).version,reference.profile(candidate.id).version);
+    await assert.rejects(()=>client.readBatch([{text:'SELECT 9007199254740993::bigint AS unsafe',values:[]}]),error=>error.code==='22003');
+    await client.transaction(async()=>assert.equal((await readProfile(client,candidate.id,asOf)).version,1));
     await assert.rejects(()=>importSnapshot(client,snapshot,schema),/rolled back/);await compare(client,snapshot,schema);
     const invalid=structuredClone(snapshot),target=invalid.tables.find(t=>t.name==='faro_mfa');target.rows[0].last_counter=-2;
     const badSchema=`${schema}_bad`;await assert.rejects(()=>importSnapshot(client,invalid,badSchema),/rolled back/);
@@ -65,7 +74,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

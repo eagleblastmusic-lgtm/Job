@@ -1,9 +1,10 @@
+import { profileReadQueries,profileFromRows } from './profileReadModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { object, text, choice, integer, array } from './validation.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints, type SalaryMinimum } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
-import { LEVELS, SOURCES, skillById, suggestSkills, employerProjection, type Claim, type Learning, type Practice, type Availability } from '../../domain/faro/skills.js';
+import { LEVELS, SOURCES, skillById, suggestSkills, employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
 
 export class ProfileService extends FaroStore {
   constraints(userId:string):CandidateConstraints {
@@ -37,11 +38,10 @@ export class ProfileService extends FaroStore {
     });
   }
   profile(userId: string) {
-    const row = this.db.prepare('SELECT * FROM faro_profiles WHERE user_id=?').get(userId) as { first_name: string; availability: string; phone: string | null; version: number; preferences: string } | undefined;
-    const claims = (this.db.prepare('SELECT * FROM faro_claims WHERE user_id=? AND revoked_at IS NULL ORDER BY confirmed_at,id').all(userId) as unknown as Array<{ id: string; skill_id: string; level: Claim['level']; source: Claim['source']; practice: string; verification: Claim['verification']; version: number; confirmed_at: string }>).map(c => ({ id: c.id, skillId: c.skill_id, level: c.level, source: c.source, practice: JSON.parse(c.practice) as Practice, verification: c.verification, version: c.version, confirmedAt: c.confirmed_at }));
-    const learning = (this.db.prepare('SELECT * FROM faro_learning WHERE user_id=? ORDER BY skill_id,mode').all(userId) as unknown as Array<{ skill_id: string; mode: Learning['mode']; practice: string }>).map(l => ({ skillId: l.skill_id, mode: l.mode, practice: JSON.parse(l.practice) as Practice }));
-    return { firstName: row?.first_name ?? '', phone: row?.phone ?? null, version: row?.version ?? 0, preferences: row ? JSON.parse(row.preferences) as Record<string, unknown> : {}, availability: row ? JSON.parse(row.availability) as Availability : { kind: 'UNKNOWN', value: null, updatedAt: this.now() } as Availability, claims, learning, activities: this.db.prepare('SELECT id,description,source,created_at FROM faro_activities WHERE user_id=? ORDER BY created_at').all(userId), proposals: this.db.prepare('SELECT id,skill_id,rationale,model_version,status FROM faro_proposals WHERE user_id=? ORDER BY created_at').all(userId) };
+    const rows=profileReadQueries(userId).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    return profileFromRows(rows,this.now());
   }
+
   save(userId: string, body: Record<string, unknown>) {
     const name = text(body.firstName, 60);
     if (!/^[\p{L}][\p{L}\p{M}'’-]*$/u.test(name)) throw new HttpError(400, 'Wpisz tylko imię, bez nazwiska.', 'FIRST_NAME_ONLY');
