@@ -202,3 +202,7 @@ CP11-L draft [#66](https://github.com/eagleblastmusic-lgtm/Job/pull/66): codex/f
 CP11-M exact remote acceptance at9beab73: [FARO37441227370](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441227370) and [CI37441227307](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441227307) SUCCESS. Actual PostgreSQL18 Node22/24 published/current wire parity, unpublished draft isolation and intake proof regressions PASS. Draft67 remains dependent/unmerged; runtime SQLite, whole plan/release PARTIAL.
 
 CP11-M draft [#67](https://github.com/eagleblastmusic-lgtm/Job/pull/67): codex/faro-cp11m-offer-read base codex/faro-cp11l-profile-read, code9beab73. Both exact remote checks SUCCESS above; unmerged.
+
+CP11-N atfd9ee0e: [FARO37441865147](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441865147) SUCCESS, including actual PostgreSQL18 Node22/24 profile writes and atomic phone-grant/audit/profile rollback. [CI37441865183](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441865183) still in progress at this observation. Draft68 dependent/unmerged; runtime SQLite, whole plan/release PARTIAL.
+
+CP11-N draft [#68](https://github.com/eagleblastmusic-lgtm/Job/pull/68): codex/faro-cp11n-profile-write base codex/faro-cp11m-offer-read, codefd9ee0e. Exact FARO SUCCESS, CI pending above; unmerged.

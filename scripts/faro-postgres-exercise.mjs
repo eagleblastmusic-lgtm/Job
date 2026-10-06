@@ -1,4 +1,4 @@
-import { saveProfile } from '../dist/server/faro/profileWriteModel.js';
+import { saveProfile,saveProfileConstraints } from '../dist/server/faro/profileWriteModel.js';
 import { readPublishedOffer } from '../dist/server/faro/offerReadModel.js';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -93,6 +93,16 @@ try {
     await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Blocked',expectedVersion:3,phone:'+48500100201',availability:{kind:'IMMEDIATE'}},asOf),error=>error.code==='23514');
     assert.equal((await client.query('SELECT revoked_at FROM faro_contact_grants WHERE process_id=$1',[process.id])).rows[0].revoked_at,null);assert.deepEqual(await readProfile(client,candidate.id,asOf),unchangedPhone);assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
     const initial=await saveProfile(client,employer.id,{firstName:'Jan',expectedVersion:0,availability:{kind:'UNKNOWN'}},asOf);assert.equal(initial.version,1);assert.equal(initial.phone,null);
+    const limits={active:true,noNights:true,noWeekends:false,workModels:['ONSITE'],contracts:['UOP'],salaryMinimum:{amount:500000,currency:'PLN',basis:'GROSS_EMPLOYMENT',period:'MONTH',hoursPerPeriod:160,ftePercent:100},maxCommuteMinutes:90};
+    await assert.rejects(()=>saveProfileConstraints(client,'absent-profile',{expectedVersion:1,constraints:limits},asOf),error=>error.code==='PROFILE_REQUIRED');
+    const privateLimits=await saveProfileConstraints(client,candidate.id,{expectedVersion:3,constraints:limits},asOf);assert.equal(privateLimits.version,4);assert.deepEqual(privateLimits.preferences,limits);assert.deepEqual(privateLimits.claims,unchangedPhone.claims);assert.equal(privateLimits.phone,unchangedPhone.phone);
+    const olderCaller={...limits};delete olderCaller.salaryMinimum;delete olderCaller.maxCommuteMinutes;
+    const preservedLimits=await saveProfileConstraints(client,candidate.id,{expectedVersion:4,constraints:olderCaller},asOf);assert.equal(preservedLimits.version,5);assert.deepEqual(preservedLimits.preferences,limits);
+    await assert.rejects(()=>saveProfileConstraints(client,candidate.id,{expectedVersion:4,constraints:limits},asOf),error=>error.code==='VERSION_CONFLICT');
+    await assert.rejects(()=>saveProfileConstraints(client,candidate.id,{expectedVersion:5,constraints:{...limits,maxCommuteMinutes:1441}},asOf),error=>error.code==='VALIDATION_ERROR');
+    await assert.rejects(()=>saveProfileConstraints(client,candidate.id,{expectedVersion:5,constraints:{...limits,salaryMinimum:{...limits.salaryMinimum,amount:-1}}},asOf),error=>error.code==='VALIDATION_ERROR');
+    assert.deepEqual(await readProfile(client,candidate.id,asOf),preservedLimits);
+    const removedLimits=await saveProfileConstraints(client,candidate.id,{expectedVersion:5,constraints:{...limits,salaryMinimum:null,maxCommuteMinutes:null}},asOf);assert.equal(removedLimits.version,6);assert.equal(removedLimits.preferences.salaryMinimum,null);assert.equal(removedLimits.preferences.maxCommuteMinutes,null);
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -120,7 +130,7 @@ try {
       const result=await Promise.allSettled([increment(client),increment(second)]);assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(result.find(r=>r.status==='rejected').reason.code,'40001');assert.equal((await client.query('SELECT value FROM pg_adapter_evidence WHERE id=$1',['cross-connection'])).rows[0].value,'1');
     }finally{await second.end();}
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}
