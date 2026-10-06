@@ -8,7 +8,8 @@ import { extract,parts,identifier,targetTable,importSnapshot,compare,clientFromE
 import { faroFixture,offerInput } from '../dist/tests/faro-fixture.js';
 import { readProfile } from '../dist/server/faro/profileReadModel.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
-import { OfferService } from '../dist/server/faro/offerService.js';
+import { createOfferDraft } from '../dist/server/faro/offerWriteModel.js';
+import { OfferService,parseOffer } from '../dist/server/faro/offerService.js';
 import { RecruitmentService } from '../dist/server/faro/recruitmentService.js';
 import { AssessmentService } from '../dist/server/faro/assessmentService.js';
 import { MfaService,totp } from '../dist/server/faro/mfaService.js';
@@ -173,6 +174,16 @@ try {
     await revokeOrganizationMember(client,employer.id,targetOrg.id,candidate.id,asOf);await assert.rejects(()=>readMembership(client,candidate.id,targetOrg.id),error=>error.code==='NOT_FOUND');assert.equal(await readAffiliation(client,candidate.id,targetOrg.id),true);
     assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE action='MEMBERSHIP_REVOKED' AND entity_id=$1",[targetOrg.id])).rowCount,1);
     const reinvite=await inviteOrganizationMember(client,employer.id,targetOrg.id,{email:candidate.email,role:'HIRING_MANAGER'},asOf);await acceptOrganizationInvite(client,candidate.id,candidate.email,reinvite.token,asOf);assert.equal((await readMembership(client,candidate.id,targetOrg.id)).role,'HIRING_MANAGER');
+    const targetDraftInput=offerInput(employer.id),targetDraft=await createOfferDraft(client,employer.id,targetOrg.id,targetDraftInput,asOf,parseOffer);assert.equal(targetDraft.status,'DRAFT');assert.equal(targetDraft.version,1);assert.equal(targetDraft.revision,1);assert.equal(targetDraft.approvedVersion,null);assert.deepEqual(targetDraft.data,parseOffer(targetDraftInput));
+    assert.equal((await client.query('SELECT 1 FROM faro_assignments WHERE offer_id=$1 AND user_id=$2',[targetDraft.id,employer.id])).rowCount,1);
+    await assert.rejects(()=>readPublishedOffer(client,targetDraft.id,asOf),error=>error.code==='PUBLICATION_NOT_FOUND');
+    await assert.rejects(()=>createOfferDraft(client,candidate.id,targetOrg.id,offerInput(candidate.id),asOf,parseOffer),error=>error.code==='NOT_FOUND');
+    await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(candidate.id),asOf,parseOffer),error=>error.code==='NOT_FOUND');
+    await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,{...offerInput(employer.id),salary:[]},asOf,parseOffer),error=>error.code==='SALARY_REQUIRED');
+    const draftCount=(await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n;
+    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_audit_guard CHECK(action<>'OFFER_DRAFT_CREATED')");
+    await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(employer.id),asOf,parseOffer),error=>error.code==='23514');assert.equal((await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n,draftCount);
+    await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_audit_guard');
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
     const tie='2030-01-01 00:00:00';await client.query("INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES($1,$2,'ANALYTICS',1,'synthetic',$3),($4,$2,'ANALYTICS',0,'synthetic',$3)",['pg-yes',candidate.id,tie,'pg-no']);
     // Use known retained analytics contract, never interpolate record values.
@@ -209,7 +220,7 @@ try {
     }finally{await victim.end();}
     assert.equal((await client.query('SELECT 1 AS healthy')).rows[0].healthy,1);
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
-    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination PASS; runtime cutover not exercised.`);
+    console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity PASS; runtime cutover not exercised.`);
   }
 } catch(error){console.error(`FARO_POSTGRES_EXERCISE_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);console.error(String(error?.stack??'').split('\n').slice(1,4).filter(line=>line.trim().startsWith('at ')).join('\n'));throw new Error('PostgreSQL exercise failed; see aggregate failure code.');}
 finally {if(client){try{if(connected&&created)await client.query(`DROP SCHEMA ${identifier(schema)} CASCADE`);}finally{await client.end();}}await f.close();}

@@ -1,3 +1,4 @@
+import { offerCreateQueries } from './offerWriteModel.js';
 import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
@@ -77,16 +78,15 @@ export class OfferService extends FaroStore {
     return { ...offer, ownInterest, acceptingInterest: this.intake(current), explanation: explainOffer(offer.data, p.claims, p.learning),conditionExplanation:assigned?[]:this.conditions(userId,offer) };
   }
   create(userId: string, orgId: string, raw: Record<string, unknown>) {
-    this.member(userId, orgId, ['OWNER','ADMIN','RECRUITER']); const data = parseOffer(raw);
-    this.member(data.recruiterId, orgId, ['OWNER','ADMIN','RECRUITER']);
-    const id = randomUUID();
-    this.transaction(() => {
-      this.db.prepare('INSERT INTO faro_offers(id,organization_id,created_at) VALUES(?,?,?)').run(id, orgId, this.now());
-      this.db.prepare('INSERT INTO faro_offer_versions(offer_id,version,content,author_id,created_at) VALUES(?,1,?,?,?)').run(id, JSON.stringify(data), userId, this.now());
-      for (const member of new Set([userId, data.recruiterId])) this.db.prepare('INSERT INTO faro_assignments(offer_id,user_id) VALUES(?,?)').run(id, member);
-      this.audit(userId, 'OFFER_DRAFT_CREATED', id);
-    }); return this.get(id);
+    const id=randomUUID();
+    return this.transaction(()=>{
+      this.member(userId,orgId,['OWNER','ADMIN','RECRUITER']);const data=parseOffer(raw);
+      this.member(data.recruiterId,orgId,['OWNER','ADMIN','RECRUITER']);
+      for(const query of offerCreateQueries(userId,orgId,id,data,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      return this.get(id);
+    });
   }
+
   edit(userId: string, id: string, body: Record<string, unknown>) {
     const offer = this.assigned(userId, id); this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
     const data = parseOffer(object(body.data)); this.member(data.recruiterId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
