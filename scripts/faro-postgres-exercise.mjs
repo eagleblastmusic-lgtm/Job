@@ -181,7 +181,7 @@ try {
     await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(candidate.id),asOf,parseOffer),error=>error.code==='NOT_FOUND');
     await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,{...offerInput(employer.id),salary:[]},asOf,parseOffer),error=>error.code==='SALARY_REQUIRED');
     const draftCount=(await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n;
-    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_audit_guard CHECK(action<>'OFFER_DRAFT_CREATED')");
+    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_offer_audit_guard CHECK(action<>'OFFER_DRAFT_CREATED') NOT VALID");
     await assert.rejects(()=>createOfferDraft(client,employer.id,targetOrg.id,offerInput(employer.id),asOf,parseOffer),error=>error.code==='23514');assert.equal((await client.query('SELECT COUNT(*) n FROM faro_offers')).rows[0].n,draftCount);
     await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_offer_audit_guard');
     // Same-timestamp consent order survives source rowid, and future inserts obtain monotonic row order.
