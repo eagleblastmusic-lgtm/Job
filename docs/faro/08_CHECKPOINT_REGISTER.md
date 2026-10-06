@@ -628,3 +628,10 @@ CP11-J exact remote acceptance at01e33b6: [FARO37391162935](https://github.com/e
 Existing Canonical SQLite producer and real async PostgreSQL staging share explicit queries/mapping; synchronous commands preserved. Read-only snapshot batch and safe integer conversion have real database regression requirements. [Scope](CP11_L_PORTABLE_PROFILE_READ.md). Source-only70/35 PASS; full application and exact remote evidence pending. Runtime remains SQLite; whole CP11/master plan/release PARTIAL. Continue from actual acceptance, then remaining async repository/current-authority/cutover deltas.
 
 CP11-L full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact real PostgreSQL and remote checks pending.
+
+## CP11-M — Shared published offer read, 2026-10-06
+Existing offer producer and PostgreSQL staging share explicit current/published reads and unchanged intake gates in an owned snapshot. Pending draft content stays private; missing proof/revoked membership/expiry cannot enable intake. [Scope](CP11_M_PORTABLE_OFFER_READ.md). Source-only70/35 PASS; full application and actual PostgreSQL acceptance pending. Runtime SQLite, whole CP11/master plan/release PARTIAL.
+
+CP11-L exact remote acceptance at207adcd: [FARO37440425309](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37440425309) and [CI37440425276](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37440425276) SUCCESS. Actual PostgreSQL18 Node22/24 profile-wire/read-only-batch/safe-integer and preceding staging proof PASS. Draft66 remains dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-M full local npm run check PASS153 Node/35 migrations/both actual restores/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Actual PostgreSQL and exact remote acceptance pending.
