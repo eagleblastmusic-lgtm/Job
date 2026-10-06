@@ -1,12 +1,12 @@
 import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment,offerLifecycleAction,offerPublicationOrganizationQuery,requireOfferPublication,offerLifecycleQueries,offerNotificationRecipientsQuery,offerNotificationQueries } from './offerWriteModel.js';
-import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,type OfferRecord } from './offerReadModel.js';
+import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,offerListReadQuery,offerConditionsReadQueries,offerConditionsFromRows,offerConditionsAllow,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { object, text, array, choice, integer, date, nullableBoolean } from './validation.js';
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
-import { explainOffer, explainConditions, sortOffers, type OfferData, type SalaryOption } from '../../domain/faro/offers.js';
+import { explainOffer, sortOffers, type OfferData, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
@@ -53,16 +53,15 @@ export class OfferService extends FaroStore {
   }
 
   private conditions(userId:string,offer:OfferRecord) {
-    const saved=this.db.prepare('SELECT result,offer_version FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(userId,offer.id) as {result:string;offer_version:number}|undefined;
-    const e=saved?JSON.parse(saved.result) as {commuteTimeMinutes:number|null;source:string;sourceDate:string;units?:{commuteTime:string}}:null;
-    return explainConditions(offer.data,new ProfileService(this.database,this.clock).constraints(userId),e&&saved?{minutes:e.commuteTimeMinutes,source:e.source,observedAt:e.sourceDate,asOf:this.now(),currentVersion:saved.offer_version===offer.version,basis:e.units?.commuteTime??''}:undefined);
+    const rows=offerConditionsReadQueries(userId,offer.id).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    return offerConditionsFromRows(offer,rows,this.now());
   }
   list(userId: string, orgId?: string, includeUnknown=false) {
     if (orgId) this.member(userId, orgId);
-    const ids = (orgId ? this.db.prepare('SELECT id FROM faro_offers WHERE organization_id=?').all(orgId) : this.db.prepare("SELECT id FROM faro_offers WHERE status='PUBLISHED'").all()) as Array<{ id: string }>;
+    const query=offerListReadQuery(orgId),ids=this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))) as Array<{id:string}>;
     return sortOffers(ids.map(row => this.get(row.id)).filter(offer => orgId || this.intake(offer)).map(offer=>orgId?offer:this.published(offer.id)).flatMap(offer=>{
       if(orgId)return [offer];const conditions=this.conditions(userId,offer);
-      return conditions.every(c=>c.state==='SATISFIED'||includeUnknown&&c.state==='UNKNOWN')?[{...offer,hasUnknownConditions:conditions.some(c=>c.state==='UNKNOWN')}]:[];
+      return offerConditionsAllow(conditions,includeUnknown)?[{...offer,hasUnknownConditions:conditions.some(c=>c.state==='UNKNOWN')}]:[];
     }));
   }
   detail(userId: string, id: string) {
