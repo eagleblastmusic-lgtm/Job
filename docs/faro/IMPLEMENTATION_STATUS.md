@@ -626,3 +626,10 @@ Existing FaroStore membership/affiliation and own organization list share explic
 CP11-P exact remote acceptance at951682f: [FARO37443239641](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239641) and [CI37443239626](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239626) SUCCESS. Actual PostgreSQL18 Node22/24 private claims/learning/activity/proposal history, ownership, confirmation, pinned-skill and rollback regressions PASS. Draft70 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-Q full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+## CP11-R — Shared organization create/verify commands, 2026-10-06
+Existing create and independent moderator verification share parameterized plans with real PostgreSQL staging. Owner/audit transaction, current ADMIN, historical affiliation and RESTRICTED separation preserved; synthetic fixture is not external qualification. [Scope](CP11_R_PORTABLE_ORGANIZATION_VERIFICATION.md). Source-only70/35 PASS; full application and actual PostgreSQL acceptance pending. Runtime SQLite; full CP11/master plan/release PARTIAL. Continue invites/membership and remaining repositories/current-authority conversion after actual acceptance.
+
+CP11-Q exact remote acceptance at6728484: [FARO37443951948](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951948) and [CI37443951915](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951915) SUCCESS. Actual PostgreSQL18 Node22/24 membership/list parity, exact role allowlists, revoked access and retained affiliation proof PASS. Draft71 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-R full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.

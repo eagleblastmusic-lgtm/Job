@@ -9,3 +9,5 @@ Actual PostgreSQL18 Node22/24 must prove SQLite wire parity, owner access, forei
 Runtime remains SQLite. Organization write commands, auth/remaining repositories, current-authority target recovery, operator cutover and external gates remain open. This bounded portability prerequisite is not full CP11/master plan or release DONE.
 
 CP11-Q full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+CP11-Q exact remote acceptance at6728484: [FARO37443951948](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951948) and [CI37443951915](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443951915) SUCCESS. Actual PostgreSQL18 Node22/24 membership/list parity, exact role allowlists, revoked access and retained affiliation proof PASS. Draft71 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.

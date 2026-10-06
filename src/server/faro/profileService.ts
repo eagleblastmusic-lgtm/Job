@@ -1,3 +1,4 @@
+import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
 import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows } from './profileReadModel.js';
@@ -72,25 +73,16 @@ export class ProfileService extends FaroStore {
   }
 
   organization(userId: string, body: Record<string, unknown>) {
-    const id = randomUUID(), name = text(body.name, 150);
-    this.transaction(() => {
-      this.db.prepare('INSERT INTO faro_organizations(id,name,created_at) VALUES(?,?,?)').run(id, name, this.now());
-      this.db.prepare("INSERT INTO faro_members(organization_id,user_id,role) VALUES(?,?,'OWNER')").run(id, userId);
-      this.audit(userId, 'ORGANIZATION_CREATED', id);
-    }); return { id, name, verification: 'PENDING' };
+    const plan=organizationCreatePlan(userId,body,this.now());
+    this.transaction(()=>this.runQueries(plan.queries));return plan.record;
   }
-  verify(adminId: string, orgId: string, note: string) {
+  verify(adminId:string,orgId:string,note:string) {
     return this.transaction(()=>{
-      const admin = this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(adminId);
-      if (!admin) throw new HttpError(403, 'Wymagany moderator.');
-      const org=this.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(orgId) as {verification:string}|undefined;
-      if(!org)throw new HttpError(404,'Nie znaleziono organizacji.');
-      if(this.affiliated(adminId,orgId))throw new HttpError(409,'Organizację musi zweryfikować moderator bez powiązania z nią.','VERIFICATION_CONFLICT');
-      if(org.verification==='RESTRICTED')throw new HttpError(409,'Ograniczenie wymaga odrębnego rozstrzygnięcia moderacyjnego.','RESTRICTION_REVIEW_REQUIRED');
-      this.db.prepare("UPDATE faro_organizations SET verification='VERIFIED',verified_at=?,verification_note=? WHERE id=?").run(this.now(), text(note, 1000, 10), orgId);
-      this.audit(adminId, 'ORGANIZATION_VERIFIED', orgId);
+      const rows=organizationVerificationReadQueries(adminId,orgId).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+      this.runQueries(organizationVerifyQueries(adminId,orgId,note,rows,this.now()));
     });
   }
+
   invite(userId: string, orgId: string, body: Record<string, unknown>) {
     this.member(userId, orgId, ['OWNER','ADMIN']);
     const token = randomUUID() + randomUUID(), hash = createHash('sha256').update(token).digest('hex');
