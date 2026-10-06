@@ -1,4 +1,4 @@
-import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment } from './offerWriteModel.js';
+import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment,offerLifecycleAction,offerPublicationOrganizationQuery,requireOfferPublication,offerLifecycleQueries,offerNotificationRecipientsQuery,offerNotificationQueries } from './offerWriteModel.js';
 import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +6,7 @@ import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { object, text, array, choice, integer, date, nullableBoolean } from './validation.js';
 import { LEVELS, skillById } from '../../domain/faro/skills.js';
-import { explainOffer, explainConditions, sortOffers, type OfferData, type OfferStatus, type SalaryOption } from '../../domain/faro/offers.js';
+import { explainOffer, explainConditions, sortOffers, type OfferData, type SalaryOption } from '../../domain/faro/offers.js';
 import { ProfileService } from './profileService.js';
 export function parseOffer(body: Record<string, unknown>): OfferData {
   const salary = array(body.salary, 8).map(raw => {
@@ -97,32 +97,17 @@ export class OfferService extends FaroStore {
   }
 
   lifecycle(userId: string, id: string, body: Record<string, unknown>) {
-    const offer = this.assigned(userId, id); this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
-    if (integer(body.expectedVersion, 1) !== offer.revision) throw new HttpError(409, 'Oferta zmieniła się.', 'VERSION_CONFLICT');
-    const action = choice(body.action, ['REVIEW','PUBLISH','PAUSE','CLOSE','ARCHIVE','RECONFIRM'] as const);
-    const allowed: Record<typeof action, OfferStatus[]> = { REVIEW: ['DRAFT'], PUBLISH: ['IN_REVIEW','PAUSED'], PAUSE: ['PUBLISHED'], CLOSE: ['DRAFT','IN_REVIEW','PUBLISHED','PAUSED'], ARCHIVE: ['CLOSED'], RECONFIRM: ['PUBLISHED','PAUSED'] };
-    if (!allowed[action].includes(offer.status)) throw new HttpError(409, 'Niedozwolona zmiana stanu.', 'INVALID_TRANSITION');
-    const publish = action === 'PUBLISH' || action === 'RECONFIRM';
-    if (publish) {
-      const org = this.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(offer.organizationId) as { verification: string };
-      if (org.verification !== 'VERIFIED') throw new HttpError(409, 'Organizacja oczekuje na weryfikację.', 'ORGANIZATION_NOT_VERIFIED');
-      if (offer.data.closesAt <= this.now() || body.confirmed !== true) throw new HttpError(400, 'Potwierdź aktualną wersję i przyszłą datę zamknięcia.');
-      this.member(offer.data.recruiterId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
-    }
-    const status: OfferStatus = ({ REVIEW: 'IN_REVIEW', PUBLISH: 'PUBLISHED', PAUSE: 'PAUSED', CLOSE: 'CLOSED', ARCHIVE: 'ARCHIVED', RECONFIRM: 'PUBLISHED' } as const)[action];
-    this.transaction(() => {
-      if(this.get(id).revision!==offer.revision)throw new HttpError(409,'Oferta zmieniła się.','VERSION_CONFLICT');
-      this.db.prepare('UPDATE faro_offers SET status=?,revision=revision+1,approved_version=?,confirmed_until=? WHERE id=?').run(status, publish ? offer.version : offer.approvedVersion, publish ? new Date(Math.min(Date.parse(offer.data.closesAt), this.clock().getTime() + 14 * 86400000)).toISOString() : offer.confirmedUntil, id);
-      if(publish) {
-        this.db.prepare("UPDATE faro_offer_versions SET publication_proof='EXPLICIT',published_at=COALESCE(published_at,?),published_by=COALESCE(published_by,?) WHERE offer_id=? AND version=?").run(this.now(),userId,id,offer.version);
-        this.db.prepare('UPDATE faro_offers SET confirmed_at=? WHERE id=?').run(this.now(),id);
-      }
-      this.audit(userId, `OFFER_${action}`, id);
-      if (publish || action === 'CLOSE') this.notifyChange(id, offer.version, action);
-    }); return this.get(id);
+    return this.transaction(()=>{
+      const offer=this.assigned(userId,id);this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);
+      const asOf=this.now(),action=offerLifecycleAction(offer,body),publish=action==='PUBLISH'||action==='RECONFIRM';
+      if(publish){const query=offerPublicationOrganizationQuery(offer.organizationId);requireOfferPublication(offer,body,this.db.prepare(query.text).get({$1:offer.organizationId}),asOf);this.member(offer.data.recruiterId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);}
+      for(const query of offerLifecycleQueries(userId,offer,action,asOf))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      if(publish||action==='CLOSE')this.notifyChange(id,offer.version,action);
+      return this.get(id);
+    });
   }
-  notifyChange(id: string, version: number, action: string) {
-    const recipients = this.db.prepare('SELECT candidate_id FROM faro_watches WHERE offer_id=? AND alerts=1 UNION SELECT candidate_id FROM faro_interests WHERE offer_id=?').all(id, id) as Array<{ candidate_id: string }>;
-    for (const recipient of recipients) this.db.prepare('INSERT OR IGNORE INTO faro_outbox(id,recipient_id,entity_type,entity_id,message,dedupe_key,next_attempt_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), recipient.candidate_id, 'offer', id, action === 'CLOSE' ? 'Obserwowana oferta została zamknięta. Sprawdź swój proces.' : 'Opublikowano warunki oferty. Sprawdź, co się zmieniło.', `offer:${id}:${version}:${action}`, this.now());
+  notifyChange(id:string,version:number,action:string) {
+    const query=offerNotificationRecipientsQuery(id),recipients=this.db.prepare(query.text).all({$1:id});
+    for(const command of offerNotificationQueries(id,version,action,recipients,this.now()))this.db.prepare(command.text).run(Object.fromEntries(command.values.map((value,index)=>[`$${index+1}`,value as string])));
   }
 }
