@@ -656,3 +656,10 @@ Existing own claim/revoke/learning/activity/proposal producers and real PostgreS
 CP11-N final CI37441865183 SUCCESS atfd9ee0e supersedes the previous pending note; FARO37441865147 also SUCCESS. CP11-O exact acceptance at7526d41: [FARO37442510890](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37442510890) and [CI37442510741](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37442510741) SUCCESS, including PostgreSQL18 Node22/24 private constraints save/preserve/remove/refusal proof. Draft68/69 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-P full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; final source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+## CP11-Q — Shared organization access reads, 2026-10-06
+Existing FaroStore membership/affiliation and own organization list share explicit queries with actual PostgreSQL. Exact active role scopes and opaque404 retained; historical affiliation survives revocation for moderator independence. [Scope](CP11_Q_PORTABLE_ORGANIZATION_ACCESS.md). Source-only70/35 PASS; full application and actual PostgreSQL acceptance pending. Runtime SQLite; whole CP11/master plan/release PARTIAL. Continue organization writes and remaining repositories/current-authority work after real acceptance.
+
+CP11-P exact remote acceptance at951682f: [FARO37443239641](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239641) and [CI37443239626](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37443239626) SUCCESS. Actual PostgreSQL18 Node22/24 private claims/learning/activity/proposal history, ownership, confirmation, pinned-skill and rollback regressions PASS. Draft70 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-Q full local npm run check PASS153 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.

@@ -1,3 +1,4 @@
+import { organizationsReadQuery } from './organizationReadModel.js';
 import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows } from './profileReadModel.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -66,8 +67,10 @@ export class ProfileService extends FaroStore {
     return { projection, confirmationToken };
   }
   organizations(userId: string) {
-    return this.db.prepare('SELECT o.id,o.name,o.verification,o.verified_at,m.role FROM faro_organizations o JOIN faro_members m ON m.organization_id=o.id WHERE m.user_id=? AND m.active=1 ORDER BY o.created_at').all(userId);
+    const query=organizationsReadQuery(userId);
+    return this.db.prepare(query.text).all({$1:userId});
   }
+
   organization(userId: string, body: Record<string, unknown>) {
     const id = randomUUID(), name = text(body.name, 150);
     this.transaction(() => {
