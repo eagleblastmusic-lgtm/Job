@@ -676,3 +676,8 @@ Existing detail and actual PostgreSQL share active assignment, own process/watch
 CP11-X0e9c483 exact acceptance: [FARO37449170085](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37449170085) and [CI37449170043](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37449170043) SUCCESS. Actual PostgreSQL18 Node22/24 public/organization list wire parity, foreign-org refusal, known-failure exclusion and private commute current/stale/unknown proof PASS. Draft78 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
 
 CP11-Y full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+## CP11-Z — Shared atomic command journal, 2026-10-06
+Existing recruitment/interview/assessment/trust commandOnce consumes shared key/hash/read/replay/save plans. Real async PostgreSQL owns SERIALIZABLE command/work/journal scope and requires current-authority callback before every replay. Existing synchronous callers keep their current authorization checks and command contract. [Scope](CP11_Z_PORTABLE_COMMAND_JOURNAL.md). Full application and actual PostgreSQL acceptance pending. Runtime SQLite; whole CP11/master plan/release PARTIAL. Continue actual acceptance then remaining native process commands/assessment/auth/privacy/current-authority conversion.
+
+CP11-Z full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.

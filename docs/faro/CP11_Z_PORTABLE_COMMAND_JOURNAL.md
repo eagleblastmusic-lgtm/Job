@@ -1,0 +1,11 @@
+# CP11-Z — Shared atomic command journal (2026-10-06)
+
+Existing RecruitmentService.commandOnce, consumed by recruitment/interview/assessment/trust producers, uses shared validation, exact JSON input SHA256, user-scoped key lookup, conflict/replay and parameterized journal save. SQLite keeps synchronous transactions and existing caller authorization. No transition, privacy projection, response clock or command key namespace changes.
+
+Async PostgreSQL runCommandOnce owns SERIALIZABLE work and journal scope. Required current-authority callback runs inside that transaction before lookup/replay on every call; a saved acknowledgement cannot replace current authority. Exact replay returns the saved result without repeating work. Different input under the same user/key is refused with IDEMPOTENCY_CONFLICT. No automatic retry on serialization conflict and no swallowed journal failures.
+
+Real PostgreSQL18 Node22/24 must inject a journal CHECK failure after synthetic process revision and outbox writes, prove rollback of all three, then succeed once and replay the identical acknowledgement without duplicate effects. It must refuse changed input and replay after membership revocation, with no additional work. The fixture uses the existing current membership reader and restores temporary process state/outbox before retained proofs. This proves command infrastructure, not completion of native async recruitment transitions or a production cutover. Existing70-table hashes/constraints/rollback and previous subsystem proof remain required.
+
+Full local application and real PostgreSQL acceptance pending. Runtime SQLite; native async process/assessment/auth/privacy producers, current-authority recovery/cutover and external acceptance gates remain open. Whole CP11/master plan/release PARTIAL.
+
+CP11-Z full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
