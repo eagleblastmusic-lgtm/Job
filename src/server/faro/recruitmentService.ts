@@ -1,3 +1,4 @@
+import { commandRequest,commandReadQuery,commandReplay,commandSaveQuery } from './commandJournal.js';
 import { AppStore } from '../store.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
@@ -27,15 +28,12 @@ export class RecruitmentService extends FaroStore {
     return row;
   }
   commandOnce<T>(userId: string, key: unknown, input: unknown, work: () => T): T {
-    const commandKey = text(key, 150), hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
-    return this.transaction(() => {
-      const existing = this.db.prepare('SELECT input_hash,result FROM faro_commands WHERE user_id=? AND command_key=?').get(userId, commandKey) as { input_hash: string; result: string } | undefined;
-      if (existing) {
-        if (existing.input_hash !== hash) throw new HttpError(409, 'Klucz operacji został już użyty dla innych danych.', 'IDEMPOTENCY_CONFLICT');
-        return JSON.parse(existing.result) as T;
-      }
-      const result = work();
-      this.db.prepare('INSERT INTO faro_commands(user_id,command_key,input_hash,result,created_at) VALUES(?,?,?,?,?)').run(userId, commandKey, hash, JSON.stringify(result), this.now());
+    const request=commandRequest(key,input);
+    return this.transaction(()=>{
+      const query=commandReadQuery(userId,request.key),replay=commandReplay<T>(this.db.prepare(query.text).all({$1:userId,$2:request.key}),request.hash);
+      if(replay.found)return replay.result;
+      const result=work(),save=commandSaveQuery(userId,request,result,this.now());
+      this.db.prepare(save.text).run(Object.fromEntries(save.values.map((value,index)=>[`$${index+1}`,value as string])));
       return result;
     });
   }
