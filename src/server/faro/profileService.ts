@@ -1,11 +1,11 @@
-import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery } from './profileWriteModel.js';
+import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows } from './profileReadModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
-import { object, text, choice, integer } from './validation.js';
+import { text, choice } from './validation.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
-import { LEVELS, SOURCES, skillById, suggestSkills, employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
+import { employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
 
 export class ProfileService extends FaroStore {
   constraints(userId:string):CandidateConstraints {
@@ -37,47 +37,23 @@ export class ProfileService extends FaroStore {
   }
   availability(input:unknown):Availability {return profileAvailability(input,this.now());}
 
-  practice(value: unknown): Practice {
-    const p = object(value);
-    return { quantity: p.quantity === null ? null : integer(p.quantity, 0, 10000), unit: choice(p.unit, ['MONTHS', 'PROJECTS', 'TASKS'] as const) };
+  private runQueries(queries:Array<{text:string;values:readonly unknown[]}>) {
+    for(const query of queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value as string|number|null])));
   }
-  claim(userId: string, body: Record<string, unknown>) {
-    const skillId = text(body.skillId, 100);
-    if (!skillById(skillId)) throw new HttpError(400, 'Wybierz znaną kompetencję.');
-    const level = choice(body.level, LEVELS), source = choice(body.source, SOURCES), practice = this.practice(body.practice);
-    if (body.confirmed !== true) throw new HttpError(400, 'Potwierdź własną deklarację.', 'CONFIRMATION_REQUIRED');
-    this.db.prepare('UPDATE faro_claims SET revoked_at=? WHERE user_id=? AND skill_id=? AND revoked_at IS NULL').run(this.now(), userId, skillId);
-    const previous = this.db.prepare('SELECT COALESCE(MAX(version),0) v FROM faro_claims WHERE user_id=? AND skill_id=?').get(userId, skillId) as { v: number };
-    this.db.prepare('INSERT INTO faro_claims(id,user_id,skill_id,level,source,practice,version,confirmed_at) VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(), userId, skillId, level, source, JSON.stringify(practice), previous.v + 1, this.now());
-    this.audit(userId, 'SKILL_DECLARED', skillId);
+  practice(value:unknown):Practice {return profilePractice(value);}
+  claim(userId:string,body:Record<string,unknown>) {this.runQueries(profileClaimQueries(userId,body,this.now()));}
+  addClaim(userId:string,body:Record<string,unknown>) {this.transaction(()=>this.claim(userId,body));return this.profile(userId);}
+  revoke(userId:string,id:string) {
+    const query=profileRevokeQuery(userId,id,this.now());
+    if(!this.db.prepare(query.text).get({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!}))throw new HttpError(404,'Nie znaleziono deklaracji.');
   }
-  addClaim(userId: string, body: Record<string, unknown>) { this.transaction(() => this.claim(userId, body)); return this.profile(userId); }
-  revoke(userId: string, id: string) {
-    if (!this.db.prepare('UPDATE faro_claims SET revoked_at=? WHERE id=? AND user_id=? AND revoked_at IS NULL').run(this.now(), id, userId).changes) throw new HttpError(404, 'Nie znaleziono deklaracji.');
-  }
-  learn(userId: string, body: Record<string, unknown>) {
-    const skillId = text(body.skillId, 100); if (!skillById(skillId)) throw new HttpError(400, 'Nieznana kompetencja.');
-    this.db.prepare('INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES(?,?,?,?) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice').run(userId, skillId, choice(body.mode, ['SELF_DEVELOPING','WANTS_TO_LEARN'] as const), JSON.stringify(this.practice(body.practice)));
-    return this.profile(userId);
-  }
-  activity(userId: string, body: Record<string, unknown>) {
-    const description = text(body.description, 3000), source = choice(body.source, SOURCES), id = randomUUID();
-    this.transaction(() => {
-      this.db.prepare('INSERT INTO faro_activities(id,user_id,description,source,created_at) VALUES(?,?,?,?,?)').run(id, userId, description, source, this.now());
-      for (const p of suggestSkills(description)) this.db.prepare('INSERT INTO faro_proposals(id,user_id,activity_id,skill_id,rationale,model_version,created_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), userId, id, p.skillId, p.rationale, p.modelVersion, this.now());
-      this.audit(userId, 'ACTIVITY_RECORDED', id);
-    });
-    return this.profile(userId);
-  }
-  decideProposal(userId: string, id: string, body: Record<string, unknown>) {
-    this.transaction(() => {
-      const p = this.db.prepare('SELECT skill_id,status FROM faro_proposals WHERE id=? AND user_id=?').get(id, userId) as { skill_id: string; status: string } | undefined;
-      if (!p) throw new HttpError(404, 'Nie znaleziono propozycji.');
-      if (p.status !== 'PENDING') throw new HttpError(409, 'Propozycja została już rozpatrzona.');
-      const status = choice(body.status, ['ACCEPTED','REJECTED'] as const);
-      if (status === 'ACCEPTED') this.claim(userId, { ...body, skillId: p.skill_id });
-      this.db.prepare('UPDATE faro_proposals SET status=?,decided_at=? WHERE id=?').run(status, this.now(), id);
-    }); return this.profile(userId);
+  learn(userId:string,body:Record<string,unknown>) {this.runQueries([profileLearningQuery(userId,body)]);return this.profile(userId);}
+  activity(userId:string,body:Record<string,unknown>) {const queries=profileActivityQueries(userId,body,this.now());this.transaction(()=>this.runQueries(queries));return this.profile(userId);}
+  decideProposal(userId:string,id:string,body:Record<string,unknown>) {
+    this.transaction(()=>{
+      const query=profileProposalQuery(userId,id),row=this.db.prepare(query.text).get({$1:id,$2:userId});
+      this.runQueries(profileProposalDecisionQueries(userId,id,body,row,this.now()));
+    });return this.profile(userId);
   }
   projection(userId: string, processId = 'preview') {
     const p = this.profile(userId);

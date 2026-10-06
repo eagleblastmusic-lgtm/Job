@@ -206,3 +206,7 @@ CP11-M draft [#67](https://github.com/eagleblastmusic-lgtm/Job/pull/67): codex/f
 CP11-N atfd9ee0e: [FARO37441865147](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441865147) SUCCESS, including actual PostgreSQL18 Node22/24 profile writes and atomic phone-grant/audit/profile rollback. [CI37441865183](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37441865183) still in progress at this observation. Draft68 dependent/unmerged; runtime SQLite, whole plan/release PARTIAL.
 
 CP11-N draft [#68](https://github.com/eagleblastmusic-lgtm/Job/pull/68): codex/faro-cp11n-profile-write base codex/faro-cp11m-offer-read, codefd9ee0e. Exact FARO SUCCESS, CI pending above; unmerged.
+
+CP11-N final CI37441865183 SUCCESS atfd9ee0e supersedes the previous pending note; FARO37441865147 also SUCCESS. CP11-O exact acceptance at7526d41: [FARO37442510890](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37442510890) and [CI37442510741](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37442510741) SUCCESS, including PostgreSQL18 Node22/24 private constraints save/preserve/remove/refusal proof. Draft68/69 dependent/unmerged; runtime SQLite, full plan/release PARTIAL.
+
+CP11-O draft [#69](https://github.com/eagleblastmusic-lgtm/Job/pull/69): codex/faro-cp11o-private-constraints base codex/faro-cp11n-profile-write, code7526d41. Both exact remote checks SUCCESS above; unmerged.
