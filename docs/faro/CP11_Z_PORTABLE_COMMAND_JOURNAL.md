@@ -9,3 +9,5 @@ Real PostgreSQL18 Node22/24 must inject a journal CHECK failure after synthetic 
 Full local application and real PostgreSQL acceptance pending. Runtime SQLite; native async process/assessment/auth/privacy producers, current-authority recovery/cutover and external acceptance gates remain open. Whole CP11/master plan/release PARTIAL.
 
 CP11-Z full local npm run check PASS154 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact actual PostgreSQL and remote acceptance pending.
+
+CP11-Z initial9b09124 real PostgreSQL failed retained hash comparison after the new journal proof: the synthetic successful acknowledgement was not removed alongside its temporary process/outbox changes. Fix removes only the exact synthetic employer/key journal row after all replay/rollback/current-authority assertions, restoring the original snapshot before the unchanged70-table comparison. No assertion skipped or relaxed; full real PostgreSQL rerun required. Local application154/35/both restores/38 browser proof remains valid because runtime code is unchanged.
