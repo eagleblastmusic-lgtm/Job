@@ -995,3 +995,11 @@ BQ full local check PASS170 Node/36 migrations/lint/typecheck/both restores/38 d
 ## CP11-BR — HTTP PostgreSQL cutover/rollback rehearsal, 2026-10-07
 
 [Scope](CP11_BR_POSTGRES_CUTOVER_REHEARSAL.md). Actual isolated listener switch preserves existing read contracts; complete native hash comparison permits read-only rollback and refuses stale-source rollback after native writes. Syntax/lint/diff PASS; actual native acceptance pending. BQ native recovery acceptance pending. BP27a7dc5 FARO37669744080/CI37669744085 SUCCESS. No production deployment/migration; default SQLite and external gates unchanged. Whole plan/release PARTIAL; continue.
+
+
+## CP11-BS — Offline MFA key rotation, 2026-10-07
+
+[Scope](CP11_BS_OFFLINE_MFA_KEY_ROTATION.md). Shared authenticated active/pending rewrap, atomic audit, preserved counters/recovery and invalidated session step-up; offline CLI takes protected env keys without logging. Node171 PASS; remaining static/native acceptance pending. BQ0ffd608 FARO37670340034 SUCCESS, CI pending. BR cutover acceptance pending. Actual operator custody/rollout/rescue and external gates remain open; whole plan/release PARTIAL; continue.
+
+
+CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PASS; syntax/diff PASS. BQ0ffd608 FARO37670340034 and CI37670339981 SUCCESS. BR valid-name fixture corrected ed7130e; actual cutover and BS native acceptance pending. Production custody and external gates remain open.
