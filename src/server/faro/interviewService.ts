@@ -1,3 +1,4 @@
+import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar,type InterviewRow } from './interviewReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
@@ -5,42 +6,21 @@ import { AppStore } from '../store.js';
 import { HttpError } from '../http.js';
 import { choice, date, integer, text } from './validation.js';
 
-interface InterviewRow {
-  id:string; process_id:string; recruiter_id:string|null; state:'PROPOSED'|'CONFIRMED'|'COMPLETED'|'CANCELLED'|'DISPUTED';
-  revision:number; starts_at:string; ends_at:string; confirm_by:string; timezone:string; location:string; meeting_url:string|null;
-  candidate_completed:number; employer_completed:number; created_at:string;
-}
 export class InterviewService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database,this.clock); }
   row(id:string) {
-    const row=this.db.prepare('SELECT * FROM faro_interviews WHERE id=?').get(id) as unknown as InterviewRow|undefined;
-    if(!row)throw new HttpError(404,'Nie znaleziono rozmowy.');
-    return row;
+    const query=interviewReadQuery(id);return interviewFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   list(userId:string,processId:string) {
-    this.recruitment.authorize(userId,processId);
-    return (this.db.prepare('SELECT id FROM faro_interviews WHERE process_id=? ORDER BY created_at,rowid').all(processId) as Array<{id:string}>).map(r=>this.view(userId,r.id));
+    this.recruitment.authorize(userId,processId);const query=interviewListQuery(processId);
+    return (this.db.prepare(query.text).all({$1:processId}) as Array<{id:string}>).map(r=>this.view(userId,r.id));
   }
-  view(userId:string,id:string) {
-    const row=this.row(id); this.recruitment.authorize(userId,row.process_id);
-    return {id:row.id,processId:row.process_id,state:row.state,revision:row.revision,startsAt:row.starts_at,endsAt:row.ends_at,confirmBy:row.confirm_by,
-      timezone:row.timezone,location:row.location,meetingUrl:row.meeting_url,candidateCompleted:Boolean(row.candidate_completed),employerCompleted:Boolean(row.employer_completed)};
-  }
+  view(userId:string,id:string) {const row=this.row(id);this.recruitment.authorize(userId,row.process_id);return interviewView(row);}
   available(candidateId:string,recruiterId:string,starts:string,ends:string) {
-    const busy=this.db.prepare("SELECT i.id FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id WHERE i.state='CONFIRMED' AND i.starts_at<? AND i.ends_at>? AND (p.candidate_id IN (?,?) OR i.recruiter_id IN (?,?)) LIMIT 1").get(ends,starts,candidateId,recruiterId,candidateId,recruiterId);
-    if(busy)throw new HttpError(409,'Ten termin nie jest już dostępny. Wybierz inny.', 'SLOT_CONFLICT');
+    const query=interviewSlotQuery(candidateId,recruiterId,starts,ends);requireInterviewSlot(this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
   }
-  calendar(userId:string,id:string) {
-    const row=this.view(userId,id);
-    if(row.state!=='CONFIRMED')throw new HttpError(409,'Do kalendarza dodasz potwierdzoną rozmowę.');
-    const stamp=(v:string)=>v.replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
-    // Fixed title and no attendee/contact fields: calendar export cannot disclose candidate identity.
-    const escape=(v:string)=>v.replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
-    const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Faro//Recruitment//PL','BEGIN:VEVENT',`UID:${id}@faro`,`DTSTAMP:${stamp(this.now())}`,`DTSTART:${stamp(row.startsAt)}`,`DTEND:${stamp(row.endsAt)}`,'SUMMARY:Rozmowa Faro',`LOCATION:${escape(row.location)}`,...(row.meetingUrl?[`URL:${escape(row.meetingUrl)}`]:[]),'END:VEVENT','END:VCALENDAR'];
-    // RFC 5545 line folding counts UTF-8 octets, not JavaScript code units.
-    const fold=(line:string)=>{let result='',part='';for(const char of line){if(Buffer.byteLength(part+char)>75){result+=part+'\r\n';part=' ';}part+=char;}return result+part;};
-    return {filename:`faro-${id}.ics`,content:lines.map(fold).join('\r\n')+'\r\n'};
-  }
+  calendar(userId:string,id:string) {return interviewCalendar(this.view(userId,id),this.now());}
+
   propose(userId:string,processId:string,body:Record<string,unknown>) {
     this.recruitment.authorize(userId,processId);
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},()=>{
