@@ -1,12 +1,13 @@
 import { test,expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
+import { faroPgFixture } from '../src/tests/faro-pg-fixture.js';
 import { faroFixture } from '../src/tests/faro-fixture.js';
 import { totp } from '../src/server/faro/mfaService.js';
 function decode(value:string){let bits=0,acc=0;const out:number[]=[];for(const c of value){acc=(acc<<5)|'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c);bits+=5;if(bits>=8){bits-=8;out.push((acc>>>bits)&255);}}return Buffer.from(out);}
 test('real privileged MFA enrollment, private-data gate and one-use recovery preserve locked login and accessible security workspace',async({page,context})=>{
-  const f=await faroFixture({faroMfaEncryptionKey:'11'.repeat(32),faroRequirePrivilegedMfa:true});f.app.config.appOrigin=f.base;const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const fixture=process.env.FARO_PG_BROWSER==='1'?faroPgFixture:faroFixture;const f=await fixture({faroMfaEncryptionKey:'11'.repeat(32),faroRequirePrivilegedMfa:true});f.app.config.appOrigin=f.base;const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   try {
-    const user=await f.user('MfaBrowser');f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(user.id);
+    const user=await f.user('MfaBrowser');if('query' in f.app.db)await f.app.db.query("UPDATE users SET role='ADMIN' WHERE id=$1",[user.id]);else f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(user.id);
     const login=async()=>{await page.goto(f.base);await page.locator('#loginForm [name=email]').fill(user.email);await page.locator('#loginForm [name=password]').fill('Bezpieczne123');await page.getByRole('button',{name:'Zaloguj się',exact:true}).click();await expect(page.getByRole('heading',{name:'Bezpieczeństwo dostępu'})).toBeVisible();};
     await login();await expect(page.getByText('Dostęp wymaga drugiego składnika.',{exact:false})).toBeVisible();
     const setup=page.locator('[data-form=mfa-setup]');await setup.locator('[name=password]').fill('Bezpieczne123');await setup.getByRole('button',{name:'Rozpocznij konfigurację MFA'}).click();

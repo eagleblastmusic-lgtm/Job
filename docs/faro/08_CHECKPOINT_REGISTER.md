@@ -1088,3 +1088,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BT — Enlarged PostgreSQL workspace browser acceptance
 
 [Scope](CP11_BT_POSTGRES_WORKSPACE_MATRIX.md). Existing six workspace plus employment/session desktop/mobile scenarios reuse native runtime (16 cases per Node22/24). Local full browsers38/follow-up4/typecheck/lint/diff PASS; actual enlarged matrix pending. BS1266fc2 FARO37671648181 SUCCESS; CI pending. Default SQLite, production/external gates open; whole plan/release PARTIAL; continue.
+
+
+## CP11-BU — PostgreSQL security and assessment browser acceptance
+
+[Scope](CP11_BU_POSTGRES_SECURITY_ASSESSMENT_BROWSER.md). All13 authenticated browser scenarios reuse native PostgreSQL26 desktop/mobile cases per Node22/24, plus retained public reflow2. Local follow-ups12/typecheck/lint/diff PASS; actual enlarged acceptance pending. BTb9fd8b5 FARO37672177171 SUCCESS, CI pending; BS1266fc2 FARO37671648181/CI37671648045 SUCCESS. Whole plan/release PARTIAL; production/external gates open; continue.

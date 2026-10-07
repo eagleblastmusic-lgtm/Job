@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { faroPgFixture } from '../src/tests/faro-pg-fixture.js';
 import { faroFixture } from '../src/tests/faro-fixture.js';
 
 test('required registration consent and optional analytics persist through the real Canonical workspace', async ({ page }) => {
-  const f = await faroFixture(); f.app.config.appOrigin = f.base;
+  const f = process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture(); f.app.config.appOrigin = f.base;
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   let registrationRequests = 0;
   page.on('request', request => { if (new URL(request.url()).pathname === '/api/auth/register') registrationRequests += 1; });
