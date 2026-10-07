@@ -1,13 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
 import { resolve } from 'node:path';
-import { rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { JobDatabase } from './db.js';
 import { loadConfig, type AppConfig } from './config.js';
 import { AppStore, type UserRecord } from './store.js';
 import { hashSessionToken, MAX_PASSWORD_LENGTH, parseCookies, verifyPassword } from './auth.js';
-import { deleteStoredFile, storeCvUpload } from './files.js';
+import { storeCvUpload } from './files.js';
 import { cvToPdf } from './pdf.js';
 import { boundedStringArrayField, boundedStringField, HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringField } from './http.js';
 import { inferCareerFactsFromText } from '../domain/careerTruth.js';
@@ -383,9 +382,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
       throw new HttpError(401, 'Podaj poprawne aktualne hasło, aby usunąć konto.', 'REAUTH_FAILED');
     }
     store.assertAccountDeletable(user.id);
-    for (const storageKey of store.listUploadPaths(user.id)) await deleteStoredFile(config.dataDir, storageKey);
-    store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id);
-    await rm(resolve(config.dataDir, 'uploads', user.id), { recursive: true, force: true });
+    store.audit(user.id, 'ACCOUNT_DELETION_REQUESTED', 'user', user.id); store.deleteUser(user.id,config.dataDir);
+    try{await store.disposeFiles(config.dataDir);}catch{/* Account erasure committed; durable file obligations remain for retry. */}
     res.setHeader('set-cookie', clearSessionCookie(config)); sendJson(res, 200, { ok: true }); return true;
   }
 

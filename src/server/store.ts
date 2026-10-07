@@ -1,3 +1,5 @@
+import { FileDisposalService } from './faro/fileDisposalService.js';
+import { fileDisposalPlan } from './faro/fileDisposalModel.js';
 import { userCreatePlan,registrationInput,registrationPlan,loginInput,requireLoginUser,sessionCreatePlan,consentWriteQueries,consentReadQuery,consentsFromRows } from './faro/authWriteModel.js';
 import { FaroStore } from './faro/base.js';
 import { sessionUserQuery,identityUser } from './faro/identityAccessModel.js';
@@ -329,13 +331,16 @@ export class AppStore {
 
   assertAccountDeletable(userId: string): void { new PrivacyService(this.database).assertDeletable(userId); }
 
-  deleteUser(userId: string): void {
+  deleteUser(userId: string,dataDir?:string): void {
     const privacy = new PrivacyService(this.database);
     privacy.transaction(() => {
+      if(dataDir)for(const storageKey of this.listUploadPaths(userId)){const query=fileDisposalPlan(userId,storageKey,dataDir,now());this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));}
       privacy.eraseDerivatives(userId);
       this.db.prepare('DELETE FROM users WHERE id=?').run(userId);
     });
   }
+
+  disposeFiles(dataDir:string){return new FileDisposalService(this.database,dataDir).run();}
 
   diagnostics(): Record<string, unknown> {
     const scalar = (sql: string): number => Number((this.db.prepare(sql).get() as { count: number }).count);

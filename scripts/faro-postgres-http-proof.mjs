@@ -1,3 +1,5 @@
+import { mkdir,writeFile,stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { createConnectedPgFaroApp } from '../dist/server/pgFaroApp.js';
 import { offerInput } from '../dist/tests/faro-fixture.js';
@@ -40,8 +42,10 @@ export async function proveNativeHttp(database,config){
   await json('/api/faro/worker/status',moderator.cookie);
   const token=hashSessionToken(candidate.cookie.split('=')[1]);await database.query('DELETE FROM sessions WHERE token_hash=$1',[token]);await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Unauthorized',expectedVersion:1,availability:{kind:'IMMEDIATE'}},401);
   const login=await request('/api/auth/login','','POST',{email:'http-candidate@example.pl',password:'Bezpieczne123'});candidate.cookie=login.cookie;
-  await json('/api/account',candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Wrong'},401);
-  await json('/api/account',candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});await json('/api/me',candidate.cookie,'GET',undefined,401);
+  const uploadKey=`uploads/${candidate.id}/synthetic-private.txt`;await mkdir(join(config.dataDir,'uploads',candidate.id),{recursive:true});await writeFile(join(config.dataDir,uploadKey),'synthetic retained private file');await database.query("INSERT INTO uploaded_files(id,user_id,kind,original_name,mime_type,storage_key,size_bytes,sha256,created_at) VALUES($1,$2,'CV','synthetic.txt','text/plain',$3,31,'synthetic',$4)",['http-upload-'+candidate.id,candidate.id,uploadKey,new Date().toISOString()]);
+  await json('/api/account',candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Wrong'},401);assert.ok(await stat(join(config.dataDir,uploadKey)));
+  await database.query("ALTER TABLE faro_file_disposals ADD CONSTRAINT http_disposal_guard CHECK(storage_key<>'"+uploadKey+"') NOT VALID");await json('/api/account',candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'},500);assert.ok(await stat(join(config.dataDir,uploadKey)));assert.equal((await database.readBatch([{text:'SELECT id FROM users WHERE id=$1',values:[candidate.id]}]))[0].length,1);await database.query('ALTER TABLE faro_file_disposals DROP CONSTRAINT http_disposal_guard');
+  await json('/api/account',candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});await json('/api/me',candidate.cookie,'GET',undefined,401);await assert.rejects(()=>stat(join(config.dataDir,uploadKey)),error=>error.code==='ENOENT');
   await json('/api/faro/sessions/revoke-all',owner.cookie,'POST',{confirmed:true,password:'Bezpieczne123'});await json('/api/faro/profile',owner.cookie,'GET',undefined,401);
   await json('/api/auth/logout',moderator.cookie,'POST',{});await json('/api/me',moderator.cookie,'GET',undefined,401);
  }finally{const closing=app.close();app.server.closeAllConnections();await closing;}

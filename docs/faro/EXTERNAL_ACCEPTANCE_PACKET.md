@@ -50,3 +50,6 @@ For each gate record: gate ID; exact enabled product/data/provider/population sc
 - [Recovery runbook](RUNBOOK.md): exact source/current-authority and new-target restrictions; source-only and actual PostgreSQL rehearsal are separate outcomes.
 
 No messages sent to reviewers/providers/participants. User authorized integration to main on 2026-10-07; deployment/release and external approvals remain open. Gather actual evidence before closing a gate; technical work on remaining authorized deltas continues independently.
+
+
+Technical evidence update2026-10-07: optional prepared-schema PostgreSQL HTTP runtime and reused candidate/employer/private-export/deletion desktop/mobile browser contracts passed exact712d838 FARO37668365491/CI37668365334 on PostgreSQL18 Node22/24. SQLite remains default pending cutover. This supersedes the earlier statement that the native HTTP adapter is unimplemented; production migration/deployment/current-authority recovery and all external acceptance decisions remain open. Durable native/SQLite file disposal0036 is under verification.

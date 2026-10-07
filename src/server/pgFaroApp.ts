@@ -1,3 +1,4 @@
+import { enqueueFileDisposalsOwned,disposeFiles } from './faro/fileDisposalModel.js';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readdirSync } from 'node:fs';
@@ -30,7 +31,7 @@ export async function createPgFaroApp(options:{connection:ClientConfig;schema:st
 /** Injected connection is already scoped to the validated schema; caller owns its lifecycle. */
 export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partial<AppConfig>={}){
  const config=loadConfig(overrides),rates=new Map<string,{count:number;resetAt:number}>();
- const worker=new FaroWorker(async()=>{await tickNativeWorker(database,new Date().toISOString(),()=>{});},config.faroWorkerEnabled,config.faroWorkerIntervalMs);
+ const worker=new FaroWorker(async()=>{await tickNativeWorker(database,new Date().toISOString(),()=>{});await disposeFiles(database,config.dataDir,new Date().toISOString(),()=>{});},config.faroWorkerEnabled,config.faroWorkerIntervalMs);
  const handleFaro=createPgFaroApi(database,config,worker),publicDir=resolve(process.cwd(),'dist/public');
  const server=createServer(async(req,res)=>{
   securityHeaders(res,config);res.setHeader('x-request-id',randomUUID());res.setHeader('cache-control','no-store');
@@ -64,9 +65,9 @@ export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partia
    }
    if(path==='/api/account'&&method==='DELETE'){
     enforceRate(rates,`account-delete:${user.id}`,5,15*60000);const body=await readJson(req);
-    // Native physical disposal needs a durable queue before retained upload accounts can be erased.
-
-    const erased=await eraseAccount(database,tokenHash,body,now(),config.faroRequirePrivilegedMfa,configured,async id=>{if((await database.readBatch([{text:'SELECT 1 FROM uploaded_files WHERE user_id=$1 LIMIT 1',values:[id]}]))[0]?.length)throw new HttpError(503,'Usunięcie przechowywanych plików wymaga ukończenia integracji magazynu.','FILE_ERASURE_REQUIRES_DISPOSAL');});res.setHeader('set-cookie',clearSessionCookie(config));ok(erased);return;
+    const erased=await eraseAccount(database,tokenHash,body,now(),config.faroRequirePrivilegedMfa,configured,id=>enqueueFileDisposalsOwned(database,id,config.dataDir,now()));
+    // Durable queue exists before account removal; a failed unlink stays pending for restart.
+    try{await disposeFiles(database,config.dataDir,now(),()=>{});}catch{/* Account erasure committed; durable disposal retries after worker restart. */}res.setHeader('set-cookie',clearSessionCookie(config));ok(erased);return;
    }
    if(path==='/api/admin/diagnostics'&&method==='GET'){
     const result=await database.transaction(async()=>{const current=await authority();if(current.user.role!=='ADMIN')throw new HttpError(403,'Wymagany administrator.','FORBIDDEN');const rows=await database.readBatch([{text:'SELECT COUNT(*) users FROM users',values:[]},{text:'SELECT COUNT(*) completed FROM analytics_events WHERE event_name=$1',values:['FARO_MUTUAL_STAGE_COMPLETED']}]);return {users:rows[0]?.[0]?.users,databaseEngine:'postgresql',worker:worker.status(),completedPairs:rows[1]?.[0]?.completed,generatedAt:now()};},{readOnly:true});ok(result);return;

@@ -1,3 +1,4 @@
+import { FileDisposalService } from './faro/fileDisposalService.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createJobApp, securityHeaders } from './app.js';
 import type { AppConfig } from './config.js';
@@ -14,7 +15,7 @@ import { hashSessionToken,parseCookies } from './auth.js';
 export function createFaroApp(overrides: Partial<AppConfig> = {}) {
   const app = createJobApp(overrides);
   const original = app.server.listeners('request')[0] as (req: IncomingMessage, res: ServerResponse) => void;
-  const worker = new FaroWorker(() => new TrustService(app.db).tick(), app.config.faroWorkerEnabled, app.config.faroWorkerIntervalMs);
+  const worker = new FaroWorker(async() => {new TrustService(app.db).tick();await new FileDisposalService(app.db,app.config.dataDir).run();}, app.config.faroWorkerEnabled, app.config.faroWorkerIntervalMs);
   const handleFaro = createFaroApi(app.db, app.store, app.config, worker);
   worker.start();
   app.server.removeAllListeners('request');

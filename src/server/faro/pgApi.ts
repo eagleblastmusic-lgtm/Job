@@ -1,3 +1,4 @@
+import { disposeFiles } from './fileDisposalModel.js';
 import type { IncomingMessage,ServerResponse } from 'node:http';
 import type { AppConfig } from '../config.js';
 import type { PgJobDatabase } from '../postgresDb.js';
@@ -147,7 +148,7 @@ retry:(u,id,b)=>retryAssessment(database,u,id,b,asOf,authorize)
 revokeSessions:(_u,b)=>revokeAllSessions(database,tokenHash,b,new Date().toISOString(),config.faroRequirePrivilegedMfa,configured),
  members:(u,id)=>read(async()=>{await readMembership(database,u,id,['OWNER','ADMIN']);return (await database.readBatch([{text:'SELECT m.user_id,m.role,m.active,u.email FROM faro_members m JOIN users u ON u.id=m.user_id WHERE m.organization_id=$1',values:[id]}]))[0]??[];}),
  transferOwner:(u,id,b)=>transferOrganizationOwner(database,u.id,id,text(b.successorId,100),asOf,async()=>{await authorize();const current=await requireIdentityOwned(database,tokenHash,new Date().toISOString(),config.faroRequirePrivilegedMfa,configured);if(!verifyPassword(text(b.password,MAX_PASSWORD_LENGTH),current.user.passwordHash))throw new HttpError(401,'Potwierdź operację aktualnym hasłem.','REAUTH_FAILED');}),
- runWorker:()=>worker.run(async()=>{await tickNativeWorker(database,new Date().toISOString(),adminAuthority);}),
+ runWorker:()=>worker.run(async()=>{await tickNativeWorker(database,new Date().toISOString(),adminAuthority);await disposeFiles(database,config.dataDir,new Date().toISOString(),adminAuthority);}),
  notifications:async()=>{for(const claim of await claimOutbox(database,new Date().toISOString(),authorize))await deliverClaimedOutbox(database,claim.id,claim.claimToken,new Date().toISOString(),authorize);},
  notificationRows:(u)=>read(async()=>(await database.readBatch([{text:"SELECT id,message,entity_type,entity_id,read_at,created_at FROM notifications WHERE user_id=$1 AND dedupe_key LIKE 'faro:%' ORDER BY created_at DESC LIMIT 100",values:[u]}]))[0]??[]),
  workerRows:()=>read(async()=>{await adminAuthority();const rows=await database.readBatch([{text:'SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status',values:[]},{text:"SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>$1",values:[new Date().toISOString()]}]);return {outbox:rows[0]??[],leases:rows[1]?.[0]};})

@@ -1056,3 +1056,10 @@ BN final full local check PASS168 Node/35 migrations/lint/typecheck/both restore
 ## CP11-BO — PostgreSQL browser acceptance, 2026-10-07
 
 [Scope](CP11_BO_POSTGRES_BROWSER_ACCEPTANCE.md). Reused existing candidate/employer and privacy scenarios against native HTTP/PostgreSQL, desktop/mobile Node22/24. Local reuse PASS4, typecheck/lint/syntax/diff PASS; actual PostgreSQL acceptance pending. BN container dependency corrected5095dee, native HTTP requires continued remediation. Whole plan/release PARTIAL; continue file disposal/recovery/cutover.
+
+
+## CP11-BP — Durable private file disposal, 2026-10-07
+
+[Scope](CP11_BP_DURABLE_FILE_DISPOSAL.md). Account erasure transaction preserves validated physical-disposal obligations on PostgreSQL and SQLite; restart/lease/retry and actual HTTP rollback/physical-file proofs added. Final local/native acceptance pending. BO712d838 FARO37668365491/CI37668365334 SUCCESS with actual PostgreSQL HTTP and desktop/mobile browser acceptance. Default SQLite, production closed; continue native recovery/cutover/operations. Whole plan/release PARTIAL.
+
+BP final full local check PASS170 Node/36 migrations/lint/typecheck/both actual restores/38 desktop-mobile browsers. Source-only PASS71/36, script syntax/diff PASS. Added native parallel-disposal proof and bounded transaction conflict retry; actual PostgreSQL acceptance pending. Continue native current-authority recovery/cutover.

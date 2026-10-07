@@ -1,3 +1,4 @@
+import { proveNativeFileDisposal } from './faro-postgres-file-disposal-proof.mjs';
 import { proveNativeHttp } from './faro-postgres-http-proof.mjs';
 import { readEconomics,saveEconomics } from '../dist/server/faro/economicsModel.js';
 import { EconomicsService } from '../dist/server/faro/economicsService.js';
@@ -79,7 +80,7 @@ try {
   mfa.confirm(user,token,{code:totp(decode(setup.secret),Math.floor(Date.now()/30000))});
   f.app.store.recordConsent(candidate.id,'ANALYTICS',true,'synthetic-import');
   const economicReference=new EconomicsService(f.app.db,()=>new Date('2026-10-06T00:00:00.000Z')),economicInput={salaryOptionIndex:0,netMin:420000,netMax:480000,commuteCost:18000,commuteMinutes:45,transport:'TRANSIT',source:'Synthetic private manual estimate',observedAt:'2026-10-05T00:00:00.000Z',assumptions:'Synthetic assumptions; no automatic tax calculation'};
-  const snapshot=await extract(f.app.config.databasePath);for(const table of snapshot.tables){const ddl=targetTable(table);assert.ok(ddl.startsWith('CREATE TABLE'));assert.ok(!/\bREFERENCES\b/i.test(ddl));}assert.equal(snapshot.versions.length,35);assert.ok(snapshot.tables.some(t=>t.name==='faro_mfa'&&t.rows.length===1));assert.ok(snapshot.tables.some(t=>t.name==='faro_attempts'&&t.rows.length===1));
+  const snapshot=await extract(f.app.config.databasePath);for(const table of snapshot.tables){const ddl=targetTable(table);assert.ok(ddl.startsWith('CREATE TABLE'));assert.ok(!/\bREFERENCES\b/i.test(ddl));}assert.equal(snapshot.versions.length,36);assert.ok(snapshot.tables.some(t=>t.name==='faro_mfa'&&t.rows.length===1));assert.ok(snapshot.tables.some(t=>t.name==='faro_attempts'&&t.rows.length===1));
   f.app.db.db.exec('CREATE TABLE unsupported_source(id TEXT)');await assert.rejects(()=>extract(f.app.config.databasePath),/schema/);f.app.db.db.exec('DROP TABLE unsupported_source');
   assert.equal((await extract(f.app.config.databasePath)).schemaHash,snapshot.schemaHash);
   if(sourceOnly){console.log(`FARO_POSTGRES_SOURCE_VALIDATED tables=${snapshot.tables.length} migrations=${snapshot.versions.length}; real PostgreSQL not exercised.`);}else{
@@ -651,6 +652,7 @@ try {
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
     await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));
+    await nativeProof('FILE_DISPOSAL',()=>proveNativeFileDisposal(client,f.app.config.dataDir,schema));
     await nativeProof('HTTP',()=>proveNativeHttp(client,f.app.config));
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
     console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order/command-journal-rollback-current-authority/native-interest-projection-history-outbox-rollback/process-view-wire-private-history/process-transitions-clock-terminal-rollback/consented-accepted-stage-lexical-v1-dedupe/native-private-process-list/private-watch-atomic-alert-cancellation/explicit-private-contact-audit-atomicity/native-assessment-definition-review-atomicity/native-version-edit-journal-atomicity/native-pinned-assignment-atomicity/private-attempt-view-wire/neutral-attempt-expiry-atomicity/native-candidate-start-clock-audit-atomicity/native-private-answer-submit-atomicity/native-human-result-review-atomicity/native-result-validity-history-atomicity/native-human-amendment-fresh-validity-replay/native-technical-report-private-evidence-atomicity/native-human-incident-resolution-atomicity/native-pinned-technical-retry-lineage-atomicity/interview-outcome-tick-atomicity/current-session-MFA-revocation-atomicity PASS; runtime cutover not exercised.`);
