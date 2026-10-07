@@ -9,9 +9,10 @@ export interface IncidentRow { id:string; category:string; statement:string; rep
 export function attemptReadQuery(id:string) {return {text:'SELECT id,process_id,assessment_id,assessment_version,state,deadline,started_at,expires_at,answers,revision,result,attempt_number,retry_of,retry_reason,retry_authorized_at FROM faro_attempts WHERE id=$1',values:[id]};}
 export function attemptFromRows(rows:Record<string,unknown>[]):AttemptRow {const row=rows[0] as unknown as AttemptRow|undefined;if(!row)throw new HttpError(404,'Nie znaleziono próby.');return row;}
 export function attemptHistoryQuery(id:string) {return {text:'SELECT revision,validity,result,reason_code AS "reasonCode",reason,created_at AS "createdAt" FROM faro_result_history WHERE attempt_id=$1 ORDER BY revision',values:[id]};}
+export function attemptIncidentQuery(id:string) {return {text:'SELECT id,category,statement,reported_at AS "reportedAt",observed_state AS "observedState",observed_revision AS "observedRevision",original_deadline AS "originalDeadline",original_started_at AS "originalStartedAt",original_expires_at AS "originalExpiresAt",state,revision,resolution,reason,resolved_at AS "resolvedAt" FROM faro_attempt_incidents WHERE attempt_id=$1',values:[id]};}
 export function attemptContextQueries(row:AttemptRow) {return [
  attemptHistoryQuery(row.id),
- {text:'SELECT id,category,statement,reported_at AS "reportedAt",observed_state AS "observedState",observed_revision AS "observedRevision",original_deadline AS "originalDeadline",original_started_at AS "originalStartedAt",original_expires_at AS "originalExpiresAt",state,revision,resolution,reason,resolved_at AS "resolvedAt" FROM faro_attempt_incidents WHERE attempt_id=$1',values:[row.id]},
+ attemptIncidentQuery(row.id),
  {text:'SELECT id FROM faro_attempts WHERE retry_of=$1',values:[row.id]},
  {text:'SELECT id FROM faro_key_corrections WHERE assessment_id=$1 AND assessment_version=$2 ORDER BY revision DESC LIMIT 1',values:[row.assessment_id,row.assessment_version]},
  {text:"SELECT id FROM faro_attempts WHERE process_id=$1 AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')",values:[row.process_id]}

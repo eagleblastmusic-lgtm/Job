@@ -228,6 +228,9 @@ test('attempt technical report and human confirmation preserve evidence and cloc
     await f.request(path,f.candidate.cookie,'POST',{...body,confirmed:false},400);
     await f.request(path,f.candidate.cookie,'POST',{...body,category:'DIAGNOSIS'},400);
     await f.request(path,f.candidate.cookie,'POST',{...body,expectedVersion:1},409);
+    f.app.db.db.exec("CREATE TRIGGER incident_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'incident delivery failed'); END");
+    await f.request(path,f.candidate.cookie,'POST',body,500);assert.deepEqual(service.row(attempt.id),original);assert.deepEqual(service.recruitment.row(f.interest.id),process);assert.equal(service.incident(attempt.id),undefined);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.candidate.id,body.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER incident_delivery_failure');
     const reported=await f.request<ReturnType<AssessmentService['overview']>>(path,f.candidate.cookie,'POST',body,201);
     assert.equal(reported.state,'STARTED');assert.equal(reported.incident!.state,'OPEN');
     assert.equal(reported.incident!.originalStartedAt,original.started_at);assert.equal(reported.incident!.originalExpiresAt,original.expires_at);assert.equal(reported.incident!.observedRevision,original.revision);
