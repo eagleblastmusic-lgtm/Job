@@ -17,6 +17,10 @@ test('moderation read audit failure returns no private report and retry preserve
   f.app.db.db.exec('DROP TRIGGER case_read_audit_guard');
   const review=await f.request<{cases:Array<{statement:string;canModerate:boolean}>}>('/api/faro/cases',moderator.cookie);assert.ok(review.cases.some(row=>row.statement===marker&&row.canModerate));
   const employer=await f.request<{cases:unknown[]}>('/api/faro/cases',owner.cookie);assert.equal(employer.cases.length,0);
+  const reviewBody={state:'EVIDENCE_REVIEW',decision:'Synthetic independent review of private evidence',reviewAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'read-review-replay'},trust=new TrustService(f.app.db),caseId=review.cases.find(row=>row.statement===marker) as unknown as {id:string};
+  f.app.db.db.exec("CREATE TRIGGER case_review_guard BEFORE INSERT ON audit_logs WHEN NEW.action='MODERATION_REVIEWED' BEGIN SELECT RAISE(ABORT,'case review audit failed'); END");await f.request(`/api/faro/cases/${caseId.id}/review`,moderator.cookie,'POST',reviewBody,500);assert.equal(trust.caseRow(caseId.id).state,'OPEN');assert.equal(trust.caseRow(caseId.id).revision,1);f.app.db.db.exec('DROP TRIGGER case_review_guard');
+  await f.request(`/api/faro/cases/${caseId.id}/review`,moderator.cookie,'POST',reviewBody);
+  f.app.db.db.prepare("INSERT INTO faro_members(organization_id,user_id,role,active) VALUES(?,?,'RECRUITER',0)").run(org.id,moderator.id);await f.request(`/api/faro/cases/${caseId.id}/review`,moderator.cookie,'POST',reviewBody,409);
   const own=await f.request<{cases:Array<{statement:string;canModerate:boolean}>}>('/api/faro/cases',candidate.cookie);assert.ok(own.cases.some(row=>row.statement===marker&&!row.canModerate));
  }finally{await f.close();}
 });

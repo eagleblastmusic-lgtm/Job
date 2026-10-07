@@ -949,3 +949,11 @@ Shared revision/reason/confirmation/mutation/audit plans and native journal requ
 
 
 CP11-BK full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 desktop-mobile browsers; source70/35, syntax/diff PASS. Actual native PostgreSQL acceptance pending. BJ0aff381 exact FARO37659409429 and CI37659409358 SUCCESS including native private moderation/restriction/reliability proofs. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BL — Portable private case writes, 2026-10-07
+
+Shared report/explanation/review/appeal plans preserve private boundaries, manual explanation windows, source restriction scope, atomic audits/delivery/journal and current moderation independence before replay. [Scope](CP11_BL_PORTABLE_PRIVATE_CASE_WRITES.md). Local/native acceptance pending. BK40f53a2 FARO37660164466 and CI37660164532 SUCCESS. Runtime SQLite; whole plan/release PARTIAL; continue economics/HTTP/recovery/cutover/external gates.
+
+
+CP11-BL full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; existing targeted moderation24 PASS, source70/35/syntax/diff PASS. Actual native case-write PostgreSQL acceptance pending. BK40f53a2 FARO37660164466/CI37660164532 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.
