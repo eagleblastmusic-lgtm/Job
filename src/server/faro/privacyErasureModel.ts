@@ -63,7 +63,7 @@ export async function eraseDerivativesOwned(database:ErasureDatabase,userId:stri
  for(const meeting of (await database.readBatch([recruiterErasureReadQuery(userId)]))[0]??[]){await execute(recruiterErasureQueries(meeting.id as string,meeting.process_id as string));await event(meeting.process_id as string,'INTERVIEW_CANCEL',{interviewId:meeting.id,reason:'RECRUITER_UNAVAILABLE'});}
  await execute(personalErasureQueries(userId,email,asOf,true));
 }
-export async function eraseAccount(database:ErasureDatabase,tokenHash:string,body:Record<string,unknown>,asOf:string,requirePrivileged:boolean,configured:boolean){
+export async function eraseAccount(database:ErasureDatabase,tokenHash:string,body:Record<string,unknown>,asOf:string,requirePrivileged:boolean,configured:boolean,beforeErasure?:(userId:string)=>void|Promise<void>){
  const result=await database.transaction(async()=>{
   const {user}=await requireIdentityOwned(database,tokenHash,asOf,requirePrivileged,configured);
   const confirmation=boundedStringField(body,'confirmation',32)??'';
@@ -72,7 +72,7 @@ export async function eraseAccount(database:ErasureDatabase,tokenHash:string,bod
   const valid=Boolean(password&&password.length<=MAX_PASSWORD_LENGTH&&verifyPassword(password,user.passwordHash));
   const audit={text:"INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES($1,$2,$3,'user',$2,'{}',$4)",values:[randomUUID(),user.id,valid?'ACCOUNT_DELETION_REQUESTED':'ACCOUNT_DELETION_REAUTH_FAILED',asOf]};
   if(!valid){await database.query(audit.text,audit.values);return false;}
-  await database.query(audit.text,audit.values);await eraseDerivativesOwned(database,user.id,asOf);await database.query('DELETE FROM users WHERE id=$1',[user.id]);return true;
+  if(beforeErasure)await beforeErasure(user.id);await database.query(audit.text,audit.values);await eraseDerivativesOwned(database,user.id,asOf);await database.query('DELETE FROM users WHERE id=$1',[user.id]);return true;
  });
  if(!result)throw new HttpError(401,'Podaj poprawne aktualne hasło.','REAUTH_FAILED');
  return {ok:true};

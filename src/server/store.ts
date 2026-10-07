@@ -17,7 +17,7 @@ const now = (): string => new Date().toISOString();
 const json = (value: unknown): string => JSON.stringify(value);
 
 interface UserRow { id: string; email: string; password_hash: string; name: string; locale: string; timezone: string; role: 'USER' | 'ADMIN'; created_at: string; updated_at: string }
-interface ProfileRow { user_id: string; desired_roles: string; location: string | null; commute_km: number | null; remote_preferences: string; salary_min: number | null; salary_mode?: string | null; contract_preferences: string; shift_preferences: string; availability: string | null }
+export interface ProfileRow { user_id: string; desired_roles: string; location: string | null; commute_km: number | null; remote_preferences: string; salary_min: number | null; salary_mode?: string | null; contract_preferences: string; shift_preferences: string; availability: string | null }
 interface FactRow { id: string; type: string; value: string; normalized_value: string; level: string | null; source: string; status: CareerFactStatus; confidence: number; evidence: string | null; allowed_for_cv: number }
 interface JobRow {
   id: string; source: string; source_url: string | null; raw_text: string; title: string | null; normalized_title: string | null; company: string | null; industry: string | null;
@@ -33,7 +33,7 @@ interface OutcomeRow { id: string; application_id: string; outcome_type: string;
 
 export interface ConsentRecord { type: string; granted: boolean; version: string; createdAt: string }
 
-function profileFromRow(row: ProfileRow | undefined): CareerProfile {
+export function profileFromRow(row: ProfileRow | undefined): CareerProfile {
   if (!row) return { desiredRoles: [], location: null, commuteKm: null, remotePreferences: [], salaryMin: null, salaryMode: 'EXCLUDE_LOWER', contractPreferences: [], shiftPreferences: { nights: null, weekends: null }, availability: null };
   const shifts = JSON.parse(row.shift_preferences) as { nights?: boolean | null; weekends?: boolean | null };
   const salaryMode = (row.salary_mode === 'DISCLOSED_ONLY' ? 'DISCLOSED_ONLY' : 'EXCLUDE_LOWER') as SalaryMode;

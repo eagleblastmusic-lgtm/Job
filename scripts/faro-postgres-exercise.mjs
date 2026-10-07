@@ -1,3 +1,4 @@
+import { proveNativeHttp } from './faro-postgres-http-proof.mjs';
 import { readEconomics,saveEconomics } from '../dist/server/faro/economicsModel.js';
 import { EconomicsService } from '../dist/server/faro/economicsService.js';
 import { proveNativeModerationRead } from './faro-postgres-moderation-read-proof.mjs';
@@ -650,6 +651,7 @@ try {
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
     await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));
+    await nativeProof('HTTP',()=>proveNativeHttp(client,f.app.config));
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
     console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order/command-journal-rollback-current-authority/native-interest-projection-history-outbox-rollback/process-view-wire-private-history/process-transitions-clock-terminal-rollback/consented-accepted-stage-lexical-v1-dedupe/native-private-process-list/private-watch-atomic-alert-cancellation/explicit-private-contact-audit-atomicity/native-assessment-definition-review-atomicity/native-version-edit-journal-atomicity/native-pinned-assignment-atomicity/private-attempt-view-wire/neutral-attempt-expiry-atomicity/native-candidate-start-clock-audit-atomicity/native-private-answer-submit-atomicity/native-human-result-review-atomicity/native-result-validity-history-atomicity/native-human-amendment-fresh-validity-replay/native-technical-report-private-evidence-atomicity/native-human-incident-resolution-atomicity/native-pinned-technical-retry-lineage-atomicity/interview-outcome-tick-atomicity/current-session-MFA-revocation-atomicity PASS; runtime cutover not exercised.`);
   }

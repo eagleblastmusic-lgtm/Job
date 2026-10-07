@@ -1007,3 +1007,10 @@ CP11-BL full local check PASS168 Node/35 migrations/lint/typecheck/both restores
 Shared private manual economics plans and atomic native current-authority/visible-offer scope. [Scope](CP11_BM_PORTABLE_PRIVATE_ECONOMICS.md). Full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers. Source-only and actual PostgreSQL acceptance pending. BL8cef85a FARO37662893498/CI37662893383 SUCCESS. Runtime SQLite; continue HTTP/recovery/cutover. External gates open; whole plan/release PARTIAL.
 
 BM source-only rehearsal PASS70 tables/35 migrations; script syntax and git diff checks PASS. Actual PostgreSQL acceptance pending.
+
+
+## CP11-BN — Shared canonical HTTP / PostgreSQL runtime, 2026-10-07
+
+[Scope](CP11_BN_POSTGRES_HTTP_RUNTIME.md). One awaited route contract, owned native identity/MFA checks, auth/account/private export and worker runtime. Initial local full check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; final follow-up verification and actual HTTP/PostgreSQL acceptance pending. Corrected BM cd15634 FARO37665201228/CI37665201181 SUCCESS. SQLite remains default; native physical upload disposal fails closed, native browser/cutover/recovery/production and external gates remain open. Whole plan/release PARTIAL; continue.
+
+BN final full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 desktop-mobile browsers. Source-only PASS70/35; script syntax and diff PASS. Actual HTTP/PostgreSQL acceptance pending; continue native browser and durable file disposal.

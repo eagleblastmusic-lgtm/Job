@@ -15,12 +15,12 @@ export class FaroWorker {
     this.timer = setInterval(() => { this.run(); }, this.intervalMs);
     this.timer.unref();
   }
-  run() {
+  run(tick:()=>void|Promise<void>=this.tick) {
     if (this.stopped || this.active) return false;
     this.lastRunAt = new Date().toISOString();
     this.runs++;
     try {
-      const result=this.tick();
+      const result=tick();
       if(result&&typeof result.then==='function') {
         this.active=result.then(()=>{this.lastSuccessAt=this.lastRunAt;this.lastErrorCode=null;return true;},()=>{this.lastErrorCode='WORKER_TICK_FAILED';return false;}).finally(()=>{this.active=null;});
         return this.active;

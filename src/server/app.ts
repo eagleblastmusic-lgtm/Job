@@ -19,7 +19,7 @@ import { canTransitionApplication } from '../domain/statusTransitions.js';
 import type { ApplicationStatus, CareerFactStatus, CareerProfile } from '../domain/types.js';
 import { AiGateway } from './aiGateway.js';
 
-const LEGAL_VERSION = '2026-09-05-test-v1';
+export const LEGAL_VERSION = '2026-09-05-test-v1';
 const JOB_TEXT_MAX_CHARS = 100_000;
 const JOB_JSON_MAX_BYTES = 256 * 1024;
 
@@ -45,7 +45,7 @@ export function securityHeaders(res: ServerResponse, config: AppConfig): void {
   if (config.nodeEnv === 'production') res.setHeader('strict-transport-security', 'max-age=31536000');
 }
 
-function clientIp(req: IncomingMessage, config: AppConfig): string {
+export function clientIp(req: IncomingMessage, config: AppConfig): string {
   if (config.trustProxy) {
     const header = req.headers['x-forwarded-for'];
     const forwarded = Array.isArray(header) ? header[0] : header;
@@ -55,7 +55,7 @@ function clientIp(req: IncomingMessage, config: AppConfig): string {
   return req.socket.remoteAddress ?? 'unknown';
 }
 
-function enforceRate(rateMap: RateMap, key: string, limit: number, windowMs: number): void {
+export function enforceRate(rateMap: RateMap, key: string, limit: number, windowMs: number): void {
   const time = Date.now();
   const current = rateMap.get(key);
   if (!current || current.resetAt <= time) {
@@ -85,13 +85,13 @@ function mapStoreNotFound<T>(operation: () => T, storeMessage: string, clientMes
   }
 }
 
-function cookieForSession(raw: string, config: AppConfig): string {
+export function cookieForSession(raw: string, config: AppConfig): string {
   const parts = [`job_session=${encodeURIComponent(raw)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${config.sessionDays * 86400}`];
   if (config.nodeEnv === 'production') parts.push('Secure');
   return parts.join('; ');
 }
 
-function clearSessionCookie(config: AppConfig): string {
+export function clearSessionCookie(config: AppConfig): string {
   return `job_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${config.nodeEnv === 'production' ? '; Secure' : ''}`;
 }
 
