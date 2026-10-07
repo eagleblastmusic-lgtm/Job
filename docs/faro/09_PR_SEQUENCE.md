@@ -383,3 +383,6 @@ Shared explicit identity/MFA queries and policy preserve current session expiry,
 
 
 CP11-BB/BC full local check2026-10-07 PASS162 Node/35 migrations/both actual restores/38 real desktop/mobile browsers/lint/typecheck, zero skips. Targeted interviews/session/MFA PASS9; source70/35 and syntax/diff PASS. Native real PostgreSQL18 Node22/24 and remote acceptance pending. Direct main checkpoint at user direction; runtime SQLite, whole plan/release PARTIAL. Continue native MFA writes and remaining runtime integration.
+
+
+CP11-BB/BC0111676 real PostgreSQL failed23505 because new tick fixture created two simultaneous active appointments in one process, contrary to existing faro_one_active_interview. Corrected proof expires the proposal before inserting the confirmed appointment, retaining all expiry/reminder/rollback/authority/terminal assertions and the UNIQUE index. Full local162/35/both restores/38 browsers remains valid; actual corrected PostgreSQL/remote acceptance pending.
