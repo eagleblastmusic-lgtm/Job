@@ -1005,3 +1005,11 @@ Shared credential/legal-consent/user/defaults/session/audit plans make existing 
 
 
 CP11-BH local2026-10-07 full check PASS166 Node/35 migrations/lint/typecheck/both restores/38 browsers; source70/35 and syntax/diff PASS. Existing auth/consent/privacy targeted8 PASS; new actual HTTP registration/login/consent audit rollback tests included in full check. Actual PostgreSQL acceptance pending. BGdb0334c remote FARO37655614735 and CI37655614342 queued, no remote PASS claimed. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BI — Portable deadlines and composed async worker, 2026-10-07
+
+Shared stale/close/watch/process deadline plans, native owned SERIALIZABLE phase with conflict retry and composed async worker retain clock/role/dedupe boundaries. [Scope](CP11_BI_PORTABLE_WORKER_DEADLINES.md). Worker/recruitment targeted27 PASS; local full and actual PostgreSQL acceptance pending. BG actual fixture failed23502 because its synthetic inbox omitted notification_type/dedupe_key/updated_at; correction d037202 supplies original required fields, no constraint changes. BH0a88065 native/CI still require corrected complete acceptance. Runtime SQLite; whole plan/release PARTIAL; continue native moderation/HTTP/recovery/cutover/external gates.
+
+
+CP11-BI local2026-10-07 full check PASS167 Node/35 migrations/lint/typecheck/both restores/38 browsers. Worker/recruitment targeted27 PASS before added rollback regression; source70/35 and syntax/diff PASS. Phase-only native diagnostics retain no SQL, credentials or record values. BG/BH original runs refused incomplete notification fixture23502; corrected d037202 acceptance pending. Runtime SQLite; whole plan/release PARTIAL.

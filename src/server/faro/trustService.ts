@@ -1,3 +1,5 @@
+import { staleOffersQuery,staleOfferQueries,closingOffersQuery,upcomingOffersQuery,pendingProcessesQuery,offerDeadlineQuery,processDeadlineQueries } from './trustTickModel.js';
+import { processRecruiterReadQuery } from './interestWriteModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
@@ -183,30 +185,11 @@ export class TrustService extends FaroStore {
     new InterviewService(this.database,this.clock).tick();
     const service = new RecruitmentService(this.database, this.clock), now = this.now();
     this.transaction(() => {
-      const stale = this.db.prepare("SELECT id,organization_id FROM faro_offers WHERE status='PUBLISHED' AND confirmed_until<=?").all(now) as Array<{ id: string; organization_id: string }>;
-      for (const offer of stale) {
-        this.db.prepare("UPDATE faro_offers SET status='PAUSED',revision=revision+1 WHERE id=?").run(offer.id);
-        this.audit(null, 'STALE_INTAKE_PAUSED', offer.id);
-        const key = `stale:${offer.id}:${now.slice(0,10)}`;
-        this.db.prepare("INSERT OR IGNORE INTO faro_cases(id,organization_id,kind,statement,dedupe_key,created_at) VALUES(?,?,'STALE_OFFER',?,?,?)").run(randomUUID(), offer.organization_id, 'Brak aktualnego potwierdzenia wakatu. Sygnał do sprawdzenia, nie ocena firmy.', key, now);
-      }
-      const closing = this.db.prepare("SELECT id FROM faro_offers WHERE status IN ('PUBLISHED','PAUSED') AND json_extract((SELECT content FROM faro_offer_versions WHERE offer_id=faro_offers.id AND publication_proof<>'NONE' ORDER BY version DESC LIMIT 1),'$.closesAt')<=?").all(now) as Array<{ id: string }>;
-      for (const offer of closing) {
-        this.db.prepare("UPDATE faro_offers SET status='CLOSED',revision=revision+1 WHERE id=?").run(offer.id);
-        service.offers.notifyChange(offer.id, service.offers.get(offer.id).version, 'CLOSE');
-      }
-      const upcoming=this.db.prepare("SELECT o.id,w.candidate_id,v.version,json_extract(v.content,'$.closesAt') deadline FROM faro_offers o JOIN faro_offer_versions v ON v.offer_id=o.id AND v.version=(SELECT MAX(version) FROM faro_offer_versions WHERE offer_id=o.id AND publication_proof<>'NONE') JOIN faro_watches w ON w.offer_id=o.id AND w.alerts=1 WHERE o.status IN ('PUBLISHED','PAUSED') AND json_extract(v.content,'$.closesAt')>? AND json_extract(v.content,'$.closesAt')<=?").all(now,new Date(this.clock().getTime()+86400000).toISOString()) as Array<{id:string;candidate_id:string;version:number;deadline:string}>;
-      for(const offer of upcoming)service.enqueue(offer.candidate_id,'offer',offer.id,'Zbliża się zamknięcie obserwowanej oferty. Sprawdź jej aktualne warunki.',`offer:${offer.id}:${offer.deadline}:closing-soon`);
-      const due = this.db.prepare("SELECT id,candidate_id,offer_id,stage,response_due_at,stage_due_at,first_response_at FROM faro_interests WHERE status IN ('INTERESTED','ACTIVE','OFFERED')").all() as unknown as Array<{ id: string; candidate_id: string; offer_id: string; stage:string; response_due_at: string; stage_due_at: string | null; first_response_at: string | null }>;
-      for (const p of due) {
-        if(['INTERVIEW_PROPOSED','INTERVIEW_CONFIRMED'].includes(p.stage))continue;
-        const deadline = p.first_response_at ? p.stage_due_at : p.response_due_at;
-        if (!deadline || Date.parse(deadline) > this.clock().getTime() + 24 * 3600000) continue;
-        const overdue = deadline < now;
-        const recruiters=this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.organization_id=o.organization_id AND m.user_id=a.user_id WHERE a.offer_id=? AND m.active=1').all(p.offer_id) as Array<{ user_id: string }>;
-        const recipients=['CLARIFICATION_REQUESTED','ASSESSMENT_REQUESTED','OFFERED'].includes(p.stage)?[{user_id:p.candidate_id}]:recruiters;
-        for (const recipient of recipients) service.enqueue(recipient.user_id, 'process', p.id, overdue ? 'Minął zadeklarowany termin w rekrutacji. Sprawdź następny krok.' : 'Zbliża się zadeklarowany termin w rekrutacji.', `${p.id}:${deadline}:${overdue ? 'overdue' : 'reminder'}`);
-      }
+      const read=(query:{text:string;values:readonly (string|number)[]})=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))),execute=(queries:Array<{text:string;values:readonly (string|number)[]}>)=>{for(const query of queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));};
+      for(const offer of read(staleOffersQuery(now)))execute(staleOfferQueries(offer.id as string,offer.organization_id as string,now));
+      for(const offer of read(closingOffersQuery(now))){this.db.prepare("UPDATE faro_offers SET status='CLOSED',revision=revision+1 WHERE id=?").run(offer.id as string);service.offers.notifyChange(offer.id as string,offer.current_version as number,'CLOSE');}
+      for(const offer of read(upcomingOffersQuery(now)))execute([offerDeadlineQuery(offer,now)]);
+      for(const process of read(pendingProcessesQuery()))execute(processDeadlineQueries(process,read(processRecruiterReadQuery(process.offer_id as string)),now));
     });
     service.deliverOutbox();
   }

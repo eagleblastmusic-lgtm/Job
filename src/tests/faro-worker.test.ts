@@ -4,7 +4,9 @@ import { FaroWorker } from '../server/faro/worker.js';
 import { TrustService } from '../server/faro/trustService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
 import { loadConfig } from '../server/config.js';
-import { faroFixture } from './faro-fixture.js';
+import { faroFixture,offerInput } from './faro-fixture.js';
+import { ProfileService } from '../server/faro/profileService.js';
+import { OfferService } from '../server/faro/offerService.js';
 import { JobDatabase } from '../server/db.js';
 import { spawn } from 'node:child_process';
 
@@ -136,4 +138,23 @@ test('async scheduler fences overlap, awaits active work before closure and mini
  let release!:()=>void,complete=false;const worker=new FaroWorker(()=>new Promise<void>(resolve=>{release=()=>{complete=true;resolve();};}),true,1000);
  const first=worker.run();assert.equal(worker.run(),false);assert.equal(worker.status().runs,1);worker.stop();let idle=false;const closing=worker.idle().then(()=>{idle=true;});await Promise.resolve();assert.equal(idle,false);release();assert.equal(await first,true);await closing;assert.equal(complete,true);assert.equal(worker.run(),false);
  const failed=new FaroWorker(async()=>{throw new Error('private recipient SQL');},false,1000);assert.equal(await failed.run(),false);assert.equal(failed.status().lastErrorCode,'WORKER_TICK_FAILED');assert.equal(JSON.stringify(failed.status()).includes('recipient'),false);await failed.idle();failed.stop();
+});
+
+test('deadline outbox failure rolls back stale intake, case and closure together before retry',async()=>{
+ const f=await faroFixture();try{
+  const owner=await f.user('TickOwner'),candidate=await f.user('TickCandidate'),profiles=new ProfileService(f.app.db),offers=new OfferService(f.app.db),org=profiles.organization(owner.id,{name:'Tick organization'});
+  f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+  const offer=offers.create(owner.id,org.id,offerInput(owner.id));offers.lifecycle(owner.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(owner.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  new RecruitmentService(f.app.db).watch(candidate.id,offer.id,true);
+  const revision=offers.get(offer.id).revision,clock=()=>new Date(Date.now()+31*86400000),trust=new TrustService(f.app.db,clock);
+  f.app.db.db.exec("CREATE TRIGGER tick_delivery_guard BEFORE INSERT ON faro_outbox WHEN NEW.dedupe_key LIKE '%:CLOSE' BEGIN SELECT RAISE(ABORT,'tick delivery failed'); END");
+  assert.throws(()=>trust.tick(),/tick delivery failed/);
+  assert.equal(offers.get(offer.id).status,'PUBLISHED');assert.equal(offers.get(offer.id).revision,revision);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_cases WHERE kind='STALE_OFFER'").get()?.n,0);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='STALE_INTAKE_PAUSED'").get()?.n,0);
+  f.app.db.db.exec('DROP TRIGGER tick_delivery_guard');trust.tick();trust.tick();
+  assert.equal(offers.get(offer.id).status,'CLOSED');assert.equal(offers.get(offer.id).revision,revision+2);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_cases WHERE kind='STALE_OFFER'").get()?.n,1);
+  assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM notifications WHERE dedupe_key LIKE '%:CLOSE'").get()?.n,1);
+ }finally{await f.close();}
 });

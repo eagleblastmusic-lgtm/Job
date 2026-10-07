@@ -1,3 +1,4 @@
+import { proveNativeWorker } from './faro-postgres-worker-proof.mjs';
 import { proveNativeAuth } from './faro-postgres-auth-proof.mjs';
 import { proveNativeErasure } from './faro-postgres-erasure-proof.mjs';
 import { exportOwnData,transferOrganizationOwner,deletableOwnershipQuery,requireDeletableOwnership } from '../dist/server/faro/privacyReadModel.js';
@@ -48,6 +49,7 @@ import { AssessmentService } from '../dist/server/faro/assessmentService.js';
 import { MfaService,totp } from '../dist/server/faro/mfaService.js';
 import { hashSessionToken } from '../dist/server/auth.js';
 const sourceOnly=process.argv.includes('--source-only'),schema=`faro_rehearsal_${randomBytes(8).toString('hex')}`,f=await faroFixture({faroMfaEncryptionKey:'44'.repeat(32)});let client,connected=false,created=false;
+async function nativeProof(phase,work){try{return await work();}catch(error){console.error(`FARO_POSTGRES_${phase}_FAILED ${typeof error?.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:'VALIDATION'}; no credentials or record values logged.`);throw error;}}
 function decode(value){let bits=0,acc=0;const out=[];for(const c of value){acc=(acc<<5)|'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c);bits+=5;if(bits>=8){bits-=8;out.push((acc>>>bits)&255);}}return Buffer.from(out);}
 try {
   assert.throws(()=>identifier('schema; DROP SCHEMA public'),/identifier/);assert.deepEqual(parts("id TEXT CHECK(id IN ('a,b','c')),x REAL DEFAULT (1+2),UNIQUE(id,x)"),["id TEXT CHECK(id IN ('a,b','c'))","x REAL DEFAULT (1+2)",'UNIQUE(id,x)']);
@@ -627,8 +629,9 @@ try {
     await assert.rejects(()=>mutateMfa(client,{...nativeMfaConfig,faroMfaEncryptionKey:'22'.repeat(32)},recoverMfaToken,'verify',{code:totp(nativeSecret,mfaCounterValue+2)},'2026-10-06T00:01:00.000Z'),error=>error.code==='MFA_UNAVAILABLE');
     for(let i=0;i<4;i++)await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='REAUTH_FAILED');await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='MFA_RATE_LIMITED');
     const mfaAudit=JSON.stringify((await client.query('SELECT metadata FROM audit_logs WHERE user_id=$1',[employer.id])).rows);for(const value of [nativeSetup.secret,pendingMfa,'Bezpieczne123',...nativeEnabled.recoveryCodes])assert.equal(mfaAudit.includes(value),false);
-    await proveNativeAuth(client,schema,asOf);
-    await proveNativeErasure(client,employer.id,offer.id,definition.id,asOf);
+    await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
+    await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
+    await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));
     const finalSource=await extract(f.app.config.databasePath);assert.deepEqual(finalSource.tables.map(t=>t.hash),snapshot.tables.map(t=>t.hash));
     console.log(`FARO_POSTGRES_REHEARSAL_OK tables=${proof.length} migrations=${snapshot.versions.length}; counts/hashes/FKs/checks/consent/rollback/source-readonly/async-scope/serializable-conflict/profile-wire/read-only-batch/safe-integer/published-offer-wire/intake-proof/profile-write/phone-revocation-rollback/private-constraints-write/claims-learning-activity-proposals/organization-RBAC-affiliation/organization-create-verify-rollback/invites-membership-atomicity/idle-backend-termination/offer-draft-atomicity/offer-edit-history-rollback/offer-lifecycle-outbox-rollback/offer-list-private-conditions/offer-detail-private-history-order/command-journal-rollback-current-authority/native-interest-projection-history-outbox-rollback/process-view-wire-private-history/process-transitions-clock-terminal-rollback/consented-accepted-stage-lexical-v1-dedupe/native-private-process-list/private-watch-atomic-alert-cancellation/explicit-private-contact-audit-atomicity/native-assessment-definition-review-atomicity/native-version-edit-journal-atomicity/native-pinned-assignment-atomicity/private-attempt-view-wire/neutral-attempt-expiry-atomicity/native-candidate-start-clock-audit-atomicity/native-private-answer-submit-atomicity/native-human-result-review-atomicity/native-result-validity-history-atomicity/native-human-amendment-fresh-validity-replay/native-technical-report-private-evidence-atomicity/native-human-incident-resolution-atomicity/native-pinned-technical-retry-lineage-atomicity/interview-outcome-tick-atomicity/current-session-MFA-revocation-atomicity PASS; runtime cutover not exercised.`);
   }
