@@ -1,3 +1,4 @@
+import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
@@ -102,22 +103,12 @@ export class AssessmentService extends FaroStore {
     const process = this.recruitment.row(processId);
     const offer = new OfferService(this.database, this.clock).assigned(userId, process.offer_id);
     this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER']);
-    const definitionId = text(body.assessmentId, 100), version = integer(body.version, 1), definition = this.definition(definitionId, version);
-    if (definition.offer_id !== process.offer_id) throw new HttpError(404, 'Nie znaleziono assessmentu.');
-    if (definition.state !== 'APPROVED') throw new HttpError(409, 'Przypisanie wymaga zatwierdzonej wersji.', 'ASSESSMENT_NOT_APPROVED');
-    const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(definitionId) as {version:number};
-    if(version!==latest.version)throw new HttpError(409,'Wybierz najnowszą zatwierdzoną wersję.','ASSESSMENT_SUPERSEDED');
-    if(integer(body.expectedVersion,1)!==process.revision)throw new HttpError(409,'Odśwież proces.','VERSION_CONFLICT');
-    if(this.correctedKey(definitionId,version))throw new HttpError(409,'Po korekcie wspólnego klucza przypisz nową zatwierdzoną wersję.','CORRECTED_VERSION_CLOSED');
-    if (process.status !== 'ACTIVE' || process.stage !== 'ACCEPTED_TO_NEXT_STAGE') throw new HttpError(409, 'Najpierw przyjmij do kolejnego etapu.');
-    if(this.db.prepare('SELECT id FROM faro_attempts WHERE process_id=? AND assessment_id=? AND assessment_version=?').get(processId,definitionId,version))throw new HttpError(409,'Ta wersja ma już próbę w tym procesie.','ASSESSMENT_ALREADY_ASSIGNED');
-    const deadline = date(body.deadline); if (deadline <= this.now()) throw new HttpError(400, 'Deadline musi być w przyszłości.');
-    const id = randomUUID();
-      this.db.prepare("INSERT INTO faro_attempts(id,process_id,assessment_id,assessment_version,state,deadline) VALUES(?,?,?,?,'INVITED',?)").run(id, processId, definitionId, version, deadline);
-      this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_REQUESTED',stage_due_at=?,revision=revision+1 WHERE id=?").run(deadline, processId);
-      this.recruitment.event(process, userId, 'ASSESSMENT_ASSIGNED', { attemptId: id, deadline });
-    return { id };
-    });
+    const request=assignmentRequest(body),definition=this.definition(request.definitionId,request.version),latestQuery=assessmentLatestQuery(request.definitionId),latest=this.db.prepare(latestQuery.text).get({$1:request.definitionId}) as {version:number},correction=assignmentCorrectionQuery(request.definitionId,request.version),existing=assignmentExistingQuery(processId,request.definitionId,request.version);
+    const plan=assessmentAssignmentPlan(process,definition,latest.version,Boolean(this.db.prepare(correction.text).get({$1:request.definitionId,$2:request.version})),Boolean(this.db.prepare(existing.text).get({$1:processId,$2:request.definitionId,$3:request.version})),body,this.now());
+    for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+    this.recruitment.event(process,userId,'ASSESSMENT_ASSIGNED',plan.event);
+    return plan.ack;
+    },()=>{this.recruitment.offers.assigned(userId,this.recruitment.row(processId).offer_id);});
   }
   expire(id?:string) {
     this.transaction(()=>{
