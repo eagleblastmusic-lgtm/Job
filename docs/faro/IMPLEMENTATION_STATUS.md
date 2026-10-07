@@ -778,3 +778,9 @@ CP11-AI448dcfa exact acceptance 2026-10-07: [FARO37613303718](https://github.com
 ## CP11-AJ — Portable pinned assessment assignment, 2026-10-07
 
 Shared SQLite/native assignment validation and exact pinned version; invitation, process stage/deadline, event/audit/outbox and idempotent acknowledgement are atomic. Current authority precedes replay. Full local162 Node/35 migrations/both restores/38 browsers/lint/typecheck PASS, zero skips; actual PostgreSQL18 Node22/24 acceptance pending. [Scope](CP11_AJ_PORTABLE_ASSESSMENT_ASSIGNMENT.md). Runtime SQLite, full plan/release PARTIAL. Continue attempt lifecycle and remaining native conversion/external gates.
+
+## CP11-AK — Portable private assessment attempt views, 2026-10-07
+
+Existing SQLite/native explicit reads and role-aware attempt mapping are shared. Candidate keys and employer draft answers stay private; submitted review, immutable result history/validity and retry/incident context retain current behavior. Native current-authority/assigned membership checked in owned read-only transaction, including empty scoped list. [Scope](CP11_AK_PORTABLE_ASSESSMENT_ATTEMPT_VIEWS.md). Local/actual PostgreSQL acceptance pending; runtime SQLite, whole plan/release PARTIAL. Continue native attempt writes and remaining conversion/external gates.
+
+CP11-AK full local npm run check PASS162 Node/35 migrations/both actual restores/38 real desktop/mobile browser executions/lint/typecheck, zero skips. Source-only70/35, syntax and diff check PASS. Existing native read fixtures require real PostgreSQL acceptance; runtime SQLite, whole plan/release PARTIAL.

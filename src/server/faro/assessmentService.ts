@@ -1,3 +1,4 @@
+import { type AttemptRow,type IncidentRow,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -7,8 +8,6 @@ import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
 import { text, integer, array, object, choice, date } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
-interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; attempt_number:number;retry_of:string|null;retry_reason:string|null;retry_authorized_at:string|null; }
-interface IncidentRow { id:string; category:string; statement:string; reportedAt:string; observedState:string; observedRevision:number; originalDeadline:string; originalStartedAt:string|null; originalExpiresAt:string|null; state:string; revision:number; resolution:string|null; reason:string|null; resolvedAt:string|null; }
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
   definition(id: string, version: number) {
@@ -126,8 +125,7 @@ export class AssessmentService extends FaroStore {
     });
   }
   row(id: string) {
-    const row = this.db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(id) as unknown as AttemptRow | undefined;
-    if (!row) throw new HttpError(404, 'Nie znaleziono próby.'); return row;
+    const query=attemptReadQuery(id);return attemptFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   resultHistory(id:string) {
     return this.db.prepare('SELECT revision,validity,result,reason_code reasonCode,reason,created_at createdAt FROM faro_result_history WHERE attempt_id=? ORDER BY revision').all(id).map(row=>({revision:Number(row.revision),validity:row.validity as 'VALID'|'INVALIDATED',reasonCode:row.reasonCode as string|null,reason:row.reason as string|null,createdAt:row.createdAt as string|null,result:JSON.parse(row.result as string) as Record<string,unknown>}));
@@ -215,22 +213,14 @@ export class AssessmentService extends FaroStore {
     return this.overview(userId,acknowledgement.id);
   }
   overview(userId: string, id: string) {
-    const row = this.row(id), process = this.recruitment.authorize(userId, row.process_id), content = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
-    const candidate = process.candidate_id === userId;
-    const history=row.state==='FINALIZED'?this.resultHistory(id):[];
-    const submitted=['SCORED_PENDING_REVIEW','FINALIZED'].includes(row.state);
-    const savedAnswers=JSON.parse(row.answers) as Record<string,number|string>;
-    const retryAttempt=this.db.prepare('SELECT id FROM faro_attempts WHERE retry_of=?').get(id) as {id:string}|undefined;
-    const retryRole=candidate?null:this.member(userId,this.recruitment.offers.get(process.offer_id).organizationId).role;
-    return { id, attemptNumber:row.attempt_number,retryOf:row.retry_of,retryReason:row.retry_reason,retryAuthorizedAt:row.retry_authorized_at,retryAttemptId:retryAttempt?.id??null,canRetry:retryRole!==null&&retryRole!=='HIRING_MANAGER'&&row.state==='TECHNICAL_ISSUE'&&this.incident(id)?.resolution==='ISSUE_CONFIRMED'&&process.status==='ACTIVE'&&process.stage==='ACCEPTED_TO_NEXT_STAGE'&&!retryAttempt&&!this.correctedKey(row.assessment_id,row.assessment_version)&&!this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id), incident:this.incident(id)??null,resultValidity:history.at(-1)?.validity??null,resultHistory:history, viewer:candidate?'CANDIDATE':'EMPLOYER', processId: row.process_id, processVersion:process.revision, state: row.state, title: content.title, type: content.type, taskCount: content.tasks.length, timeLimitMinutes: content.timeLimitMinutes, expectedMinutes: content.expectedMinutes, deadline: row.deadline, startedAt: row.started_at, expiresAt: row.expires_at, serverNow: this.now(), revision: row.revision, rubricVersion: content.rubricVersion, scoringMode: content.scoringMode,
-      tasks: candidate && row.started_at ? content.tasks.map(task => ({ id: task.id, prompt: task.prompt, options: task.options, points: task.points,evaluationCriteria:task.evaluationCriteria })) : [],
-      reviewTasks:!candidate&&submitted?content.tasks.map(t=>({id:t.id,prompt:t.prompt,options:t.options,points:t.points,correctOption:content.type==='QUIZ'?t.answer:null,chosenOption:typeof savedAnswers[t.id]==='number'?savedAnswers[t.id]:null,chosenText:typeof savedAnswers[t.id]==='string'?savedAnswers[t.id]:null,evaluationCriteria:t.evaluationCriteria})):[],
-      answers: candidate ? savedAnswers : {}, result: submitted && row.result && (row.state!=='FINALIZED'||history.at(-1)?.validity==='VALID') && (row.state === 'FINALIZED' || !candidate) ? (row.state==='FINALIZED'?history.at(-1)!.result:JSON.parse(row.result) as Record<string, unknown>) : null };
+    const row=this.row(id),process=this.recruitment.authorize(userId,row.process_id),content=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition,candidate=process.candidate_id===userId,role=candidate?null:this.member(userId,this.recruitment.offers.get(process.offer_id).organizationId).role;
+    const context=attemptContextQueries(row).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    return attemptView(row,process,content,userId,this.now(),context,role);
   }
   attempts(userId: string, processId?: string) {
-    if (processId) this.recruitment.authorize(userId, processId);
-    const rows = (processId ? this.db.prepare('SELECT id FROM faro_attempts WHERE process_id=?').all(processId) : this.db.prepare('SELECT a.id FROM faro_attempts a JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId)) as Array<{ id: string }>;
-    return rows.map(row => this.overview(userId, row.id));
+    if(processId)this.recruitment.authorize(userId,processId);
+    const query=attemptListQuery(userId,processId),rows=this.db.prepare(query.text).all({$1:processId??userId}) as Array<{id:string}>;
+    return rows.map(row=>this.overview(userId,row.id));
   }
   candidate(userId: string, row: AttemptRow) {
     const process = this.recruitment.row(row.process_id);
