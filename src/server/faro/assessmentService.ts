@@ -1,10 +1,11 @@
+import { incidentReportPlan,requireIncidentCandidate } from './assessmentIncidentModel.js';
 import { assessmentAmendmentPlan } from './assessmentAmendmentModel.js';
 import { assessmentInvalidationPlan } from './assessmentInvalidationModel.js';
 import { assessmentFinalizeQueries } from './assessmentReviewModel.js';
 import { attemptAnswerQueries } from './assessmentAnswerModel.js';
 import { requireAttemptCandidate,attemptStartQueries } from './assessmentStartModel.js';
 import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
-import { type AttemptRow,type IncidentRow,attemptHistoryQuery,attemptHistoryFromRows,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
+import { type AttemptRow,type IncidentRow,attemptHistoryQuery,attemptHistoryFromRows,attemptIncidentQuery,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -132,27 +133,22 @@ export class AssessmentService extends FaroStore {
     const query=attemptHistoryQuery(id);return attemptHistoryFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   incident(id:string) {
-    return this.db.prepare('SELECT id,category,statement,reported_at reportedAt,observed_state observedState,observed_revision observedRevision,original_deadline originalDeadline,original_started_at originalStartedAt,original_expires_at originalExpiresAt,state,revision,resolution,reason,resolved_at resolvedAt FROM faro_attempt_incidents WHERE attempt_id=?').get(id) as unknown as IncidentRow|undefined;
+    const query=attemptIncidentQuery(id);return this.db.prepare(query.text).get({$1:id}) as unknown as IncidentRow|undefined;
   }
   reportIncident(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>{
       const row=this.row(id),process=this.recruitment.row(row.process_id);
-      if(process.candidate_id!==userId)throw new HttpError(404,'Nie znaleziono próby.');
+      requireIncidentCandidate(userId,process);
       return {row,process};
     };
     authorize();
     const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_INCIDENT_REPORT'},()=>{
       const {row,process}=authorize();
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
-      if(!['INVITED','STARTED','EXPIRED','SCORED_PENDING_REVIEW'].includes(row.state)||this.incident(id))throw new HttpError(409,'Ta próba nie przyjmuje nowego zgłoszenia technicznego.','INCIDENT_NOT_AVAILABLE');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź zakres udostępnienia zgłoszenia.','CONFIRMATION_REQUIRED');
-      const category=choice(body.category,['ACCESS','CONNECTION','ANSWER_SAVE','OTHER_TECHNICAL'] as const),statement=text(body.statement,1000,10);
-      this.db.prepare('INSERT INTO faro_attempt_incidents(id,attempt_id,reporter_id,category,statement,reported_at,observed_state,observed_revision,original_deadline,original_started_at,original_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(randomUUID(),id,userId,category,statement,this.now(),row.state,row.revision,row.deadline,row.started_at,row.expires_at);
-      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
-      // An allegation does not pause/reset time, erase answers or make a negative fact.
-      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_REPORTED',{attemptId:id,category});
+      const plan=incidentReportPlan(userId,row,process,this.incident(id),body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_REPORTED',plan.event);
       return {id};
-    });
+    },authorize);
     return this.overview(userId,acknowledgement.id);
   }
   resolveIncident(userId:string,id:string,body:Record<string,unknown>) {
