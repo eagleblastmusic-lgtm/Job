@@ -245,6 +245,10 @@ test('attempt technical report and human confirmation preserve evidence and cloc
     await f.request(`${path}/resolve`,f.candidate.cookie,'POST',resolve,404);await f.request(`${path}/resolve`,f.admin.cookie,'POST',resolve,404);
     await f.request(`${path}/resolve`,f.employer.cookie,'POST',{...resolve,confirmed:false},400);
     await f.request(`${path}/resolve`,f.employer.cookie,'POST',{...resolve,processVersion:1},409);
+    const resolveAttemptBefore={...service.row(attempt.id)},resolveIncidentBefore=service.incident(attempt.id),resolveProcessBefore={...service.recruitment.row(f.interest.id)};
+    f.app.db.db.exec("CREATE TRIGGER resolve_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'resolve delivery failed'); END");
+    await f.request(`${path}/resolve`,f.employer.cookie,'POST',resolve,500);assert.deepEqual({...service.row(attempt.id)},resolveAttemptBefore);assert.deepEqual(service.incident(attempt.id),resolveIncidentBefore);assert.deepEqual({...service.recruitment.row(f.interest.id)},resolveProcessBefore);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,resolve.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER resolve_delivery_failure');
     const resolved=await f.request<ReturnType<AssessmentService['overview']>>(`${path}/resolve`,f.employer.cookie,'POST',resolve);
     assert.equal(resolved.state,'TECHNICAL_ISSUE');assert.equal(resolved.incident!.resolution,'ISSUE_CONFIRMED');assert.equal(resolved.result,null);
     unchanged(await f.request(`${path}/resolve`,f.employer.cookie,'POST',resolve),resolved);

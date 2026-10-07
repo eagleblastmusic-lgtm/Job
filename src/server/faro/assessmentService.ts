@@ -1,4 +1,4 @@
-import { incidentReportPlan,requireIncidentCandidate } from './assessmentIncidentModel.js';
+import { incidentReportPlan,incidentResolutionPlan,otherActiveAttemptQuery,requireIncidentCandidate } from './assessmentIncidentModel.js';
 import { assessmentAmendmentPlan } from './assessmentAmendmentModel.js';
 import { assessmentInvalidationPlan } from './assessmentInvalidationModel.js';
 import { assessmentFinalizeQueries } from './assessmentReviewModel.js';
@@ -13,7 +13,7 @@ import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
-import { text, integer, array, object, choice, date } from './validation.js';
+import { text, integer, array, object, date } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
@@ -162,23 +162,13 @@ export class AssessmentService extends FaroStore {
     authorize();
     const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_INCIDENT_RESOLVE'},()=>{
       const {row,process}=authorize(),incident=this.incident(id);
-      if(!incident)throw new HttpError(404,'Nie znaleziono zgłoszenia.');
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision||integer(body.incidentVersion,1)!==incident.revision)throw new HttpError(409,'Próba, proces lub zgłoszenie zmieniły się.','VERSION_CONFLICT');
-      if(incident.state!=='OPEN')throw new HttpError(409,'Zgłoszenie ma już rozstrzygnięcie.','INCIDENT_RESOLVED');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ręczny przegląd zgłoszenia.','CONFIRMATION_REQUIRED');
-      const resolution=choice(body.resolution,['ISSUE_CONFIRMED','NOT_ESTABLISHED'] as const),reason=text(body.reason,1000,10);
-      const neutralize=resolution==='ISSUE_CONFIRMED'&&['INVITED','STARTED','EXPIRED','SCORED_PENDING_REVIEW'].includes(row.state);
-      this.db.prepare("UPDATE faro_attempt_incidents SET state='RESOLVED',revision=2,resolution=?,reason=?,resolved_at=?,reviewer_id=? WHERE attempt_id=?").run(resolution,reason,this.now(),userId,id);
-      this.db.prepare('UPDATE faro_attempts SET state=?,revision=revision+1 WHERE id=?').run(neutralize?'TECHNICAL_ISSUE':row.state,id);
-      const anotherActive=this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND id<>? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id,id);
-      if(neutralize&&!TERMINAL.includes(process.status)&&!anotherActive&&['ASSESSMENT_REQUESTED','ASSESSMENT_COMPLETED'].includes(process.stage)) {
-        const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
-        this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?").run(new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString(),'Problem techniczny potwierdzony. Ustal ręcznie dalszy krok; brak automatycznej oceny lub odmowy.',process.id);
-      }
-      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_RESOLVED',{attemptId:id,resolution});
+      const other=otherActiveAttemptQuery(process.id,id),anotherActive=Boolean(this.db.prepare(other.text).get({$1:process.id,$2:id})),decisionHours=incident&&body.resolution==='ISSUE_CONFIRMED'&&['INVITED','STARTED','EXPIRED','SCORED_PENDING_REVIEW'].includes(row.state)&&!TERMINAL.includes(process.status)&&!anotherActive&&['ASSESSMENT_REQUESTED','ASSESSMENT_COMPLETED'].includes(process.stage)?this.recruitment.offers.version(process.offer_id,process.offer_version).decisionHours:null;
+      const plan=incidentResolutionPlan(userId,row,process,incident,anotherActive,decisionHours,body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(process,userId,'ATTEMPT_INCIDENT_RESOLVED',plan.event);
       // Do not retain the candidate statement in another user's command replay cache after erasure.
       return {id};
-    });
+    },authorize);
     return this.overview(userId,acknowledgement.id);
   }
   retry(userId:string,id:string,body:Record<string,unknown>) {
