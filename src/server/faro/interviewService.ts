@@ -1,12 +1,12 @@
+import { interviewOutcomePlan,interviewModeratorQuery,interviewCaseNotifications } from './interviewOutcomeModel.js';
+import { processRecruiterReadQuery } from './interestWriteModel.js';
 import { interviewChangeInput,interviewSchedulePlan } from './interviewScheduleModel.js';
 import { interviewProposalContextQueries,interviewProposalInput,interviewProposalPlan } from './interviewProposalModel.js';
 import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar,type InterviewRow } from './interviewReadModel.js';
-import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { AppStore } from '../store.js';
 import { HttpError } from '../http.js';
-import { choice } from './validation.js';
 
 export class InterviewService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database,this.clock); }
@@ -70,31 +70,14 @@ export class InterviewService extends FaroStore {
         for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
         this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);return this.view(userId,id);
       }
-      let state:InterviewRow['state']=row.state,stage=p.stage,due=p.stage_due_at,action=p.next_action,caseId:string|null=null;
-      {
-        if(row.state!=='CONFIRMED'||row.ends_at>this.now())throw new HttpError(409,'Najpierw musi upłynąć potwierdzony termin rozmowy.');
-        if(command==='COMPLETE') {
-          if(candidate?row.candidate_completed:row.employer_completed)throw new HttpError(409,'Twoje potwierdzenie zostało już zapisane.');
-          this.db.prepare(`UPDATE faro_interviews SET ${candidate?'candidate_completed':'employer_completed'}=1 WHERE id=?`).run(id);
-          if(candidate?row.employer_completed:row.candidate_completed) {
-            state='COMPLETED';stage='INTERVIEW_COMPLETED';action='Firma przekaże decyzję lub kolejny krok.';
-            due=new Date(this.clock().getTime()+this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours*3600000).toISOString();
-          }
-        } else {
-          state='DISPUTED';stage='ACCEPTED_TO_NEXT_STAGE';action='Rozbieżność dotycząca rozmowy czeka na wyjaśnienie.';due=null;
-          const reason=choice(body.reason,['NO_SHOW','TECHNICAL_ISSUE','OTHER_DISCREPANCY'] as const);
-          caseId=randomUUID();
-          this.db.prepare("INSERT INTO faro_cases(id,organization_id,process_id,reporter_id,kind,statement,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?)").run(caseId,this.recruitment.offers.get(p.offer_id).organizationId,p.id,userId,reason==='NO_SHOW'?'NO_SHOW_CASE':'INTERVIEW_DISCREPANCY',`Rozmowa ${id}: ${reason}. Wymaga wyjaśnienia przez obie strony; bez automatycznej sankcji.`,`interview:${id}`,this.now());
-          const moderators=this.db.prepare("SELECT id FROM users WHERE role='ADMIN'").all() as Array<{id:string}>;
-          for(const moderator of moderators)this.recruitment.enqueue(moderator.id,'case',caseId,'Nowa rozbieżność po rozmowie wymaga przeglądu.',`case:${caseId}:opened`);
-          const assigned=this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=o.organization_id AND m.active=1 WHERE a.offer_id=?').all(p.offer_id) as Array<{user_id:string}>;
-          for(const recipient of [p.candidate_id,...assigned.map(a=>a.user_id)])this.recruitment.enqueue(recipient,'case',caseId,'Możesz przekazać prywatne wyjaśnienie rozbieżności po rozmowie.',`case:${caseId}:opened`);
-        }
+      const plan=interviewOutcomePlan(userId,row,p,body,this.recruitment.offers.get(p.offer_id).organizationId,this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      if(plan.caseId) {
+        const moderators=this.db.prepare(interviewModeratorQuery().text).all(),assigned=this.db.prepare(processRecruiterReadQuery(p.offer_id).text).all({$1:p.offer_id});
+        for(const query of interviewCaseNotifications(plan.caseId,p,moderators,assigned,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       }
-      this.db.prepare('UPDATE faro_interviews SET state=?,revision=revision+1 WHERE id=?').run(state,id);
-      this.db.prepare('UPDATE faro_interests SET stage=?,stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?').run(stage,due,action,p.id);
-      this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,caseId,reason:command==='DISPUTE'?body.reason:null});
-      if(state==='COMPLETED')new AppStore(this.database).faroMutualStageCompleted(id);
+      this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);
+      if(plan.state==='COMPLETED')new AppStore(this.database).faroMutualStageCompleted(id);
       return this.view(userId,id);
     },authorize);
   }

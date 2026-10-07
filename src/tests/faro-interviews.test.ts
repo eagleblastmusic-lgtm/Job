@@ -150,8 +150,13 @@ test('interview confirmation reserves participants atomically, scopes API, freez
     assert.deepEqual(Object.keys(confirmed).sort(),['id','processId','state','revision','startsAt','endsAt','confirmBy','timezone','location','meetingUrl','candidateCompleted','employerCompleted'].sort());
     assert.throws(()=>f.interviews.change(f.candidate.id,first.id,{command:'COMPLETE',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'early'}));
     f.setNow('2026-10-25T02:00:00Z');
+    const rollbackBody={command:'COMPLETE',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'candidate-complete'},rollbackProcess={...f.recruitment.row(f.first)};
+    f.app.db.db.exec("CREATE TRIGGER outcome_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'outcome delivery failed'); END");
+    assert.throws(()=>f.interviews.change(f.candidate.id,first.id,rollbackBody),/outcome delivery failed/);assert.equal(f.interviews.row(first.id).candidate_completed,0);assert.deepEqual({...f.recruitment.row(f.first)},rollbackProcess);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE command_key=?').get(rollbackBody.idempotencyKey)!.n,0);f.app.db.db.exec('DROP TRIGGER outcome_delivery_failure');
     const own=f.interviews.change(f.candidate.id,first.id,{command:'COMPLETE',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'candidate-complete'});
     assert.equal(own.state,'CONFIRMED');assert.equal(own.candidateCompleted,true);assert.equal(f.recruitment.row(f.first).stage,'INTERVIEW_CONFIRMED');
+    const employerBody={command:'COMPLETE',confirmed:true,expectedVersion:3,processVersion:5,idempotencyKey:'employer-complete'};
+    f.app.db.db.exec("CREATE TRIGGER outcome_audit_failure BEFORE INSERT ON audit_logs WHEN NEW.action='INTERVIEW_COMPLETE' BEGIN SELECT RAISE(ABORT,'outcome audit failed'); END");assert.throws(()=>f.interviews.change(f.employer.id,first.id,employerBody),/outcome audit failed/);assert.deepEqual(f.interviews.view(f.candidate.id,first.id),own);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE command_key=?').get(employerBody.idempotencyKey)!.n,0);f.app.db.db.exec('DROP TRIGGER outcome_audit_failure');
     const done=f.interviews.change(f.employer.id,first.id,{command:'COMPLETE',confirmed:true,expectedVersion:3,processVersion:5,idempotencyKey:'employer-complete'});
     assert.equal(done.state,'COMPLETED');assert.equal(f.recruitment.row(f.first).stage,'INTERVIEW_COMPLETED');
     const report=new TrustService(f.app.db,f.clock).reliability(f.employer.id,f.org.id,'2026-10-24T00:00:00Z','2026-10-25T02:00:00Z');
@@ -172,6 +177,8 @@ test('unconfirmed expiry is neutral; confirmed no-show opens review; withdrawal 
     const meeting=f.interviews.propose(f.employer.id,f.first,{...f.proposal,confirmBy:'2026-10-24T22:30:00Z',expectedVersion:4,idempotencyKey:'replacement'});
     f.interviews.change(f.candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:5,idempotencyKey:'confirm-replacement'});
     f.setNow('2026-10-25T03:00:00Z');
+    const disputeBody={command:'DISPUTE',reason:'NO_SHOW',confirmed:true,expectedVersion:2,processVersion:6,idempotencyKey:'no-show'},beforeDispute={...f.recruitment.row(f.first)};
+    f.app.db.db.exec("CREATE TRIGGER dispute_delivery_failure BEFORE INSERT ON faro_outbox WHEN NEW.entity_type='case' BEGIN SELECT RAISE(ABORT,'dispute delivery failed'); END");assert.throws(()=>f.interviews.change(f.employer.id,meeting.id,disputeBody),/dispute delivery failed/);assert.equal(f.interviews.row(meeting.id).state,'CONFIRMED');assert.deepEqual({...f.recruitment.row(f.first)},beforeDispute);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_cases').get()!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE command_key=?').get(disputeBody.idempotencyKey)!.n,0);f.app.db.db.exec('DROP TRIGGER dispute_delivery_failure');
     f.interviews.change(f.employer.id,meeting.id,{command:'DISPUTE',reason:'NO_SHOW',confirmed:true,expectedVersion:2,processVersion:6,idempotencyKey:'no-show'});
     const review=f.app.db.db.prepare('SELECT kind,state FROM faro_cases').get() as {kind:string;state:string};assert.deepEqual({...review},{kind:'NO_SHOW_CASE',state:'OPEN'});
     assert.equal((f.app.db.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(f.org.id) as {verification:string}).verification,'VERIFIED');
