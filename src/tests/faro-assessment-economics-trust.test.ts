@@ -567,3 +567,14 @@ test('result-history migration preserves legacy result and actual review timesta
     assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{db.close();}
 });
+
+
+test('assessment definition create and approval audit failures are atomic through real API including versioned edit',async()=>{
+  const f=await assessmentSetup();try{
+    const db=f.app.db.db,s=new AssessmentService(f.app.db),input={title:'Rubryka bez częściowego zapisu',type:'OPEN_ANSWER',scoringMode:'HUMAN',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'atomic-v1',tasks:[{prompt:'Opisz rozwiązanie',evaluationCriteria:'Jasne kroki z uzasadnieniem.',points:2}]},url=`/api/faro/offers/${f.offer.id}/assessments`;
+    db.exec("CREATE TRIGGER fail_definition_create BEFORE INSERT ON audit_logs WHEN NEW.action='ASSESSMENT_DRAFT_CREATED' BEGIN SELECT RAISE(ABORT,'definition audit unavailable'); END");await f.request(url,f.employer.cookie,'POST',input,500);assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_assessments WHERE offer_id=?').get(f.offer.id)!.n,0);db.exec('DROP TRIGGER fail_definition_create');
+    const d=await f.request<{id:string}>(url,f.employer.cookie,'POST',input,201),versionUrl=`/api/faro/assessments/${d.id}/versions/1`;await f.request(versionUrl,f.employer.cookie,'POST',{action:'REVIEW'});const before={...s.definition(d.id,1)};
+    db.exec("CREATE TRIGGER fail_definition_approve BEFORE INSERT ON audit_logs WHEN NEW.action='ASSESSMENT_APPROVE' BEGIN SELECT RAISE(ABORT,'approval audit unavailable'); END");await f.request(versionUrl,f.employer.cookie,'POST',{action:'APPROVE',confirmed:true},500);assert.deepEqual({...s.definition(d.id,1)},before);db.exec('DROP TRIGGER fail_definition_approve');await f.request(versionUrl,f.employer.cookie,'POST',{action:'APPROVE',confirmed:true});
+    const pinned={...s.definition(d.id,1)};const edit={expectedVersion:1,idempotencyKey:'definition-edit-atomic',data:{...input,rubricVersion:'atomic-v2'}};await f.request(versionUrl,f.employer.cookie,'PUT',edit,201);assert.deepEqual({...s.definition(d.id,1)},pinned);assert.equal(s.definition(d.id,2).state,'DRAFT');await f.request(versionUrl,f.employer.cookie,'POST',{action:'APPROVE',confirmed:true},409);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
