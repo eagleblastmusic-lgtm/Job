@@ -166,6 +166,10 @@ test('technical retry creates a pinned separate lineage, preserves original evid
     await f.request(path,f.employer.cookie,'POST',{...retry,expectedVersion:1},409);
     await f.request(path,f.employer.cookie,'POST',{...retry,confirmed:false},400);
     await f.request(path,f.employer.cookie,'POST',{...retry,deadline:'2000-01-01T00:00:00.000Z'},400);
+    const retryProcessBefore={...s.recruitment.row(f.interest.id)};
+    f.app.db.db.exec("CREATE TRIGGER retry_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'retry delivery failed'); END");
+    await f.request(path,f.employer.cookie,'POST',retry,500);assert.deepEqual({...s.row(a.id)},original);assert.deepEqual(s.incident(a.id),originalIncident);assert.deepEqual({...s.recruitment.row(f.interest.id)},retryProcessBefore);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_attempts WHERE retry_of=?').get(a.id)!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,retry.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER retry_delivery_failure');
     const next=await f.request<ReturnType<AssessmentService['overview']>>(path,f.employer.cookie,'POST',retry,201);
     assert.equal(next.state,'INVITED');assert.equal(next.attemptNumber,2);assert.equal(next.retryOf,a.id);assert.equal(next.rubricVersion,'retry-1');assert.equal(next.startedAt,null);assert.equal(next.expiresAt,null);assert.equal(next.result,null);
     assert.deepEqual({...s.row(a.id)},original);assert.deepEqual(s.incident(a.id),originalIncident);
