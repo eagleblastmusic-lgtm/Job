@@ -1,0 +1,9 @@
+# CP11-AX — Portable atomic interview proposal (2026-10-07)
+
+SQLite/native PostgreSQL share process revision, explicit availability, ACTIVE eligible stage, no existing active interview, completed count from original pinned offer, native UTC/IANA offset/DST validation, future confirmation/start, positive maximum8h duration, private location and HTTPS URL without credentials. Exact participant overlap query remains within command transaction. Candidate cannot propose; OWNER/ADMIN/RECRUITER must currently be assigned. Current session and privileged role execute before fresh work or cached acknowledgement, including SQLite replay.
+
+Shared explicit proposal and process stage/deadline/revision writes preserve original response clocks/snapshot. Required event/audit/outbox and journal acknowledgement are atomic. UTC instants across autumn repeated local hour remain pinned. No external calendar/provider integration or automatic availability claim.
+
+Rebuilt existing actual API interview regression extended with actual outbox trigger: complete proposal/process/journal rollback then successful retry, current HIRING_MANAGER refusal on cached replay. Calendar/DST/scoped slot/mutual completion and neutral expiry/spring DST tests PASS2, zero skips; source70/35 and syntax/diff PASS. Actual PostgreSQL18 Node22/24 verifies real proposal with pinned definition, current candidate/role/revision/confirmation/zone/offset/HTTPS/time refusal, actual delivery failure/rollback, repeat once and original response clocks. Full local/remote acceptance pending.
+
+Runtime SQLite; drafts unmerged and whole CP11/master plan/release PARTIAL. Continue interview confirmation/completion/dispute/tick and remaining auth/MFA/privacy/worker/recovery/operator integration and external acceptance. Locked login/CV/EHV unchanged; no provider, advanced execution or release enablement.
