@@ -1,3 +1,4 @@
+import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
 import { type AttemptRow,type IncidentRow,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
@@ -111,15 +112,10 @@ export class AssessmentService extends FaroStore {
   }
   expire(id?:string) {
     this.transaction(()=>{
-      const due=this.db.prepare("SELECT id FROM faro_attempts WHERE state IN ('INVITED','STARTED') AND (deadline<=? OR (state='STARTED' AND expires_at<=?))"+(id?' AND id=?':'')).all(...(id?[this.now(),this.now(),id]:[this.now(),this.now()])) as Array<{id:string}>;
+      const query=dueAttemptsQuery(this.now(),id),due=this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))) as Array<{id:string}>;
       for(const item of due) {
-        const attempt=this.row(item.id),process=this.recruitment.row(attempt.process_id);
-        this.db.prepare("UPDATE faro_attempts SET state='EXPIRED',revision=revision+1 WHERE id=?").run(item.id);
-        if(!TERMINAL.includes(process.status)&&process.stage==='ASSESSMENT_REQUESTED') {
-          const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
-          const dueAt=new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString();
-          this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?").run(dueAt,'Termin assessmentu upłynął. Ustal kolejny krok; brak automatycznej odmowy.',process.id);
-        }
+        const attempt=this.row(item.id),process=this.recruitment.row(attempt.process_id),decisionHours=!TERMINAL.includes(process.status)&&process.stage==='ASSESSMENT_REQUESTED'?this.recruitment.offers.version(process.offer_id,process.offer_version).decisionHours:null;
+        for(const write of attemptExpiryQueries(attempt,process,decisionHours,this.now()))this.db.prepare(write.text).run(Object.fromEntries(write.values.map((value,index)=>[`$${index+1}`,value])));
         this.recruitment.event(process,null,'ATTEMPT_EXPIRED',{attemptId:item.id});
       }
     });
