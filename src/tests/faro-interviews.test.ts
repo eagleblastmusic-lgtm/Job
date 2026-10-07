@@ -116,7 +116,12 @@ test('moderator can close appointment evidence review after the explicit explana
 
 test('interview confirmation reserves participants atomically, scopes API, freezes UTC across autumn DST, exports private ICS and requires both completion reports',async()=>{
   const f=await setup();try {
+    const before={...f.recruitment.row(f.first)};
+    f.app.db.db.exec("CREATE TRIGGER proposal_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'proposal delivery failed'); END");
+    await f.request(`/api/faro/processes/${f.first}/interviews`,f.employer.cookie,'POST',f.proposal,500);assert.deepEqual({...f.recruitment.row(f.first)},before);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_interviews WHERE process_id=?').get(f.first)!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,f.proposal.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER proposal_delivery_failure');
     const first=f.interviews.propose(f.employer.id,f.first,f.proposal);
+    f.app.db.db.prepare("UPDATE faro_members SET role='HIRING_MANAGER' WHERE user_id=? AND organization_id=?").run(f.employer.id,f.org.id);await f.request(`/api/faro/processes/${f.first}/interviews`,f.employer.cookie,'POST',f.proposal,404);f.app.db.db.prepare("UPDATE faro_members SET role='OWNER' WHERE user_id=? AND organization_id=?").run(f.employer.id,f.org.id);
     assert.equal(first.startsAt,'2026-10-25T00:30:00.000Z');assert.equal(first.endsAt,'2026-10-25T01:30:00.000Z');
     assert.equal(Date.parse(first.endsAt)-Date.parse(first.startsAt),3600000);
     assert.deepEqual(f.interviews.propose(f.employer.id,f.first,f.proposal),first);

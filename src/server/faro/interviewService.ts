@@ -1,10 +1,11 @@
+import { interviewProposalContextQueries,interviewProposalInput,interviewProposalPlan } from './interviewProposalModel.js';
 import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar,type InterviewRow } from './interviewReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { AppStore } from '../store.js';
 import { HttpError } from '../http.js';
-import { choice, date, integer, text } from './validation.js';
+import { choice, integer } from './validation.js';
 
 export class InterviewService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database,this.clock); }
@@ -22,41 +23,14 @@ export class InterviewService extends FaroStore {
   calendar(userId:string,id:string) {return interviewCalendar(this.view(userId,id),this.now());}
 
   propose(userId:string,processId:string,body:Record<string,unknown>) {
-    this.recruitment.authorize(userId,processId);
+    const authorize=()=>{const p=this.recruitment.authorize(userId,processId);if(p.candidate_id===userId)throw new HttpError(403,'Propozycję terminu rozpoczyna rekruter.');this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);};authorize();
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},()=>{
-      const p=this.recruitment.authorize(userId,processId),offer=this.recruitment.offers.get(p.offer_id);
-      if(p.candidate_id===userId)throw new HttpError(403,'Propozycję terminu rozpoczyna rekruter.');
-      this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER']);
-      if(integer(body.expectedVersion,1)!==p.revision)throw new HttpError(409,'Odśwież proces.','VERSION_CONFLICT');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź swoją dostępność.','CONFIRMATION_REQUIRED');
-      if(p.status!=='ACTIVE'||!['ACCEPTED_TO_NEXT_STAGE','ASSESSMENT_COMPLETED','INTERVIEW_COMPLETED'].includes(p.stage))throw new HttpError(409,'Ten etap nie pozwala zaproponować rozmowy.','INVALID_TRANSITION');
-      if(this.db.prepare("SELECT id FROM faro_interviews WHERE process_id=? AND state IN ('PROPOSED','CONFIRMED')").get(processId))throw new HttpError(409,'Najpierw zakończ lub anuluj poprzednią propozycję.','ACTIVE_INTERVIEW_EXISTS');
-      const completed=(this.db.prepare("SELECT COUNT(*) n FROM faro_interviews WHERE process_id=? AND state='COMPLETED'").get(processId) as {n:number}).n;
-      if(completed>=this.recruitment.offers.version(p.offer_id,p.offer_version).interviewCount)throw new HttpError(409,'Wykorzystano liczbę rozmów zadeklarowaną przy zgłoszeniu.','INTERVIEW_LIMIT');
-      const starts=date(body.startsAt),ends=date(body.endsAt),confirmBy=date(body.confirmBy),zone=text(body.timezone,100);
-      try { new Intl.DateTimeFormat('pl-PL',{timeZone:zone}).format(); } catch { throw new HttpError(400,'Nieprawidłowa strefa IANA.'); }
-      for(const raw of [body.startsAt,body.endsAt,body.confirmBy]) {
-        const value=text(raw,40);
-        if(value.endsWith('Z'))continue;
-        const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value));
-        const part=(type:string)=>parts.find(p=>p.type===type)!.value;
-        const local=`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}`;
-        if(local!==value.slice(0,19))throw new HttpError(400,'Godzina lub przesunięcie UTC nie odpowiada wybranej strefie. Sprawdź zmianę czasu.','TIMEZONE_MISMATCH');
-      }
-      if(confirmBy<=this.now()||starts<=confirmBy||ends<=starts||Date.parse(ends)-Date.parse(starts)>8*3600000)throw new HttpError(400,'Potwierdzenie musi poprzedzać przyszłą rozmowę trwającą maksymalnie 8 godzin.');
-      const location=text(body.location,300),meetingUrl=body.meetingUrl?text(body.meetingUrl,2000):null;
-      if(meetingUrl) {
-        let url:URL; try { url=new URL(meetingUrl); } catch { throw new HttpError(400,'Nieprawidłowy link spotkania.'); }
-        if(url.protocol!=='https:'||url.username||url.password)throw new HttpError(400,'Link spotkania musi używać HTTPS bez danych logowania.');
-      }
-      this.available(p.candidate_id,userId,starts,ends);
-      const id=randomUUID();
-      this.db.prepare("INSERT INTO faro_interviews(id,process_id,recruiter_id,state,starts_at,ends_at,confirm_by,timezone,location,meeting_url,created_at) VALUES(?,?,?,'PROPOSED',?,?,?,?,?,?,?)").run(id,processId,userId,starts,ends,confirmBy,zone,location,meetingUrl,this.now());
-      this.db.prepare("UPDATE faro_interests SET stage='INTERVIEW_PROPOSED',stage_due_at=?,next_action='Potwierdź zaproponowany termin rozmowy.',revision=revision+1 WHERE id=?").run(confirmBy,processId);
-      this.recruitment.event(p,userId,'INTERVIEW_PROPOSED',{interviewId:id,startsAt:starts,endsAt:ends,confirmBy});
-      return this.view(userId,id);
-    });
+      const p=this.recruitment.authorize(userId,processId),rows=interviewProposalContextQueries(processId).map(query=>this.db.prepare(query.text).all({$1:processId})),input=interviewProposalInput(p,Boolean(rows[0]?.length),rows[1]?.[0]?.n as number,this.recruitment.offers.version(p.offer_id,p.offer_version).interviewCount,body,this.now());this.available(p.candidate_id,userId,input.starts,input.ends);const plan=interviewProposalPlan(userId,p,input,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(p,userId,'INTERVIEW_PROPOSED',plan.event);return this.view(userId,plan.id);
+    },authorize);
   }
+
   tick() {
     this.transaction(()=>{
       const pending=this.db.prepare("SELECT * FROM faro_interviews WHERE state IN ('PROPOSED','CONFIRMED')").all() as unknown as InterviewRow[];
