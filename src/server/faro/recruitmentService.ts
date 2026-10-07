@@ -1,3 +1,4 @@
+import { interestReadQueries,interestPlan,processRecruiterReadQuery,processEventQueries } from './interestWriteModel.js';
 import { commandRequest,commandReadQuery,commandReplay,commandSaveQuery } from './commandJournal.js';
 import { AppStore } from '../store.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -40,31 +41,17 @@ export class RecruitmentService extends FaroStore {
   enqueue(recipient: string, type: string, id: string, message: string, key: string) {
     this.db.prepare('INSERT OR IGNORE INTO faro_outbox(id,recipient_id,entity_type,entity_id,message,dedupe_key,next_attempt_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(), recipient, type, id, message, key, this.now());
   }
-  event(row: ProcessRow, actor: string | null, kind: string, data: Record<string, unknown>) {
-    const eventId = randomUUID();
-    this.db.prepare('INSERT INTO faro_events(id,process_id,actor_id,kind,data,occurred_at) VALUES(?,?,?,?,?,?)').run(eventId, row.id, actor, kind, JSON.stringify(data), this.now());
-    this.audit(actor, kind, row.id);
-    this.enqueue(row.candidate_id, 'process', row.id, 'W Twojej rekrutacji pojawiła się aktualizacja.', eventId);
-    const recruiters = this.db.prepare('SELECT a.user_id FROM faro_assignments a JOIN faro_offers o ON o.id=a.offer_id JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=o.organization_id WHERE a.offer_id=? AND m.active=1').all(row.offer_id) as Array<{ user_id: string }>;
-    for (const recruiter of recruiters) this.enqueue(recruiter.user_id, 'process', row.id, 'W przypisanej rekrutacji pojawiła się aktualizacja.', eventId);
+  event(row: Pick<ProcessRow,'id'|'candidate_id'|'offer_id'>, actor: string | null, kind: string, data: Record<string, unknown>) {
+    const read=processRecruiterReadQuery(row.offer_id),recipients=this.db.prepare(read.text).all({$1:row.offer_id});
+    for(const query of processEventQueries(row,actor,kind,data,recipients,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value as string|null])));
   }
   interest(userId: string, offerId: string, body: Record<string, unknown>) {
-    return this.commandOnce(userId, body.idempotencyKey, { ...body, offerId }, () => {
-      const offer = this.offers.get(offerId);
-      if (!this.offers.intake(offer)) throw new HttpError(409, 'Oferta nie przyjmuje nowych zgłoszeń.', 'INTAKE_CLOSED');
-      if (integer(body.offerVersion, 1) !== offer.version) throw new HttpError(409, 'Warunki oferty zmieniły się. Sprawdź je ponownie.', 'OFFER_CHANGED');
-      if (body.projectionConfirmed !== true) throw new HttpError(400, 'Potwierdź zakres udostępnianych danych.');
-      if (this.db.prepare("SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=? AND status IN ('INTERESTED','ACTIVE','OFFERED')").get(userId, offerId)) throw new HttpError(409, 'Masz już aktywne zgłoszenie.', 'ACTIVE_INTEREST_EXISTS');
-      const previous=this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=? ORDER BY rowid DESC LIMIT 1').get(userId,offerId) as {id:string}|undefined;
-      if(previous&&(body.previousInterestId!==previous.id||body.renewalConfirmed!==true))throw new HttpError(409,'Potwierdź nowy proces powiązany z poprzednim zgłoszeniem.','RENEWAL_CONFIRMATION_REQUIRED');
-      if(!previous&&body.previousInterestId)throw new HttpError(400,'Nieprawidłowy poprzedni proces.','INVALID_HISTORY_LINK');
-      const preview = new ProfileService(this.database, this.clock).previewConfirmation(userId);
-      if (body.confirmationToken !== preview.confirmationToken) throw new HttpError(409, 'Profil zmienił się lub brakuje potwierdzonego podglądu. Sprawdź dane ponownie.', 'PROFILE_CHANGED');
-      const id = randomUUID(), snapshot = { ...preview.projection, processId: id };
-      const responseDue = new Date(this.clock().getTime() + offer.data.responseHours * 3600000).toISOString();
-      this.db.prepare("INSERT INTO faro_interests(id,candidate_id,offer_id,offer_version,snapshot,status,stage,response_due_at,created_at,previous_interest_id) VALUES(?,?,?,?,?,'INTERESTED','AWAITING_EMPLOYER',?,?,?)").run(id, userId, offerId, offer.version, JSON.stringify(snapshot), responseDue, this.now(),previous?.id??null);
-      this.event(this.row(id), userId, 'INTEREST_CREATED', { offerVersion: offer.version,previousInterestId:previous?.id??null });
-      return { id };
+    return this.commandOnce(userId,body.idempotencyKey,{...body,offerId},()=>{
+      const offer=this.offers.get(offerId),rows=interestReadQueries(userId,offerId).map(query=>this.db.prepare(query.text).all({$1:userId,$2:offerId}));
+      const plan=interestPlan(userId,offer,this.offers.intake(offer),body,rows,()=>new ProfileService(this.database,this.clock).previewConfirmation(userId),this.now());
+      this.db.prepare(plan.query.text).run(Object.fromEntries(plan.query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.event(plan.subject,userId,'INTEREST_CREATED',plan.event);
+      return {id:plan.id};
     });
   }
   view(userId: string, id: string) {

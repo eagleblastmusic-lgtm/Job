@@ -1,12 +1,11 @@
 import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries,organizationInvitePlan,organizationInviteReadQuery,organizationInviteFromRows,organizationExistingMemberQuery,organizationInviteAcceptPlan,organizationRevokeQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
 import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
-import { profileReadQueries,profileFromRows } from './profileReadModel.js';
-import { createHash } from 'node:crypto';
+import { profileReadQueries,profileFromRows,profileProjection,profilePreview } from './profileReadModel.js';
 import { FaroStore } from './base.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
 import { HttpError } from '../http.js';
-import { employerProjection, type Practice, type Availability } from '../../domain/faro/skills.js';
+import { type Practice, type Availability } from '../../domain/faro/skills.js';
 
 export class ProfileService extends FaroStore {
   constraints(userId:string):CandidateConstraints {
@@ -57,14 +56,10 @@ export class ProfileService extends FaroStore {
     });return this.profile(userId);
   }
   projection(userId: string, processId = 'preview') {
-    const p = this.profile(userId);
-    if (!p.firstName) throw new HttpError(400, 'Najpierw zapisz swoje imię w profilu.', 'PROFILE_REQUIRED');
-    return employerProjection(processId, p.firstName, p.claims, p.learning, p.availability);
+    return profileProjection(this.profile(userId),processId);
   }
   previewConfirmation(userId: string) {
-    const projection = this.projection(userId);
-    const confirmationToken = createHash('sha256').update(JSON.stringify({ userId, projection })).digest('hex');
-    return { projection, confirmationToken };
+    return profilePreview(userId,this.profile(userId));
   }
   organizations(userId: string) {
     const query=organizationsReadQuery(userId);
