@@ -1,3 +1,4 @@
+import { assessmentRetryPlan,attemptRetryContextQueries } from './assessmentRetryModel.js';
 import { incidentReportPlan,incidentResolutionPlan,otherActiveAttemptQuery,requireIncidentCandidate } from './assessmentIncidentModel.js';
 import { assessmentAmendmentPlan } from './assessmentAmendmentModel.js';
 import { assessmentInvalidationPlan } from './assessmentInvalidationModel.js';
@@ -13,7 +14,7 @@ import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
-import { text, integer, array, object, date } from './validation.js';
+import { text, integer, array, object } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
@@ -182,21 +183,11 @@ export class AssessmentService extends FaroStore {
     authorize();
     const acknowledgement=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ATTEMPT_RETRY'},()=>{
       const {row,process}=authorize(),incident=this.incident(id);
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
-      if(row.state!=='TECHNICAL_ISSUE'||incident?.state!=='RESOLVED'||incident.resolution!=='ISSUE_CONFIRMED')throw new HttpError(409,'Ponowienie wymaga potwierdzonego problemu technicznego.','RETRY_NOT_ELIGIBLE');
-      if(process.status!=='ACTIVE'||process.stage!=='ACCEPTED_TO_NEXT_STAGE')throw new HttpError(409,'Proces nie pozwala teraz na ponowienie.');
-      if(this.db.prepare('SELECT id FROM faro_attempts WHERE retry_of=?').get(id)||this.db.prepare("SELECT id FROM faro_attempts WHERE process_id=? AND state IN ('INVITED','STARTED','SCORED_PENDING_REVIEW')").get(process.id))throw new HttpError(409,'Istnieje już ponowienie lub aktywna próba.','RETRY_ALREADY_EXISTS');
-      if(this.definition(row.assessment_id,row.assessment_version).state!=='APPROVED')throw new HttpError(409,'Wersja próby nie jest zatwierdzona.');
-      if(this.correctedKey(row.assessment_id,row.assessment_version))throw new HttpError(409,'Skorygowana wersja nie przyjmuje nowych prób. Przygotuj nową zatwierdzoną wersję.','CORRECTED_VERSION_CLOSED');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ponowienie tej samej wersji.','CONFIRMATION_REQUIRED');
-      const reason=text(body.reason,1000,10),deadline=date(body.deadline);
-      if(deadline<=this.now())throw new HttpError(400,'Deadline musi być w przyszłości.');
-      const nextId=randomUUID();
-      this.db.prepare("INSERT INTO faro_attempts(id,process_id,assessment_id,assessment_version,state,deadline,attempt_number,retry_of,retry_reason,retry_authorized_at,retry_authorized_by) VALUES(?,?,?,?,'INVITED',?,?,?,?,?,?)").run(nextId,process.id,row.assessment_id,row.assessment_version,deadline,row.attempt_number+1,id,reason,this.now(),userId);
-      this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_REQUESTED',stage_due_at=?,revision=revision+1 WHERE id=?").run(deadline,process.id);
-      this.recruitment.event(process,userId,'ATTEMPT_RETRY_AUTHORIZED',{attemptId:nextId,previousAttemptId:id});
-      return {id:nextId};
-    });
+      const rows=attemptRetryContextQueries(row).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])))),plan=assessmentRetryPlan(userId,row,process,this.definition(row.assessment_id,row.assessment_version),incident,Boolean(rows[1]?.length),Boolean(rows[2]?.length),Boolean(rows[3]?.length),body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(process,userId,'ATTEMPT_RETRY_AUTHORIZED',plan.event);
+      return plan.ack;
+    },authorize);
     return this.overview(userId,acknowledgement.id);
   }
   overview(userId: string, id: string) {
