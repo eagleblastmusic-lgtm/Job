@@ -62,7 +62,7 @@ export async function proveNativeErasure(db,templateUserId,templateOfferId,templ
  assert.ok(await scalar('SELECT id FROM users WHERE id=$1',[candidate]));
  // Use the unrelated surviving account as recipient to prove process-derived delivery cleanup.
  await db.query("INSERT INTO faro_outbox(id,recipient_id,entity_type,entity_id,message,dedupe_key,next_attempt_at) VALUES($1,$2,'process',$3,'Synthetic delivery',$1,$4)",[randomUUID(),stranger,process,asOf]);
- await db.query("INSERT INTO notifications(id,user_id,entity_type,entity_id,message,created_at) VALUES($1,$2,'process',$3,'Synthetic inbox',$4)",[randomUUID(),stranger,process,asOf]);
+ await db.query("INSERT INTO notifications(id,user_id,notification_type,entity_type,entity_id,message,dedupe_key,created_at,updated_at) VALUES($1,$2,'FOLLOW_UP','process',$3,'Synthetic inbox',$1,$4,$4)",[randomUUID(),stranger,process,asOf]);
  await db.query("INSERT INTO faro_case_explanations(id,case_id,user_id,participant,statement,created_at) VALUES($1,$2,$3,'EMPLOYER','Private surviving statement',$4)",[randomUUID(),caseId,stranger,asOf]);
  await db.query("ALTER TABLE faro_erasure_log ADD CONSTRAINT pg_erasure_guard CHECK(policy_version<>'local-erasure-v1') NOT VALID");
  await assert.rejects(()=>erase(candidate),error=>error.code==='23514');
