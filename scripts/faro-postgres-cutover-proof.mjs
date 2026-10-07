@@ -17,8 +17,8 @@ export async function proveNativeCutover(snapshot,fixture,candidate,process){
   for(let i=0;i<paths.length;i++)assert.deepEqual(await read(paths[i]),baseline[i]);
   const rollback=async()=>{await compare(db,snapshot,schema);target=fixture.base;};
   await rollback();for(let i=0;i<paths.length;i++)assert.deepEqual(await read(paths[i]),baseline[i]);
-  target=native;const profile=await read('/api/faro/profile'),response=await fetch(native+'/api/faro/profile',{method:'PUT',headers:{cookie:candidate.cookie,'content-type':'application/json'},body:JSON.stringify({firstName:'Native cutover write',expectedVersion:profile.version,availability:{kind:'IMMEDIATE'}})});assert.equal(response.status,200);
-  await assert.rejects(rollback,/row\/hash comparison failed/);assert.equal(target,native);assert.equal((await read('/api/faro/profile')).firstName,'Native cutover write');
+  target=native;const profile=await read('/api/faro/profile'),response=await fetch(native+'/api/faro/profile',{method:'PUT',headers:{cookie:candidate.cookie,'content-type':'application/json'},body:JSON.stringify({firstName:'Natalia',expectedVersion:profile.version,availability:{kind:'IMMEDIATE'}})});assert.equal(response.status,200);
+  await assert.rejects(rollback,/row\/hash comparison failed/);assert.equal(target,native);assert.equal((await read('/api/faro/profile')).firstName,'Natalia');
   const original=await fixture.request('/api/faro/profile',candidate.cookie);assert.equal(original.firstName,profile.firstName);
   console.log('FARO_POSTGRES_CUTOVER_PASS read parity, read-only rollback, stale-source rollback refusal after native write; synthetic only.');
  }finally{
