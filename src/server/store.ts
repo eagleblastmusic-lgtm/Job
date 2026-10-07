@@ -1,4 +1,5 @@
-import { randomUUID, createHash } from 'node:crypto';
+import { acceptedStageQuery,stageConsentQuery,pairStagePlan } from './faro/stageAnalytics.js';
+import { randomUUID } from 'node:crypto';
 import { PrivacyService } from './faro/privacyService.js';
 import { MfaService } from './faro/mfaService.js';
 import type { AppConfig } from './config.js';
@@ -309,18 +310,14 @@ export class AppStore {
   }
   /** Candidate acceptance of pinned human offer terms, not verified employment commencement. */
   faroOfferAccepted(processId:string):boolean {
-    const source=this.db.prepare("SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interests p JOIN faro_events e ON e.process_id=p.id JOIN faro_events o ON o.process_id=p.id JOIN faro_offer_versions v ON v.offer_id=p.offer_id AND v.version=json_extract(e.data,'$.employmentOffer.sourceVersion') WHERE p.id=? AND p.status='HIRED' AND e.kind='ACCEPT_OFFER' AND e.actor_id=p.candidate_id AND o.kind='OFFER' AND o.actor_id<>p.candidate_id AND json_extract(e.data,'$.stage')='TERMINAL' AND json_extract(e.data,'$.employmentOffer.revision') IS NOT NULL AND json_extract(e.data,'$.employmentOffer')=json_extract(o.data,'$.employmentOffer') AND v.publication_proof<>'NONE' ORDER BY e.occurred_at DESC,e.rowid DESC LIMIT 1").get(processId) as {candidate_id:string;offer_id:string;occurred_at:string}|undefined;
+    const query=acceptedStageQuery(processId),source=this.db.prepare(query.text).get({$1:processId}) as {candidate_id:string;offer_id:string;occurred_at:string}|undefined;
     return this.faroPairStage(source,'OFFER_ACCEPTED');
   }
   private faroPairStage(source:{candidate_id:string;offer_id:string;occurred_at:string}|undefined,stage:'INTERVIEW_COMPLETED'|'OFFER_ACCEPTED'):boolean {
     if(!source)return false;
-    const consent=this.db.prepare("SELECT granted,created_at FROM consents WHERE user_id=? AND consent_type='ANALYTICS' ORDER BY created_at DESC,rowid DESC LIMIT 1").get(source.candidate_id) as {granted:number;created_at:string}|undefined;
-    if(consent?.granted!==1||consent.created_at>source.occurred_at)return false;
-    const week=new Date(source.occurred_at);if(!Number.isFinite(week.getTime()))return false;
-    week.setUTCDate(week.getUTCDate()-(week.getUTCDay()+6)%7);week.setUTCHours(0,0,0,0);
-    const weekStart=week.toISOString(),definitionVersion='faro-mutual-stage-pair-week-v2',dedupeNamespace='faro-mutual-stage-pair-week-v1';
-    const id=createHash('sha256').update(JSON.stringify([dedupeNamespace,source.candidate_id,source.offer_id,weekStart])).digest('hex');
-    return Number(this.db.prepare("INSERT OR IGNORE INTO analytics_events(id,user_id,event_name,properties,created_at) VALUES(?,?,'FARO_MUTUAL_STAGE_COMPLETED',?,?)").run(id,source.candidate_id,JSON.stringify({definitionVersion,weekStart,stage}),source.occurred_at).changes)===1;
+    const read=stageConsentQuery(source.candidate_id),consent=this.db.prepare(read.text).get({$1:source.candidate_id}),plan=pairStagePlan(source,consent,stage);
+    if(!plan)return false;
+    return Number(this.db.prepare(plan.text).run(Object.fromEntries(plan.values.map((value,index)=>[`$${index+1}`,value]))).changes)===1;
   }
 
   audit(userId: string | null, action: string, entityType: string | null, entityId: string | null, metadata: Record<string, unknown> = {}): void {
