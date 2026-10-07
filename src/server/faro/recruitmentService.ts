@@ -1,3 +1,5 @@
+import { processReadQuery,processFromRows,processContextReadQueries,processViewFromRows,processLatestDataQuery,processClarificationFromRows,processEmploymentFromRows,type ProcessRow } from './processReadModel.js';
+export type { ProcessRow } from './processReadModel.js';
 import { interestReadQueries,interestPlan,processRecruiterReadQuery,processEventQueries } from './interestWriteModel.js';
 import { commandRequest,commandReadQuery,commandReplay,commandSaveQuery } from './commandJournal.js';
 import { AppStore } from '../store.js';
@@ -7,21 +9,12 @@ import { ProfileService } from './profileService.js';
 import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
 import { text, integer, choice, date, object } from './validation.js';
-import { transition, COMMANDS, REJECTION_REASONS, TERMINAL, type InterestStatus, type Stage } from '../../domain/faro/recruitment.js';
-import { materialDiff } from '../../domain/faro/offers.js';
-import type { employerProjection } from '../../domain/faro/skills.js';
+import { transition, COMMANDS, REJECTION_REASONS, TERMINAL, type Stage } from '../../domain/faro/recruitment.js';
 import { LEVELS, SOURCES, skillById } from '../../domain/faro/skills.js';
-export interface ProcessRow {
-  id: string; candidate_id: string; offer_id: string; offer_version: number; snapshot: string;
-  previous_interest_id:string|null;
-  status: InterestStatus; stage: Stage; revision: number; response_due_at: string; first_response_at: string | null;
-  stage_due_at: string | null; next_action: string | null; reason: string | null; created_at: string;
-}
 export class RecruitmentService extends FaroStore {
   get offers() { return new OfferService(this.database, this.clock); }
   row(id: string) {
-    const row = this.db.prepare('SELECT * FROM faro_interests WHERE id=?').get(id) as unknown as ProcessRow | undefined;
-    if (!row) throw new HttpError(404, 'Nie znaleziono procesu.', 'NOT_FOUND'); return row;
+    const query=processReadQuery(id);return processFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   authorize(userId: string, id: string) {
     const row = this.row(id);
@@ -55,27 +48,9 @@ export class RecruitmentService extends FaroStore {
     });
   }
   view(userId: string, id: string) {
-    const row = this.authorize(userId, id), candidate = row.candidate_id === userId;
-    const offer = candidate?this.offers.published(row.offer_id):this.offers.get(row.offer_id);
-    const events = (this.db.prepare('SELECT kind,data,occurred_at FROM faro_events WHERE process_id=? ORDER BY occurred_at,rowid').all(id) as Array<{kind:string;data:string;occurred_at:string}>).map(event=>{
-      if(event.kind!=='ANSWER')return event;
-      const data=JSON.parse(event.data) as Record<string,unknown>;
-      // Historical free-form candidate answers never cross the employer API boundary.
-      delete data.action;
-      return {...event,data:JSON.stringify(data)};
-    });
-    const last=this.db.prepare('SELECT kind FROM faro_events WHERE process_id=? ORDER BY rowid DESC LIMIT 1').get(id) as {kind:string}|undefined;
-    const grant = this.db.prepare('SELECT granted_at,revoked_at FROM faro_contact_grants WHERE process_id=?').get(id) ?? null;
-    return { id, previousInterestId:row.previous_interest_id, offerId: row.offer_id, offerVersion: row.offer_version, role: offer.data.role, company: offer.company, status: row.status, stage: row.stage, revision: row.revision,
-      responseDueAt: row.response_due_at, firstResponseAt: row.first_response_at, stageDueAt: row.stage_due_at, nextAction: last?.kind==='ANSWER'?'Kandydat odpowiedział. Firma sprawdzi deklarację i przekaże kolejny krok.':row.next_action,
-      clarification:this.clarification(row.id),
-      employmentOffer:this.employmentOffer(row.id),
-      employmentSource:this.offers.published(row.offer_id),
-      availableCommands:COMMANDS.filter(command=>transition(row.status,row.stage,candidate?'CANDIDATE':'EMPLOYER',command)||(!candidate&&command==='CLARIFY'&&row.stage==='CLARIFICATION_REQUESTED'&&!this.clarification(row.id))),
-      reason: row.reason ? JSON.parse(row.reason) as Record<string, unknown> : null, createdAt: row.created_at,
-      projection: JSON.parse(row.snapshot) as ReturnType<typeof employerProjection>, events, contactGrant: grant, viewer: candidate ? 'CANDIDATE' : 'EMPLOYER',
-      requirements: this.offers.version(row.offer_id, row.offer_version).requirements,
-      changes: materialDiff(this.offers.version(row.offer_id, row.offer_version), offer.data) };
+    const row=this.authorize(userId,id),candidate=row.candidate_id===userId,source=this.offers.published(row.offer_id),offer=candidate?source:this.offers.get(row.offer_id);
+    const rows=processContextReadQueries(row).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));
+    return processViewFromRows(row,candidate,offer,source,rows);
   }
   list(userId: string, offerId?: string) {
     if (offerId) this.offers.assigned(userId, offerId);
@@ -156,8 +131,7 @@ export class RecruitmentService extends FaroStore {
     });
   }
   employmentOffer(id:string):{revision:number;sourceVersion:number;salaryIndex:number;amount:number;startsAt:string;responseDueAt:string;conditions:ReturnType<OfferService['version']>}|null {
-    const event=this.db.prepare("SELECT data FROM faro_events WHERE process_id=? AND kind='OFFER' ORDER BY rowid DESC LIMIT 1").get(id) as {data:string}|undefined;
-    return event?(JSON.parse(event.data) as {employmentOffer?:ReturnType<RecruitmentService['employmentOffer']>}).employmentOffer??null:null;
+    const query=processLatestDataQuery(id,'OFFER');return processEmploymentFromRows(this.db.prepare(query.text).all({$1:id,$2:'OFFER'}));
   }
   cancelObligations(id:string) {
     this.db.prepare('UPDATE faro_contact_grants SET revoked_at=COALESCE(revoked_at,?) WHERE process_id=?').run(this.now(),id);
@@ -165,8 +139,7 @@ export class RecruitmentService extends FaroStore {
     this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE process_id=? AND state IN ('PROPOSED','CONFIRMED')").run(id);
   }
   clarification(id:string):{topic:'REQUIREMENT'|'AVAILABILITY';requirementId:string|null;skillId:string|null;previousStage:Stage}|null {
-    const latest=this.db.prepare("SELECT data FROM faro_events WHERE process_id=? AND kind='CLARIFY' ORDER BY rowid DESC LIMIT 1").get(id) as {data:string}|undefined;
-    return latest?(JSON.parse(latest.data) as {question?:ReturnType<RecruitmentService['clarification']>}).question??null:null;
+    const query=processLatestDataQuery(id,'CLARIFY');return processClarificationFromRows(this.db.prepare(query.text).all({$1:id,$2:'CLARIFY'}));
   }
   watch(userId: string, offerId: string, watching: boolean) {
     return this.transaction(()=>{

@@ -1,0 +1,11 @@
+# CP11-AB — Shared private process view/context (2026-10-07)
+
+Existing RecruitmentService.row/view/clarification/employmentOffer and OfferService.version consume shared explicit native queries and response mapping used by actual PostgreSQL staging. Candidate viewers use proven published conditions; assigned active members retain current conditions. Read access checks current membership and assignment in the owned PostgreSQL SERIALIZABLE READ ONLY snapshot, with opaque missing/foreign/revoked refusal. Pinned requirements, immutable minimized projection, previous process link, original response/first/stage clocks, events, contact-grant timestamps and native availableCommands remain unchanged.
+
+Explicit columns exclude target import-order metadata. Event chronology keeps occurred_at/insertion tie order, while latest event/clarification/employment terms keep insertion-order semantics using SQLite rowid or existing reviewed target identity. Historical ANSWER data.action is removed from both wire views, and an insertion-latest ANSWER controls the existing generic next action even with backdated occurred_at. No private phone/contact data or mutable profile lookup is added to the frozen projection.
+
+Actual PostgreSQL18 Node22/24 must prove candidate/employer wire parity, missing/foreign/revoked refusal, preserved candidate history after employer revocation, and real historical backdated ANSWER fixture with no free-text action leak, correct chronology, insertion-latest generic next action and unchanged pinned projection/version. Temporary fixture is removed before the unchanged70-table hash comparison. Previous native interest/journal/offer/profile/organization/privacy/recovery proof remains required.
+
+Full local application and actual PostgreSQL acceptance pending. Runtime SQLite; native async process transitions, assessment/interview/auth/privacy/worker/target recovery/operator cutover and external acceptance remain open. Whole CP11/master plan/release PARTIAL.
+
+CP11-AB full local npm run check PASS155 Node/35 migrations/both actual restore drills/38 desktop/mobile browser executions/lint/typecheck, zero skips; source-only70/35 and diff-check PASS. Exact real PostgreSQL and remote acceptance pending.
