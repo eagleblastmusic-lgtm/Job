@@ -10,7 +10,7 @@ export function attemptExpiryQueries(row:AttemptRow,process:ProcessRow,decisionH
  const queries:Array<{text:string;values:readonly string[]}>=[{text:"UPDATE faro_attempts SET state='EXPIRED',revision=revision+1 WHERE id=$1",values:[row.id]}];
  if(!TERMINAL.includes(process.status)&&process.stage==='ASSESSMENT_REQUESTED'){
   if(decisionHours===null)throw new HttpError(404,'Nie znaleziono wersji oferty.');
-  const dueAt=new Date(Date.parse(asOf)+decisionHours*3600000).toISOString();queries.push({text:"UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=$1,next_action=$2,revision=revision+1 WHERE id=$3",values:[dueAt,'Termin assessmentu upĹ‚ynÄ…Ĺ‚. Ustal kolejny krok; brak automatycznej odmowy.',process.id]});
+  const dueAt=new Date(Date.parse(asOf)+decisionHours*3600000).toISOString();queries.push({text:"UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=$1,next_action=$2,revision=revision+1 WHERE id=$3",values:[dueAt,'Termin assessmentu upłynął. Ustal kolejny krok; brak automatycznej odmowy.',process.id]});
  }
  return queries;
 }

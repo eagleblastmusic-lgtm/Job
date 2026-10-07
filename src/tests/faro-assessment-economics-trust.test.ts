@@ -385,7 +385,7 @@ test('idle assessment expiry is server driven and neutral; started expiry retain
     new TrustService(f.app.db,()=>future).tick();
     const expired=late.row(attempt.id),p=late.recruitment.row(f.interest.id);
     assert.equal(expired.state,'EXPIRED');assert.equal(expired.answers,'{"task-1":1}');assert.equal(expired.result,null);
-    assert.equal(p.status,'ACTIVE');assert.equal(p.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(p.first_response_at,first);assert.ok(p.stage_due_at!>future.toISOString());
+    assert.equal(p.status,'ACTIVE');assert.equal(p.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(p.first_response_at,first);assert.ok(p.stage_due_at!>future.toISOString());assert.equal(p.next_action,'Termin assessmentu upłynął. Ustal kolejny krok; brak automatycznej odmowy.');
     assert.throws(()=>late.start(f.candidate.id,attempt.id),/nie jest już aktywne/);
     assert.throws(()=>late.save(f.candidate.id,attempt.id,{expectedVersion:expired.revision,answers:{'task-1':0}},true),/upłynął/);
     assert.equal(late.row(attempt.id).answers,expired.answers);
