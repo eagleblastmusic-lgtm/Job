@@ -472,3 +472,8 @@ BM source-only rehearsal PASS70 tables/35 migrations; script syntax and git diff
 [Scope](CP11_BN_POSTGRES_HTTP_RUNTIME.md). One awaited route contract, owned native identity/MFA checks, auth/account/private export and worker runtime. Initial local full check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; final follow-up verification and actual HTTP/PostgreSQL acceptance pending. Corrected BM cd15634 FARO37665201228/CI37665201181 SUCCESS. SQLite remains default; native physical upload disposal fails closed, native browser/cutover/recovery/production and external gates remain open. Whole plan/release PARTIAL; continue.
 
 BN final full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 desktop-mobile browsers. Source-only PASS70/35; script syntax and diff PASS. Actual HTTP/PostgreSQL acceptance pending; continue native browser and durable file disposal.
+
+
+## CP11-BO — PostgreSQL browser acceptance, 2026-10-07
+
+[Scope](CP11_BO_POSTGRES_BROWSER_ACCEPTANCE.md). Reused existing candidate/employer and privacy scenarios against native HTTP/PostgreSQL, desktop/mobile Node22/24. Local reuse PASS4, typecheck/lint/syntax/diff PASS; actual PostgreSQL acceptance pending. BN container dependency corrected5095dee, native HTTP requires continued remediation. Whole plan/release PARTIAL; continue file disposal/recovery/cutover.

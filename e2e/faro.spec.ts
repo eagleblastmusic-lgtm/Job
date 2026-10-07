@@ -1,3 +1,4 @@
+import { faroPgFixture } from '../src/tests/faro-pg-fixture.js';
 import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
@@ -13,12 +14,12 @@ async function login(page: Page, base: string, email: string) {
   await expect(page.locator('#f-content')).toHaveAttribute('aria-busy', 'false');
 }
 test('Faro real candidate and employer process, private watch, economics and responsive workspace', async ({ page }, info) => {
-  const f = await faroFixture(); f.app.config.appOrigin = f.base;
+  const f = process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture(); f.app.config.appOrigin = f.base;
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   const retired: string[] = []; page.on('request', r => { if (/\/api\/(cv|career-truth|billing|applications|job-search)/.test(r.url())) retired.push(r.url()); });
   try {
     const employer = await f.user('BrowserEmployer'), candidate = await f.user('BrowserCandidate'), admin = await f.user('BrowserAdmin');
-    f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE users SET role='ADMIN' WHERE id=$1",[admin.id]);else f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
     const org = await f.request<{ id: string }>('/api/faro/organizations', employer.cookie, 'POST', { name: 'Faro test · Pracownia' }, 201);
     await f.request(`/api/faro/organizations/${org.id}/verify`, admin.cookie, 'POST', { note: 'Synthetic browser fixture verification' });
     const draft = await f.request<{ id: string }>(`/api/faro/organizations/${org.id}/offers`, employer.cookie, 'POST', offerInput(employer.id), 201);
@@ -244,7 +245,7 @@ test('case workspace supports private explanations from both sides, independent 
 });
 
 test('privacy workspace exports own data and requires reauthentication before erasure',async({page})=>{
-  const f=await faroFixture(); f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture(); f.app.config.appOrigin=f.base;
   try{
     const candidate=await f.user('PrivacyBrowser');
     await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',availability:{kind:'IMMEDIATE'},expectedVersion:0});
