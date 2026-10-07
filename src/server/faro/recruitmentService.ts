@@ -1,3 +1,4 @@
+import { watchReadQuery,watchApplicantQuery,watchListQuery,watchStateQuery,watchAlertPlan,watchCancelQueries } from './watchModel.js';
 import { processChangePlan,processCancelQueries } from './processWriteModel.js';
 import { processReadQuery,processListReadQuery,processFromRows,processContextReadQueries,processViewFromRows,processLatestDataQuery,processClarificationFromRows,processEmploymentFromRows,type ProcessRow } from './processReadModel.js';
 export type { ProcessRow } from './processReadModel.js';
@@ -84,28 +85,27 @@ export class RecruitmentService extends FaroStore {
     return this.transaction(()=>{
     if (watching) {
       const offer = this.offers.get(offerId); if (!this.offers.intake(offer)) throw new HttpError(409, 'Możesz obserwować aktywną ofertę.');
-      this.db.prepare('INSERT OR IGNORE INTO faro_watches(candidate_id,offer_id,created_at) VALUES(?,?,?)').run(userId, offerId, this.now());
-    } else {this.db.prepare('DELETE FROM faro_watches WHERE candidate_id=? AND offer_id=?').run(userId, offerId);this.cancelWatchAlerts(userId,offerId);}
+    }
+    const query=watchStateQuery(userId,offerId,watching,this.now());this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+    if(!watching)this.cancelWatchAlerts(userId,offerId);
     return { watching };
     });
   }
   cancelWatchAlerts(userId:string,offerId:string) {
-    this.db.prepare("DELETE FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=? AND status='PENDING' AND dedupe_key LIKE '%:closing-soon'").run(userId,offerId);
-    // Applicant updates are independent of an optional watch preference.
-    if(!this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? AND offer_id=?').get(userId,offerId))this.db.prepare("DELETE FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=? AND status='PENDING'").run(userId,offerId);
+    const read=watchApplicantQuery(userId,offerId),applicant=Boolean(this.db.prepare(read.text).get({$1:userId,$2:offerId}));
+    for(const query of watchCancelQueries(userId,offerId,applicant))this.db.prepare(query.text).run({$1:userId,$2:offerId});
   }
   watchSettings(userId:string,offerId:string,body:Record<string,unknown>) {
     if(typeof body.alerts!=='boolean')throw new HttpError(400,'Wybierz, czy chcesz otrzymywać alerty.');
     return this.transaction(()=>{
-      const watch=this.db.prepare('SELECT alerts FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(userId,offerId);
-      if(!watch)throw new HttpError(404,'Nie znaleziono obserwowanej oferty.');
-      this.db.prepare('UPDATE faro_watches SET alerts=? WHERE candidate_id=? AND offer_id=?').run(body.alerts?1:0,userId,offerId);
-      if(!body.alerts)this.cancelWatchAlerts(userId,offerId);
-      return {watching:true,alerts:body.alerts};
+      const read=watchReadQuery(userId,offerId),watch=this.db.prepare(read.text).get({$1:userId,$2:offerId}),plan=watchAlertPlan(userId,offerId,body,watch);
+      this.db.prepare(plan.query.text).run(Object.fromEntries(plan.query.values.map((value,index)=>[`$${index+1}`,value])));
+      if(!plan.alerts)this.cancelWatchAlerts(userId,offerId);
+      return {watching:true,alerts:plan.alerts};
     });
   }
   watches(userId: string) {
-    const rows = this.db.prepare('SELECT offer_id,alerts FROM faro_watches WHERE candidate_id=? ORDER BY created_at DESC').all(userId) as Array<{ offer_id: string;alerts:number }>;
+    const read=watchListQuery(userId),rows=this.db.prepare(read.text).all({$1:userId}) as Array<{ offer_id: string;alerts:number }>;
     return rows.flatMap(row=>{
       try {return [{...this.offers.published(row.offer_id),watchAlerts:row.alerts===1}];}
       catch(error){if(error instanceof HttpError&&error.code==='PUBLICATION_NOT_FOUND')return [];throw error;}
