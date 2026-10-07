@@ -3,6 +3,8 @@ import { test, expect, type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
 import { faroFixture, offerInput } from '../src/tests/faro-fixture.js';
+import { proposeInterview } from '../src/server/faro/interviewProposalModel.js';
+import { changeInterviewSchedule } from '../src/server/faro/interviewScheduleModel.js';
 import { InterviewService } from '../src/server/faro/interviewService.js';
 
 async function login(page: Page, base: string, email: string) {
@@ -169,11 +171,11 @@ test('Faro real candidate and employer process, private watch, economics and res
 });
 
 test('clarification workspace shares only structured declarations and keeps profile snapshot unchanged',async({page})=>{
-  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   try {
     const employer=await f.user('ClarifyEmployer'),candidate=await f.user('ClarifyCandidate');
     const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Rozmowa o kompetencjach'},201);
-    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);else f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
     await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
     const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
     await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});
@@ -209,12 +211,12 @@ test('clarification workspace shares only structured declarations and keeps prof
 });
 
 test('case workspace supports private explanations from both sides, independent review and candidate appeal',async({page})=>{
-  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   try {
     const employer=await f.user('CaseBrowserEmployer'),candidate=await f.user('CaseBrowserCandidate'),admin=await f.user('CaseBrowserModerator');
-    f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE users SET role='ADMIN' WHERE id=$1",[admin.id]);else f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(admin.id);
     const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Sprawa po rozmowie'},201);
-    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);else f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
     await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
     const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
     await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
@@ -222,9 +224,11 @@ test('case workspace supports private explanations from both sides, independent 
     const p=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'case-browser-interest'},201);
     await f.request(`/api/faro/processes/${p.id}/commands`,employer.cookie,'POST',{command:'ADVANCE',nextAction:'Uzgodnijmy rozmowę',dueAt:new Date(Date.now()+86400000).toISOString(),expectedVersion:1,idempotencyKey:'case-browser-advance'});
     // A controlled fixture clock reaches the meeting outcome without a wall-clock sleep.
-    const now=Date.now(),interviews=new InterviewService(f.app.db,()=>new Date(now-3*3600000));
-    const meeting=interviews.propose(employer.id,p.id,{startsAt:new Date(now-2*3600000).toISOString(),endsAt:new Date(now-3600000).toISOString(),confirmBy:new Date(now-2.5*3600000).toISOString(),timezone:'Europe/Warsaw',location:'Online',confirmed:true,expectedVersion:2,idempotencyKey:'case-browser-propose'});
-    interviews.change(candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'case-browser-confirm'});
+    const now=Date.now(),asOf=new Date(now-3*3600000).toISOString();
+    const proposal={startsAt:new Date(now-2*3600000).toISOString(),endsAt:new Date(now-3600000).toISOString(),confirmBy:new Date(now-2.5*3600000).toISOString(),timezone:'Europe/Warsaw',location:'Online',confirmed:true,expectedVersion:2,idempotencyKey:'case-browser-propose'};
+    const meeting='query' in f.app.db?await proposeInterview(f.app.db,employer.id,p.id,proposal,asOf,()=>{}):new InterviewService(f.app.db,()=>new Date(asOf)).propose(employer.id,p.id,proposal);
+    const confirmation={command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'case-browser-confirm'};
+    if('query' in f.app.db)await changeInterviewSchedule(f.app.db,candidate.id,meeting.id,confirmation,asOf,()=>{});else new InterviewService(f.app.db,()=>new Date(asOf)).change(candidate.id,meeting.id,confirmation);
     await f.request(`/api/faro/interviews/${meeting.id}`,employer.cookie,'POST',{command:'DISPUTE',reason:'NO_SHOW',confirmed:true,expectedVersion:2,processVersion:4,idempotencyKey:'case-browser-dispute'});
     await login(page,f.base,candidate.email);await page.getByRole('link',{name:'Zgłoszenia',exact:true}).click();
     const explanation=page.locator('[data-form=case-explain]');await explanation.locator('[name=statement]').fill('Prywatna informacja medyczna kandydata.');await explanation.getByRole('button',{name:'Przekaż wyjaśnienie'}).click();
@@ -272,11 +276,11 @@ test('privacy workspace exports own data and requires reauthentication before er
 });
 
 test('Faro assessment assignment and reviewed result through real workspace',async({page})=>{
-  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   try {
     const employer=await f.user('QuizEmployer'),candidate=await f.user('QuizCandidate');
     const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Pracownia quizu'},201);
-    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);else f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
     await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
     const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',offerInput(employer.id),201);
     await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});
@@ -381,11 +385,11 @@ test('Faro assessment assignment and reviewed result through real workspace',asy
 });
 
 test('Faro preserves additional salary variants during edit and compares the selected economics basis',async({page})=>{
-  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   try {
     const employer=await f.user('SalaryEmployer'),candidate=await f.user('SalaryCandidate');
     const org=await f.request<{id:string}>('/api/faro/organizations',employer.cookie,'POST',{name:'Warianty wynagrodzenia'},201);
-    f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);else f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
     const input=offerInput(employer.id),second={...input.salary[0]!,contract:'B2B',basis:'B2B_NET_INVOICE_EXCL_VAT',min:7500,max:9000,period:'HOUR',hoursPerPeriod:1};
     const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,employer.cookie,'POST',{...input,salary:[input.salary[0],second]},201);
     await f.request(`/api/faro/offers/${offer.id}/lifecycle`,employer.cookie,'POST',{action:'REVIEW',expectedVersion:1});

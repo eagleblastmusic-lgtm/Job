@@ -1083,3 +1083,8 @@ BQ full local check PASS170 Node/36 migrations/lint/typecheck/both restores/38 d
 
 
 CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PASS; syntax/diff PASS. BQ0ffd608 FARO37670340034 and CI37670339981 SUCCESS. BR valid-name fixture corrected ed7130e; actual cutover and BS native acceptance pending. Production custody and external gates remain open.
+
+
+## CP11-BT — Enlarged PostgreSQL workspace browser acceptance
+
+[Scope](CP11_BT_POSTGRES_WORKSPACE_MATRIX.md). Existing six workspace plus employment/session desktop/mobile scenarios reuse native runtime (16 cases per Node22/24). Local full browsers38/follow-up4/typecheck/lint/diff PASS; actual enlarged matrix pending. BS1266fc2 FARO37671648181 SUCCESS; CI pending. Default SQLite, production/external gates open; whole plan/release PARTIAL; continue.

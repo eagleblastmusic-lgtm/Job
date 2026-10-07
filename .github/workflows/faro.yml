@@ -107,8 +107,8 @@ jobs:
           FARO_PG_REHEARSAL_URL: postgres://faro_test:synthetic-ci-only@127.0.0.1:5432/faro_test
       - name: Install real Chromium for PostgreSQL browser acceptance
         run: npx playwright install --with-deps chromium
-      - name: Existing candidate/employer and privacy browser contracts on PostgreSQL, desktop/mobile
-        run: npx playwright test e2e/faro.spec.ts --grep "Faro real candidate and employer process|privacy workspace exports own data"
+      - name: All existing canonical workspace browser contracts on PostgreSQL, desktop/mobile
+        run: npx playwright test e2e/faro.spec.ts e2e/faro-employment.spec.ts e2e/faro-session.spec.ts
         env:
           FARO_PG_BROWSER: '1'
           FARO_PG_REHEARSAL_URL: postgres://faro_test:synthetic-ci-only@127.0.0.1:5432/faro_test

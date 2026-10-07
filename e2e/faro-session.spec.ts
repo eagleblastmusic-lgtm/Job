@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
+import { faroPgFixture } from '../src/tests/faro-pg-fixture.js';
 import { faroFixture } from '../src/tests/faro-fixture.js';
 
 test('Canonical offline retry and real expired session clear private workspace without replaying writes',async({page,context})=>{
-  const f=await faroFixture();f.app.config.appOrigin=f.base;
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   try {
     const candidate=await f.user('SessionBoundary');
@@ -43,7 +44,7 @@ test('Canonical offline retry and real expired session clear private workspace w
     expect(cached).toContain('/');
     expect(cached.some(path=>path.startsWith('/api/'))).toBe(false);
     // Expire the actual session row used by Chromium, not a mocked 401.
-    f.app.db.db.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00.000Z' WHERE user_id=?").run(candidate.id);
+    if('query' in f.app.db)await f.app.db.query("UPDATE sessions SET expires_at='2000-01-01T00:00:00.000Z' WHERE user_id=$1",[candidate.id]);else f.app.db.db.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00.000Z' WHERE user_id=?").run(candidate.id);
     await page.getByRole('link',{name:'Moje procesy',exact:true}).click();
     await expect(page.locator('#loginForm')).toBeVisible();
     await expect(page.locator('#authMessage')).toHaveText('Sesja wygasła. Zaloguj się ponownie.');
