@@ -119,6 +119,10 @@ test('human amendment preserves pinned original evidence, missing answers and te
     await f.request(path,f.employer.cookie,'POST',{...body,processVersion:1},409);
     for(const scores of [{'task-1':3,'task-2':null},{'task-1':1.5,'task-2':null},{'task-1':1,'task-2':0},{'task-1':1},{'task-1':1,'task-2':null,extra:0}])await f.request(path,f.employer.cookie,'POST',{...body,scores},400);
     assert.equal(s.resultHistory(a.id).length,1);
+    const amendmentHistoryBefore=s.resultHistory(a.id);
+    f.app.db.db.exec("CREATE TRIGGER amendment_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'amendment delivery failed'); END");
+    await f.request(path,f.employer.cookie,'POST',body,500);assert.deepEqual({...s.row(a.id)},original);assert.deepEqual(s.resultHistory(a.id),amendmentHistoryBefore);assert.deepEqual({...s.recruitment.row(f.interest.id)},process);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,body.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER amendment_delivery_failure');
     const updated=await f.request<ReturnType<AssessmentService['overview']>>(path,f.employer.cookie,'POST',body);
     assert.equal(updated.result!.earned,1);assert.equal(updated.result!.possible,5);assert.equal(updated.result!.unanswered,1);assert.equal(updated.result!.review,'AMENDED');
     assert.deepEqual({...s.row(a.id)},{...original,revision:original.revision+1});assert.deepEqual({...s.definition(d.id,1)},definition);assert.deepEqual({...s.recruitment.row(f.interest.id)},process);

@@ -1,3 +1,4 @@
+import { assessmentAmendmentPlan } from './assessmentAmendmentModel.js';
 import { assessmentInvalidationPlan } from './assessmentInvalidationModel.js';
 import { assessmentFinalizeQueries } from './assessmentReviewModel.js';
 import { attemptAnswerQueries } from './assessmentAnswerModel.js';
@@ -276,22 +277,11 @@ export class AssessmentService extends FaroStore {
     authorize();
     const ack=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_AMEND'},()=>{
       authorize();const row=this.row(id),process=this.recruitment.row(row.process_id),previous=this.resultHistory(id).at(-1);
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
-      if(row.state!=='FINALIZED'||previous?.validity!=='VALID')throw new HttpError(409,'Korekta wymaga aktualnego zatwierdzonego wyniku.','RESULT_NOT_VALID');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź indywidualną korektę z zachowaniem historii.','CONFIRMATION_REQUIRED');
-      const reason=text(body.reason,1000,10),definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition,answers=JSON.parse(row.answers) as Record<string,number>,scores=object(body.scores);
-      if(Object.keys(scores).length!==definition.tasks.length||Object.keys(scores).some(key=>!definition.tasks.some(t=>t.id===key)))throw new HttpError(400,'Podaj ocenę każdego zadania przypisanej wersji.');
-      const breakdown=definition.tasks.map(task=>{
-        if(answers[task.id]===undefined) {if(scores[task.id]!==null)throw new HttpError(400,'Brak odpowiedzi pozostaje odrębny od zera punktów.');return {taskId:task.id,earned:null,possible:task.points};}
-        return {taskId:task.id,earned:integer(scores[task.id],0,task.points),possible:task.points};
-      });
-      const result={...previous.result,breakdown,earned:breakdown.reduce((sum,t)=>sum+(t.earned??0),0),possible:breakdown.reduce((sum,t)=>sum+t.possible,0),unanswered:breakdown.filter(t=>t.earned===null).length,assessmentVersion:row.assessment_version,rubricVersion:definition.rubricVersion,review:'AMENDED',reviewNote:reason,comparisonStatus:'INDIVIDUAL_HUMAN_AMENDMENT',scoringRevision:null};
-      if(JSON.stringify(previous.result.breakdown)===JSON.stringify(breakdown))throw new HttpError(409,'Punkty nie zmieniły się.');
-      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'VALID',?,'HUMAN_AMENDMENT',?,?)").run(id,previous.revision+1,JSON.stringify(result),reason,this.now());
-      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
-      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_AMENDED',{attemptId:id,resultRevision:previous.revision+1});
+      const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition,plan=assessmentAmendmentPlan(row,process,definition,previous,body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_AMENDED',plan.event);
       return {id};
-    });
+    },authorize);
     return this.overview(userId,ack.id);
   }
 
