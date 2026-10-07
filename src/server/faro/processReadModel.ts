@@ -39,11 +39,23 @@ interface ProcessReadDatabase {
   readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;
   transaction<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean}):Promise<T>;
 }
-export async function readProcessView(database:ProcessReadDatabase,userId:string,id:string,asOf:string) {
-  return database.transaction(async()=>{
+async function processViewOwned(database:ProcessReadDatabase,userId:string,id:string,asOf:string) {
     const row=processFromRows((await database.readBatch([processReadQuery(id)]))[0]??[]),candidate=row.candidate_id===userId,current=offerFromRows((await database.readBatch([offerReadQuery(row.offer_id)]))[0]??[]);
     if(!candidate){const access=await database.readBatch([membershipReadQuery(userId,current.organizationId),offerAssignedReadQuery(userId,row.offer_id)]);membershipFromRows(access[0]??[]);requireOfferAssignment(access[1]??[]);}
     const publication=await database.readBatch([publishedReadQuery(row.offer_id),...intakeReadQueries(current)]),source=publishedFromRows(current,publication[0]??[],intakeFromRows(current,publication.slice(1),asOf));
     return processViewFromRows(row,candidate,candidate?source:current,source,await database.readBatch(processContextReadQueries(row,true)));
+}
+export async function readProcessView(database:ProcessReadDatabase,userId:string,id:string,asOf:string) {
+  return database.transaction(()=>processViewOwned(database,userId,id,asOf),{readOnly:true});
+}
+export function processListReadQuery(userId:string,offerId?:string,postgres=false) {
+  return {text:`SELECT id FROM faro_interests WHERE ${offerId?'offer_id':'candidate_id'}=$1 ORDER BY created_at ${offerId?'ASC':'DESC'},${postgres?'__faro_source_rowid':'rowid'} ASC`,values:[offerId||userId]};
+}
+export async function readProcessList(database:ProcessReadDatabase,userId:string,offerId:string|undefined,asOf:string) {
+  return database.transaction(async()=>{
+    if(offerId){const offer=offerFromRows((await database.readBatch([offerReadQuery(offerId)]))[0]??[]),access=await database.readBatch([membershipReadQuery(userId,offer.organizationId),offerAssignedReadQuery(userId,offerId)]);membershipFromRows(access[0]??[]);requireOfferAssignment(access[1]??[]);}
+    const rows=(await database.readBatch([processListReadQuery(userId,offerId,true)]))[0]??[],views=[];
+    for(const row of rows)views.push(await processViewOwned(database,userId,row.id as string,asOf));
+    return views;
   },{readOnly:true});
 }
