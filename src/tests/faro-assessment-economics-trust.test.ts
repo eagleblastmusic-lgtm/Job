@@ -85,7 +85,11 @@ test('cohort key correction previews the complete pinned group, fences changes a
     for(const cookie of [f.candidate.cookie,f.admin.cookie]) {await f.request(path+'/preview',cookie,'POST',input,404);await f.request(path,cookie,'POST',body,404);}
     await f.request(path,f.employer.cookie,'POST',body,400);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_key_corrections').get()!.n,0);
     const originals=[a,b,c].map(x=>({...s.row(x.id)})),processes=[f.interest.id,second.p.id,third.p.id].map(id=>({...s.recruitment.row(id)})),definition={...s.definition(d.id,1)};
-    const command={...body,replaceIndividualAmendments:true},ack=await f.request<{correctionId:string;affected:number}>(path,f.employer.cookie,'POST',command);assert.equal(ack.affected,2);
+    const command={...body,replaceIndividualAmendments:true},histories=[a,b,c].map(x=>s.resultHistory(x.id));
+    f.app.db.db.exec("CREATE TRIGGER cohort_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'cohort delivery failed'); END");
+    await f.request(path,f.employer.cookie,'POST',command,500);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_key_corrections').get()!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,command.idempotencyKey)!.n,0);[a,b,c].forEach((x,i)=>{assert.deepEqual({...s.row(x.id)},originals[i]);assert.deepEqual(s.resultHistory(x.id),histories[i]);});[f.interest.id,second.p.id,third.p.id].forEach((id,i)=>assert.deepEqual({...s.recruitment.row(id)},processes[i]));assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='ASSESSMENT_COHORT_CORRECTED'").get()!.n,0);
+    f.app.db.db.exec('DROP TRIGGER cohort_delivery_failure');
+    const ack=await f.request<{correctionId:string;affected:number}>(path,f.employer.cookie,'POST',command);assert.equal(ack.affected,2);
     assert.deepEqual(await f.request(path,f.employer.cookie,'POST',command),ack);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_key_corrections').get()!.n,1);
     [a,b,c].forEach((x,i)=>assert.deepEqual({...s.row(x.id)},{...originals[i],revision:originals[i]!.revision+(i<2?1:0)}));
     [f.interest.id,second.p.id,third.p.id].forEach((id,i)=>assert.deepEqual({...s.recruitment.row(id)},processes[i]));assert.deepEqual({...s.definition(d.id,1)},definition);
