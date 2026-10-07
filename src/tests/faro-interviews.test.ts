@@ -1,3 +1,4 @@
+import { mutualStageQuery } from '../server/faro/stageAnalytics.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { faroFixture,offerInput } from './faro-fixture.js';
@@ -45,6 +46,10 @@ test('Canonical optional progression derives mutual completion, dedupes pair/wee
     assert.equal(f.app.store.faroMutualStageCompleted('not-an-interview'),false);
     assert.throws(()=>f.app.store.analytics(f.candidate.id,'FARO_MUTUAL_STAGE_COMPLETED',{phone:'private',answers:'private'}),/verified event producer/);
     const first=complete('first','2026-10-25T00:30:00Z','2026-10-25T01:30:00Z','2026-10-24T19:00:00Z','2026-10-25T02:00:00Z');assert.equal(events().length,0);
+    const proof=f.app.db.db.prepare("SELECT id,data FROM faro_events WHERE kind='INTERVIEW_COMPLETE' AND json_extract(data,'$.interviewId')=? AND json_extract(data,'$.state')='COMPLETED'").get(first.id)!;
+    const sourceQuery=mutualStageQuery(first.id),source=()=>f.app.db.db.prepare(sourceQuery.text).get({$1:first.id});assert.equal(source()!.candidate_id,f.candidate.id);
+    for(const data of [`{"interviewId":"${first.id}","state":"PROPOSED","state":"COMPLETED"}`,`{"interviewId":"wrong-first","interviewId":"${first.id}","state":"COMPLETED"}`]) {f.app.db.db.prepare('UPDATE faro_events SET data=? WHERE id=?').run(data,proof.id!);assert.equal(source(),undefined);}
+    f.app.db.db.prepare('UPDATE faro_events SET data=? WHERE id=?').run(proof.data!,proof.id!);assert.equal(source()!.offer_id,f.recruitment.row(f.first).offer_id);
     f.setNow('2026-10-25T03:00:00Z');consent(true);assert.equal(f.app.store.faroMutualStageCompleted(first.id),false);
     const second=complete('second','2026-10-25T04:00:00Z','2026-10-25T05:00:00Z','2026-10-25T03:30:00Z','2026-10-25T06:00:00Z');assert.equal(events().length,1);assert.equal(f.app.store.faroMutualStageCompleted(second.id),false);
     complete('third','2026-10-25T07:00:00Z','2026-10-25T08:00:00Z','2026-10-25T06:30:00Z','2026-10-25T09:00:00Z');assert.equal(events().length,1);

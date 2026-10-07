@@ -59,3 +59,16 @@ export async function recordAcceptedStageOwned(database:AnalyticsDatabase,id:str
 export async function recordAcceptedStage(database:AnalyticsDatabase,id:string):Promise<boolean> {
   return database.transaction(()=>recordAcceptedStageOwned(database,id));
 }
+
+export function mutualStageQuery(id:string,postgres=false) {
+ if(!postgres)return {text:"SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id JOIN faro_events e ON e.process_id=p.id WHERE i.id=$1 AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND e.kind='INTERVIEW_COMPLETE' AND json_extract(e.data,'$.interviewId')=i.id AND json_extract(e.data,'$.state')='COMPLETED' ORDER BY e.occurred_at DESC,e.rowid DESC LIMIT 1",values:[id]};
+ const interviewId=firstField('e.data::json','interviewId'),state=firstField('e.data::json','state');
+ return {text:`SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id JOIN faro_events e ON e.process_id=p.id WHERE i.id=$1 AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND e.kind='INTERVIEW_COMPLETE' AND (${interviewId})#>>'{}'=i.id AND (${state})#>>'{}'='COMPLETED' ORDER BY e.occurred_at DESC,e.__faro_source_rowid DESC LIMIT 1`,values:[id]};
+}
+// Called by interview completion inside its existing owned command transaction.
+export async function recordMutualStageOwned(database:AnalyticsDatabase,id:string):Promise<boolean> {
+ const source=(await database.readBatch([mutualStageQuery(id,true)]))[0]?.[0] as unknown as StageSource|undefined;if(!source)return false;
+ const consent=(await database.readBatch([stageConsentQuery(source.candidate_id,true)]))[0]?.[0],plan=pairStagePlan(source,consent,'INTERVIEW_COMPLETED');if(!plan)return false;
+ const result=await database.query(plan.text,plan.values) as {rowCount:number|null};return result.rowCount===1;
+}
+export async function recordMutualStage(database:AnalyticsDatabase,id:string):Promise<boolean> {return database.transaction(()=>recordMutualStageOwned(database,id));}
