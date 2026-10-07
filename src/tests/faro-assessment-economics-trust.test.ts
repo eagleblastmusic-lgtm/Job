@@ -540,6 +540,10 @@ test('invalid result retains original evidence, informs both roles, rejects stal
     await f.request(url,f.employer.cookie,'POST',{...body,expectedVersion:old.revision-1},409);
     await f.request(url,f.employer.cookie,'POST',{...body,processVersion:process.revision-1},409);
     assert.equal(s.resultHistory(a.id).length,1);assert.deepEqual(s.row(a.id),old);
+    const invalidBefore={...s.row(a.id)},invalidHistoryBefore=s.resultHistory(a.id);
+    f.app.db.db.exec("CREATE TRIGGER invalidate_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'invalidate delivery failed'); END");
+    await f.request(url,f.employer.cookie,'POST',body,500);assert.deepEqual({...s.row(a.id)},invalidBefore);assert.deepEqual(s.resultHistory(a.id),invalidHistoryBefore);assert.deepEqual(r.row(f.interest.id),process);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,body.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER invalidate_delivery_failure');
     const response=await f.request<{result:null;resultValidity:string;resultHistory:Array<{validity:string;result:{earned:number};reason:string}>}>(url,f.employer.cookie,'POST',body);
     assert.equal(response.result,null);assert.equal(response.resultValidity,'INVALIDATED');assert.equal(response.resultHistory.length,2);
     assert.equal(response.resultHistory[0]!.validity,'VALID');assert.equal(response.resultHistory[0]!.result.earned,0);

@@ -1,8 +1,9 @@
+import { assessmentInvalidationPlan } from './assessmentInvalidationModel.js';
 import { assessmentFinalizeQueries } from './assessmentReviewModel.js';
 import { attemptAnswerQueries } from './assessmentAnswerModel.js';
 import { requireAttemptCandidate,attemptStartQueries } from './assessmentStartModel.js';
 import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
-import { type AttemptRow,type IncidentRow,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
+import { type AttemptRow,type IncidentRow,attemptHistoryQuery,attemptHistoryFromRows,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -127,7 +128,7 @@ export class AssessmentService extends FaroStore {
     const query=attemptReadQuery(id);return attemptFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   resultHistory(id:string) {
-    return this.db.prepare('SELECT revision,validity,result,reason_code reasonCode,reason,created_at createdAt FROM faro_result_history WHERE attempt_id=? ORDER BY revision').all(id).map(row=>({revision:Number(row.revision),validity:row.validity as 'VALID'|'INVALIDATED',reasonCode:row.reasonCode as string|null,reason:row.reason as string|null,createdAt:row.createdAt as string|null,result:JSON.parse(row.result as string) as Record<string,unknown>}));
+    const query=attemptHistoryQuery(id);return attemptHistoryFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   incident(id:string) {
     return this.db.prepare('SELECT id,category,statement,reported_at reportedAt,observed_state observedState,observed_revision observedRevision,original_deadline originalDeadline,original_started_at originalStartedAt,original_expires_at originalExpiresAt,state,revision,resolution,reason,resolved_at resolvedAt FROM faro_attempt_incidents WHERE attempt_id=?').get(id) as unknown as IncidentRow|undefined;
@@ -264,16 +265,11 @@ export class AssessmentService extends FaroStore {
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_INVALIDATE'},()=>{
       const row=this.row(id),process=this.recruitment.row(row.process_id);
       this.recruitment.offers.assigned(userId,process.offer_id);
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się.','VERSION_CONFLICT');
-      const previous=this.resultHistory(id).at(-1);
-      if(row.state!=='FINALIZED'||!previous||previous.validity!=='VALID')throw new HttpError(409,'Tylko aktualny zatwierdzony wynik można oznaczyć jako nieważny.','RESULT_NOT_VALID');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wycofanie ważności wyniku.','CONFIRMATION_REQUIRED');
-      const reasonCode=choice(body.reasonCode,['KEY_ERROR','AMBIGUOUS_TASK','TECHNICAL_INCIDENT'] as const),reason=text(body.reason,1000,10);
-      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'INVALIDATED',?,?,?,?)").run(id,Number(previous.revision)+1,JSON.stringify(previous.result),reasonCode,reason,this.now());
-      this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(id);
-      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_INVALIDATED',{attemptId:id,reasonCode});
+      const plan=assessmentInvalidationPlan(row,process,this.resultHistory(id).at(-1),body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      this.recruitment.event(process,userId,'ASSESSMENT_RESULT_INVALIDATED',plan.event);
       return this.overview(userId,id);
-    });
+    },()=>{this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);});
   }
   amendResult(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);
