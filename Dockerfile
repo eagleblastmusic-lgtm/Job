@@ -13,7 +13,8 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/scripts ./scripts
-COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 RUN mkdir -p /app/data/uploads && chown -R node:node /app
 USER node
 EXPOSE 3000
