@@ -31,6 +31,8 @@ test('restriction appeal and independent restoration retain history, guard scope
     const appeal={expectedVersion:1,idempotencyKey:'restriction-appeal',reason:'Naprawiono proces. Prosimy o niezależny przegląd.'};
     const path=`/api/faro/restrictions/${one.id}`;
     await f.request(`${path}/appeal`,f.candidate.cookie,'POST',appeal,404);
+    f.app.db.db.exec("CREATE TRIGGER restriction_appeal_guard BEFORE INSERT ON audit_logs WHEN NEW.action='RESTRICTION_APPEALED' BEGIN SELECT RAISE(ABORT,'restriction appeal audit failed'); END");
+    await f.request(`${path}/appeal`,f.owner.cookie,'POST',appeal,500);assert.equal(f.app.db.db.prepare('SELECT revision FROM faro_restrictions WHERE id=?').get(one.id)?.revision,1);assert.equal(f.app.db.db.prepare('SELECT appeal FROM faro_restrictions WHERE id=?').get(one.id)?.appeal,null);assert.equal(f.app.db.db.prepare('SELECT command_key FROM faro_commands WHERE user_id=? AND command_key=?').get(f.owner.id,appeal.idempotencyKey),undefined);f.app.db.db.exec('DROP TRIGGER restriction_appeal_guard');
     const ack=await f.request(`${path}/appeal`,f.owner.cookie,'POST',appeal);assert.deepEqual(await f.request(`${path}/appeal`,f.owner.cookie,'POST',appeal),ack);
     await f.request(`${path}/appeal`,f.owner.cookie,'POST',{...appeal,reason:'Zmiana tej samej operacji odwołania.'},409);
     const restore={expectedVersion:2,idempotencyKey:'restriction-restore',confirmed:true,reason:'Warunki sprawdzono niezależnie; kończymy to ograniczenie.'};
@@ -42,6 +44,8 @@ test('restriction appeal and independent restoration retain history, guard scope
     f.app.db.db.prepare("UPDATE users SET role='ADMIN' WHERE id=?").run(f.candidate.id);await f.request(`${path}/restore`,f.candidate.cookie,'POST',restore,403);await f.request(listPath,f.candidate.cookie,'GET',undefined,404);
     await f.request(`${path}/restore`,f.moderator.cookie,'POST',{...restore,expectedVersion:1},409);
     await f.request(`${path}/restore`,f.moderator.cookie,'POST',{...restore,confirmed:false},400);
+    f.app.db.db.exec("CREATE TRIGGER restriction_restore_guard BEFORE INSERT ON audit_logs WHEN NEW.action='RESTRICTION_RESTORED' BEGIN SELECT RAISE(ABORT,'restriction restore audit failed'); END");
+    await f.request(`${path}/restore`,f.moderator.cookie,'POST',restore,500);assert.equal(f.app.db.db.prepare('SELECT state,revision FROM faro_restrictions WHERE id=?').get(one.id)?.state,'ACTIVE');assert.equal(f.app.db.db.prepare('SELECT revision FROM faro_restrictions WHERE id=?').get(one.id)?.revision,2);assert.equal(f.app.db.db.prepare('SELECT command_key FROM faro_commands WHERE user_id=? AND command_key=?').get(f.moderator.id,restore.idempotencyKey),undefined);f.app.db.db.exec('DROP TRIGGER restriction_restore_guard');
     const restored=await f.request(`${path}/restore`,f.moderator.cookie,'POST',restore);assert.deepEqual(await f.request(`${path}/restore`,f.moderator.cookie,'POST',restore),restored);
     assert.equal(f.app.db.db.prepare('SELECT verification FROM faro_organizations WHERE id=?').get(f.org.id)!.verification,'RESTRICTED');
     await f.request(`/api/faro/restrictions/${two.id}/restore`,f.moderator.cookie,'POST',{...restore,expectedVersion:1,idempotencyKey:'restriction-restore-two'});

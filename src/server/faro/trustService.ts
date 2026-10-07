@@ -1,3 +1,4 @@
+import { restrictionAppealQueries,restrictionRestoreQueries } from './restrictionWriteModel.js';
 import { reliabilityWindow,reliabilityQueries,reliabilityFromRows } from './reliabilityReadModel.js';
 import { caseReadQuery,caseFromRows,caseListQuery,caseExplanationsQuery,caseVisible,caseView,restrictionReadQuery,restrictionFromRows,restrictionsReadQuery,restrictionView,type CaseRow,type RestrictionRow } from './trustReadModel.js';
 import { staleOffersQuery,staleOfferQueries,closingOffersQuery,upcomingOffersQuery,pendingProcessesQuery,offerDeadlineQuery,processDeadlineQueries } from './trustTickModel.js';
@@ -32,23 +33,14 @@ export class TrustService extends FaroStore {
   appealRestriction(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>{const row=this.restriction(id);this.member(userId,row.organization_id,['OWNER','ADMIN']);return row;};authorize();
     return new RecruitmentService(this.database,this.clock).commandOnce(userId,body.idempotencyKey,{...body,id,operation:'RESTRICTION_APPEAL'},()=>{
-      const row=authorize();if(integer(body.expectedVersion,1)!==row.revision)throw new HttpError(409,'Odśwież ograniczenie.','VERSION_CONFLICT');
-      if(row.state!=='ACTIVE'||row.appeal)throw new HttpError(409,'Odwołanie nie jest teraz dostępne.');
-      this.db.prepare('UPDATE faro_restrictions SET appeal=?,appealed_at=?,appeal_by=?,revision=revision+1 WHERE id=?').run(text(body.reason,1500,10),this.now(),userId,id);
-      this.audit(userId,'RESTRICTION_APPEALED',id);this.notifyModerators(row.organization_id,'Odwołanie od ograniczenia organizacji wymaga ręcznego przeglądu.',`restriction:${id}:appeal`,'organization');
+      const row=authorize();for(const query of restrictionAppealQueries(userId,row,body,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));this.notifyModerators(row.organization_id,'Odwołanie od ograniczenia organizacji wymaga ręcznego przeglądu.',`restriction:${id}:appeal`,'organization');
       return {id};
     });
   }
   restoreRestriction(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>{const row=this.restriction(id);if(!this.restrictionModerator(userId,row))throw new HttpError(403,'Wymagany niezależny moderator.','MODERATION_CONFLICT');return row;};authorize();
     return new RecruitmentService(this.database,this.clock).commandOnce(userId,body.idempotencyKey,{...body,id,operation:'RESTRICTION_RESTORE'},()=>{
-      const row=authorize();if(integer(body.expectedVersion,1)!==row.revision)throw new HttpError(409,'Odśwież ograniczenie.','VERSION_CONFLICT');
-      if(row.state!=='ACTIVE')throw new HttpError(409,'Ograniczenie zostało już rozpatrzone.');
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź ręczne sprawdzenie warunków przywrócenia.','CONFIRMATION_REQUIRED');
-      this.db.prepare("UPDATE faro_restrictions SET state='RESTORED',restoration_reason=?,restored_at=?,restored_by=?,revision=revision+1 WHERE id=?").run(text(body.reason,1500,10),this.now(),userId,id);
-      // Releasing one restriction never clears another or republishes a vacancy.
-      if(!this.db.prepare("SELECT id FROM faro_restrictions WHERE organization_id=? AND state='ACTIVE'").get(row.organization_id))this.db.prepare("UPDATE faro_organizations SET verification='PENDING' WHERE id=? AND verification='RESTRICTED'").run(row.organization_id);
-      this.audit(userId,'RESTRICTION_RESTORED',id);this.notifyRestriction(this.restriction(id));return {id};
+      const row=authorize();for(const query of restrictionRestoreQueries(userId,row,body,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));this.notifyRestriction(this.restriction(id));return {id};
     });
   }
   reliability(userId:string,orgId:string,from:string,to:string) {

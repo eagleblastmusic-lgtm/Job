@@ -442,3 +442,11 @@ Shared explicit reads and case masking, native current-authority/audited access 
 
 
 CP11-BJ local full check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; source70/35 and diff PASS. Actual PostgreSQL acceptance pending. BI5de2b8a exact FARO37657263026 and CI37657262955 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BK — Portable restriction appeal/restoration, 2026-10-07
+
+Shared revision/reason/confirmation/mutation/audit plans and native journal require current owner/admin or independent moderator authority before replay. One restored restriction never clears another or republishes intake. [Scope](CP11_BK_PORTABLE_RESTRICTION_WRITES.md). Original targeted restriction1 PASS; full local/actual PostgreSQL acceptance pending. Runtime SQLite; whole plan/release PARTIAL; continue native case writes/HTTP/recovery/cutover/external gates.
+
+
+CP11-BK full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 desktop-mobile browsers; source70/35, syntax/diff PASS. Actual native PostgreSQL acceptance pending. BJ0aff381 exact FARO37659409429 and CI37659409358 SUCCESS including native private moderation/restriction/reliability proofs. Runtime SQLite; whole plan/release PARTIAL.
