@@ -100,3 +100,9 @@ export async function readOfferDetail(database:OfferReadDatabase,userId:string,i
     return offerDetailFromRows(offer,access,intake,profile,conditions);
   },{readOnly:true});
 }
+
+export function offerVersionReadQuery(id:string,version:number) {return {text:'SELECT content FROM faro_offer_versions WHERE offer_id=$1 AND version=$2',values:[id,version]};}
+export function offerVersionFromRows(rows:Record<string,unknown>[]):OfferData {
+  if(!rows[0])throw new HttpError(404,'Nie znaleziono wersji.');
+  return JSON.parse(rows[0].content as string) as OfferData;
+}

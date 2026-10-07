@@ -1,5 +1,5 @@
 import { offerCreateQueries,offerEditQueries,offerAssignedReadQuery,requireOfferAssignment,offerLifecycleAction,offerPublicationOrganizationQuery,requireOfferPublication,offerLifecycleQueries,offerNotificationRecipientsQuery,offerNotificationQueries } from './offerWriteModel.js';
-import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,offerListReadQuery,offerConditionsReadQueries,offerConditionsFromRows,offerConditionsAllow,offerDetailReadQueries,requireOfferDetailAccess,offerDetailFromRows,type OfferRecord } from './offerReadModel.js';
+import { offerReadQuery,offerFromRows,publishedReadQuery,publishedFromRows,intakeReadQueries,intakeFromRows,offerListReadQuery,offerConditionsReadQueries,offerConditionsFromRows,offerConditionsAllow,offerDetailReadQueries,requireOfferDetailAccess,offerDetailFromRows,offerVersionReadQuery,offerVersionFromRows,type OfferRecord } from './offerReadModel.js';
 export type { OfferRecord } from './offerReadModel.js';
 import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
@@ -34,8 +34,7 @@ export class OfferService extends FaroStore {
   }
 
   version(id: string, version: number): OfferData {
-    const row = this.db.prepare('SELECT content FROM faro_offer_versions WHERE offer_id=? AND version=?').get(id, version) as { content: string } | undefined;
-    if (!row) throw new HttpError(404, 'Nie znaleziono wersji.'); return JSON.parse(row.content) as OfferData;
+    const query=offerVersionReadQuery(id,version);return offerVersionFromRows(this.db.prepare(query.text).all({$1:id,$2:version}));
   }
   published(id:string):OfferRecord {
     const offer=this.get(id),query=publishedReadQuery(id);
