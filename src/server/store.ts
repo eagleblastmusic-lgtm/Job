@@ -1,4 +1,4 @@
-import { acceptedStageQuery,stageConsentQuery,pairStagePlan } from './faro/stageAnalytics.js';
+import { acceptedStageQuery,mutualStageQuery,stageConsentQuery,pairStagePlan } from './faro/stageAnalytics.js';
 import { randomUUID } from 'node:crypto';
 import { PrivacyService } from './faro/privacyService.js';
 import { MfaService } from './faro/mfaService.js';
@@ -305,7 +305,7 @@ export class AppStore {
   }
   /** Closed Canonical product event: derive proof and payload from actual mutual completion, never client metadata. */
   faroMutualStageCompleted(interviewId:string):boolean {
-    const source=this.db.prepare("SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id JOIN faro_events e ON e.process_id=p.id WHERE i.id=? AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND e.kind='INTERVIEW_COMPLETE' AND json_extract(e.data,'$.interviewId')=i.id AND json_extract(e.data,'$.state')='COMPLETED' ORDER BY e.occurred_at DESC,e.rowid DESC LIMIT 1").get(interviewId) as {candidate_id:string;offer_id:string;occurred_at:string}|undefined;
+    const query=mutualStageQuery(interviewId),source=this.db.prepare(query.text).get({$1:interviewId}) as {candidate_id:string;offer_id:string;occurred_at:string}|undefined;
     return this.faroPairStage(source,'INTERVIEW_COMPLETED');
   }
   /** Candidate acceptance of pinned human offer terms, not verified employment commencement. */
