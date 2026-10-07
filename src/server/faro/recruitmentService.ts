@@ -1,5 +1,5 @@
 import { processChangePlan,processCancelQueries } from './processWriteModel.js';
-import { processReadQuery,processFromRows,processContextReadQueries,processViewFromRows,processLatestDataQuery,processClarificationFromRows,processEmploymentFromRows,type ProcessRow } from './processReadModel.js';
+import { processReadQuery,processListReadQuery,processFromRows,processContextReadQueries,processViewFromRows,processLatestDataQuery,processClarificationFromRows,processEmploymentFromRows,type ProcessRow } from './processReadModel.js';
 export type { ProcessRow } from './processReadModel.js';
 import { interestReadQueries,interestPlan,processRecruiterReadQuery,processEventQueries } from './interestWriteModel.js';
 import { commandRequest,commandReadQuery,commandReplay,commandSaveQuery } from './commandJournal.js';
@@ -55,7 +55,7 @@ export class RecruitmentService extends FaroStore {
   }
   list(userId: string, offerId?: string) {
     if (offerId) this.offers.assigned(userId, offerId);
-    const rows = (offerId ? this.db.prepare('SELECT id FROM faro_interests WHERE offer_id=? ORDER BY created_at').all(offerId) : this.db.prepare('SELECT id FROM faro_interests WHERE candidate_id=? ORDER BY created_at DESC').all(userId)) as Array<{ id: string }>;
+    const query=processListReadQuery(userId,offerId),rows=this.db.prepare(query.text).all({$1:query.values[0]!}) as Array<{id:string}>;
     return rows.map(row => this.view(userId, row.id));
   }
   change(userId: string, id: string, body: Record<string, unknown>) {
