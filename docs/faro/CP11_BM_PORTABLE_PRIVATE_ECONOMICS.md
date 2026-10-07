@@ -7,3 +7,5 @@ Full local check PASS: 168 Node tests, 35 migrations, lint/typecheck, both backu
 BL8cef85a actual FARO37662893498 and CI37662893383 SUCCESS, including PostgreSQL18 Node22/24. Runtime remains SQLite until HTTP integration and cutover acceptance. External acceptance gates remain open; whole plan/release PARTIAL.
 
 BM source-only rehearsal PASS70 tables/35 migrations; script syntax and git diff checks PASS. Actual PostgreSQL acceptance pending.
+
+Native BM acceptance exposed a fixture interaction: an initial private commute estimate made an existing unknown-commute offer assertion known. Removed only that early seed; final native save/get/privacy/constraint proofs remain intact. No product criteria changed. Corrected native acceptance pending.
