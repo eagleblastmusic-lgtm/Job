@@ -91,14 +91,15 @@ export function requireOfferDetailAccess(rows:Record<string,unknown>[][],accepti
 export function offerDetailFromRows(offer:OfferRecord,rows:Record<string,unknown>[][],accepting:boolean,profile:ReturnType<typeof profileFromRows>,conditions:ReturnType<typeof offerConditionsFromRows>) {
   return {...offer,ownInterest:rows[1]?.[0]??null,acceptingInterest:accepting,explanation:explainOffer(offer.data,profile.claims,profile.learning),conditionExplanation:rows[0]?.length?[]:conditions};
 }
-export async function readOfferDetail(database:OfferReadDatabase,userId:string,id:string,asOf:string) {
-  return database.transaction(async()=>{
+export async function offerDetailOwned(database:OfferReadDatabase,userId:string,id:string,asOf:string) {
     const current=offerFromRows((await database.readBatch([offerReadQuery(id)]))[0]??[]),intake=intakeFromRows(current,await database.readBatch(intakeReadQueries(current)),asOf);
     const access=await database.readBatch(offerDetailReadQueries(userId,current,true));requireOfferDetailAccess(access,intake);
     const offer=access[0]?.length?current:publishedFromRows(current,(await database.readBatch([publishedReadQuery(id)]))[0]??[],intake);
     const profile=profileFromRows(await database.readBatch(profileReadQueries(userId)),asOf),conditions=access[0]?.length?[]:offerConditionsFromRows(offer,await database.readBatch(offerConditionsReadQueries(userId,id)),asOf);
     return offerDetailFromRows(offer,access,intake,profile,conditions);
-  },{readOnly:true});
+}
+export async function readOfferDetail(database:OfferReadDatabase,userId:string,id:string,asOf:string) {
+  return database.transaction(()=>offerDetailOwned(database,userId,id,asOf),{readOnly:true});
 }
 
 export function offerVersionReadQuery(id:string,version:number) {return {text:'SELECT content FROM faro_offer_versions WHERE offer_id=$1 AND version=$2',values:[id,version]};}

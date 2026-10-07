@@ -1,3 +1,5 @@
+import { readEconomics,saveEconomics } from '../dist/server/faro/economicsModel.js';
+import { EconomicsService } from '../dist/server/faro/economicsService.js';
 import { proveNativeModerationRead } from './faro-postgres-moderation-read-proof.mjs';
 import { readReliability } from '../dist/server/faro/reliabilityReadModel.js';
 import { TrustService } from '../dist/server/faro/trustService.js';
@@ -75,6 +77,7 @@ try {
   const token=hashSessionToken(candidate.cookie.slice(candidate.cookie.indexOf('=')+1)),user=f.app.store.getUserById(candidate.id),mfa=new MfaService(f.app.db,f.app.config),setup=mfa.setup(user,token,{password:'Bezpieczne123'});
   mfa.confirm(user,token,{code:totp(decode(setup.secret),Math.floor(Date.now()/30000))});
   f.app.store.recordConsent(candidate.id,'ANALYTICS',true,'synthetic-import');
+  const economicReference=new EconomicsService(f.app.db,()=>new Date('2026-10-06T00:00:00.000Z')),economicInput={salaryOptionIndex:0,netMin:420000,netMax:480000,commuteCost:18000,commuteMinutes:45,transport:'TRANSIT',source:'Synthetic private manual estimate',observedAt:'2026-10-05T00:00:00.000Z',assumptions:'Synthetic assumptions; no automatic tax calculation'};economicReference.save(candidate.id,offer.id,economicInput);
   const snapshot=await extract(f.app.config.databasePath);for(const table of snapshot.tables){const ddl=targetTable(table);assert.ok(ddl.startsWith('CREATE TABLE'));assert.ok(!/\bREFERENCES\b/i.test(ddl));}assert.equal(snapshot.versions.length,35);assert.ok(snapshot.tables.some(t=>t.name==='faro_mfa'&&t.rows.length===1));assert.ok(snapshot.tables.some(t=>t.name==='faro_attempts'&&t.rows.length===1));
   f.app.db.db.exec('CREATE TABLE unsupported_source(id TEXT)');await assert.rejects(()=>extract(f.app.config.databasePath),/schema/);f.app.db.db.exec('DROP TABLE unsupported_source');
   assert.equal((await extract(f.app.config.databasePath)).schemaHash,snapshot.schemaHash);
@@ -83,6 +86,7 @@ try {
     await compare(client,snapshot,schema);await client.query(`SET search_path TO ${identifier(schema)}`);
     const asOf='2026-10-06T00:00:00.000Z',reference=new ProfileService(f.app.db,()=>new Date(asOf)),wire=value=>JSON.parse(JSON.stringify(value));
     const exportAuthority=id=>async()=>assert.equal((await client.readBatch([{text:'SELECT id FROM users WHERE id=$1',values:[id]}]))[0]?.[0]?.id,id);
+    for(const viewer of [candidate.id,employer.id])assert.deepEqual(await readEconomics(client,viewer,offer.id,asOf,()=>{}),economicReference.get(viewer,offer.id));
     const metricsAsOf=new Date(Date.now()+1000).toISOString();assert.deepEqual(await readReliability(client,employer.id,org.id,'','',metricsAsOf,()=>{}),new TrustService(f.app.db,()=>new Date(metricsAsOf)).reliability(employer.id,org.id,'',''));
     for(const account of [candidate,employer]){const exported=await exportOwnData(client,account.id,asOf,exportAuthority(account.id)),expected=new PrivacyService(f.app.db,()=>new Date(asOf)).exportOwn(account.id);assert.deepEqual(exported,wire(expected));const serialized=JSON.stringify(exported);for(const forbidden of ['__faro_source_rowid','password_hash','active_cipher','pending_cipher','code_hash','token_hash'])assert.equal(serialized.includes(forbidden),false);}
     await assert.rejects(()=>exportOwnData(client,candidate.id,asOf,()=>{throw new Error('EXPORT_AUTHORITY_REFUSED');}),/EXPORT_AUTHORITY_REFUSED/);
@@ -633,6 +637,15 @@ try {
     await assert.rejects(()=>mutateMfa(client,{...nativeMfaConfig,faroMfaEncryptionKey:'22'.repeat(32)},recoverMfaToken,'verify',{code:totp(nativeSecret,mfaCounterValue+2)},'2026-10-06T00:01:00.000Z'),error=>error.code==='MFA_UNAVAILABLE');
     for(let i=0;i<4;i++)await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='REAUTH_FAILED');await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='MFA_RATE_LIMITED');
     const mfaAudit=JSON.stringify((await client.query('SELECT metadata FROM audit_logs WHERE user_id=$1',[employer.id])).rows);for(const value of [nativeSetup.secret,pendingMfa,'Bezpieczne123',...nativeEnabled.recoveryCodes])assert.equal(mfaAudit.includes(value),false);
+    await nativeProof('ECONOMICS',async()=>{
+      const authority=async()=>assert.equal((await client.readBatch([{text:'SELECT id FROM users WHERE id=$1',values:[employer.id]}]))[0]?.[0]?.id,employer.id);
+      assert.equal(await readEconomics(client,employer.id,offer.id,asOf,authority),null);
+      const saved=await saveEconomics(client,employer.id,offer.id,economicInput,asOf,authority);assert.deepEqual(await readEconomics(client,employer.id,offer.id,asOf,authority),saved);assert.equal(saved.result.automaticTax.supported,false);assert.deepEqual(saved.result.netAfterCommute,{min:402000,max:462000});
+      await assert.rejects(()=>saveEconomics(client,employer.id,offer.id,{...economicInput,commuteCostPeriod:'YEAR'},asOf,authority),error=>error.code==='ECONOMICS_UNIT_MISMATCH');await assert.rejects(()=>saveEconomics(client,employer.id,offer.id,{...economicInput,netMax:null},asOf,authority),error=>error.status===400);
+      await client.query("ALTER TABLE faro_economics ADD CONSTRAINT pg_economics_guard CHECK(updated_at<>'"+asOf+"') NOT VALID");await assert.rejects(()=>saveEconomics(client,employer.id,offer.id,{...economicInput,netMin:430000},asOf,authority),error=>error.code==='23514');assert.deepEqual(await readEconomics(client,employer.id,offer.id,asOf,authority),saved);await client.query('ALTER TABLE faro_economics DROP CONSTRAINT pg_economics_guard');
+      await assert.rejects(()=>saveEconomics(client,employer.id,offer.id,economicInput,asOf,()=>{throw new Error('ECONOMICS_AUTHORITY_REFUSED');}),/ECONOMICS_AUTHORITY_REFUSED/);
+      const unknown=await saveEconomics(client,employer.id,offer.id,{...economicInput,netMin:null,netMax:null,commuteCost:null,commuteMinutes:null},asOf,authority);assert.equal(unknown.result.estimatedNetRange,null);assert.equal(unknown.result.netAfterCommute,null);
+    });
     await nativeProof('MODERATION_READ',()=>proveNativeModerationRead(client,employer.id,offer.id,asOf));
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));

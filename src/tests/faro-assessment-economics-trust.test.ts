@@ -441,6 +441,7 @@ test('economics is private, versioned and honest about unsupported automatic tax
     await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteCostPeriod:'YEAR'},400);
     await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteTimeBasis:'ONE_WAY'},400);
     assert.deepEqual(f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id),stored);
+    f.app.db.db.exec("CREATE TRIGGER economics_update_guard BEFORE UPDATE ON faro_economics BEGIN SELECT RAISE(ABORT,'economics write failed'); END");await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,netMin:430000},500);assert.deepEqual(f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id),stored);f.app.db.db.exec('DROP TRIGGER economics_update_guard');
     const employerView = await f.request<Record<string, unknown>>(`/api/faro/offers/${f.offer.id}/economics`, f.employer.cookie, 'GET', undefined, 200);
     assert.equal(employerView, null);
     const text = JSON.stringify(result);

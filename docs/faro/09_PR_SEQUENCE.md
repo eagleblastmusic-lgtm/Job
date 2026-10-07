@@ -458,3 +458,10 @@ Shared report/explanation/review/appeal plans preserve private boundaries, manua
 
 
 CP11-BL full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; existing targeted moderation24 PASS, source70/35/syntax/diff PASS. Actual native case-write PostgreSQL acceptance pending. BK40f53a2 FARO37660164466/CI37660164532 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BM — Portable private offer economics, 2026-10-07
+
+Shared private manual economics plans and atomic native current-authority/visible-offer scope. [Scope](CP11_BM_PORTABLE_PRIVATE_ECONOMICS.md). Full local check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers. Source-only and actual PostgreSQL acceptance pending. BL8cef85a FARO37662893498/CI37662893383 SUCCESS. Runtime SQLite; continue HTTP/recovery/cutover. External gates open; whole plan/release PARTIAL.
+
+BM source-only rehearsal PASS70 tables/35 migrations; script syntax and git diff checks PASS. Actual PostgreSQL acceptance pending.
