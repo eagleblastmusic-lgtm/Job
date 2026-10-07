@@ -378,10 +378,14 @@ test('idle assessment expiry is server driven and neutral; started expiry retain
     const start=service.start(f.candidate.id,attempt.id);
     service.save(f.candidate.id,attempt.id,{expectedVersion:start.revision,answers:{'task-1':1}},false);
     const future=new Date(Date.parse(start.expiresAt!)+1000),late=new AssessmentService(f.app.db,()=>future);
+    const beforeAttempt={...late.row(attempt.id)},beforeProcess={...late.recruitment.row(f.interest.id)};
+    f.app.db.db.exec("CREATE TRIGGER expiry_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'expiry delivery failed'); END");
+    assert.throws(()=>late.expire(attempt.id),/expiry delivery failed/);assert.deepEqual({...late.row(attempt.id)},beforeAttempt);assert.deepEqual({...late.recruitment.row(f.interest.id)},beforeProcess);assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ATTEMPT_EXPIRED'").get(f.interest.id)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER expiry_delivery_failure');
     new TrustService(f.app.db,()=>future).tick();
     const expired=late.row(attempt.id),p=late.recruitment.row(f.interest.id);
     assert.equal(expired.state,'EXPIRED');assert.equal(expired.answers,'{"task-1":1}');assert.equal(expired.result,null);
-    assert.equal(p.status,'ACTIVE');assert.equal(p.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(p.first_response_at,first);assert.ok(p.stage_due_at!>future.toISOString());
+    assert.equal(p.status,'ACTIVE');assert.equal(p.stage,'ACCEPTED_TO_NEXT_STAGE');assert.equal(p.first_response_at,first);assert.ok(p.stage_due_at!>future.toISOString());assert.equal(p.next_action,'Termin assessmentu upłynął. Ustal kolejny krok; brak automatycznej odmowy.');
     assert.throws(()=>late.start(f.candidate.id,attempt.id),/nie jest już aktywne/);
     assert.throws(()=>late.save(f.candidate.id,attempt.id,{expectedVersion:expired.revision,answers:{'task-1':0}},true),/upłynął/);
     assert.equal(late.row(attempt.id).answers,expired.answers);

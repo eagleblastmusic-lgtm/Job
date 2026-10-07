@@ -1,0 +1,13 @@
+# CP11-AL — Portable neutral assessment expiry (2026-10-07)
+
+SQLite and PostgreSQL staging share the due-attempt query and expiry writes. INVITED attempts expire at their deadline; STARTED attempts also expire at the server timer. Expiry increments the attempt revision without changing saved answers, result, deadline, original startedAt or expiresAt. For a non-terminal process still at ASSESSMENT_REQUESTED, the neutral next step and decision deadline use the pinned offer version. A newer process stage or terminal decision is preserved. No automatic refusal or grade is introduced.
+
+The entire due batch owns one transaction including process updates, ATTEMPT_EXPIRED event, minimized audit and notifications. A delivery failure rolls back the batch; retry expires once. Required worker-authority callback runs inside the native SERIALIZABLE transaction. Actual production worker/auth/database integration remains open; callbacks and staging helpers do not prove runtime cutover.
+
+Existing timed SQLite regression now injects notification failure before actual expiry, verifies unchanged attempt/process/no expiry event, removes the failure and exercises the existing idle worker retry, saved answers, neutral clock and unstarted expiry assertions. Actual PostgreSQL18 Node22/24 must prove worker refusal, real notification constraint rollback/retry/repeat, pinned neutral clock/private evidence and preservation of a newer process stage. Full162 Node/35 migrations/both actual restores/38 browsers and original70-table hash/privacy/closed-release proof remain required.
+
+Full local and remote acceptance pending. Runtime SQLite, dependent drafts unmerged; whole CP11/master plan/release PARTIAL. Next candidate start/save/submit, incidents/review/validity/retries/corrections and remaining auth/MFA/interview/privacy/worker/recovery/operator cutover. External gates and independent review remain open; locked login and CV/EHV unchanged.
+
+CP11-AL regression repair: initial added rollback assertion compared a SQLite null-prototype row with a spread object. Normalize both row representations while retaining exact values; rebuilt targeted idle-expiry regression PASS1, zero skips. Full check rerun pending; initial failed run is not acceptance evidence.
+
+CP11-AL09968c5 real PostgreSQL22/24 failure at neutral next-action assertion identified a real encoding regression: a Python edit read the UTF-8 module through Windows default encoding. Restore the exact existing Polish text from accepted58df3f5 source, preserve explicit UTF-8 for edits, and add exact neutral-text assertion to the timed SQLite regression. No acceptance assertion weakened; failed runs retained, complete corrected rerun required.
