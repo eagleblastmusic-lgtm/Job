@@ -1,3 +1,4 @@
+import { parseAssessment,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
@@ -5,17 +6,12 @@ import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
 import { text, integer, array, object, choice, date } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
-interface Task { id: string; prompt: string; options: string[]; answer: number; points: number; evaluationCriteria?:string; }
-interface Definition { title: string; type: 'QUIZ'|'OPEN_ANSWER'; tasks: Task[]; timeLimitMinutes: number; expectedMinutes: number; rubricVersion: string; scoringMode: 'OBJECTIVE'|'HUMAN'; }
-interface DefinitionRow { id: string; version: number; offer_id: string; state: 'DRAFT' | 'IN_REVIEW' | 'APPROVED'; content: string; origin: string; }
 interface AttemptRow { id: string; process_id: string; assessment_id: string; assessment_version: number; state: string; deadline: string; started_at: string | null; expires_at: string | null; answers: string; revision: number; result: string | null; attempt_number:number;retry_of:string|null;retry_reason:string|null;retry_authorized_at:string|null; }
 interface IncidentRow { id:string; category:string; statement:string; reportedAt:string; observedState:string; observedRevision:number; originalDeadline:string; originalStartedAt:string|null; originalExpiresAt:string|null; state:string; revision:number; resolution:string|null; reason:string|null; resolvedAt:string|null; }
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
   definition(id: string, version: number) {
-    integer(version,1);
-    const row = this.db.prepare('SELECT * FROM faro_assessments WHERE id=? AND version=?').get(id, version) as unknown as DefinitionRow | undefined;
-    if (!row) throw new HttpError(404, 'Nie znaleziono wersji assessmentu.'); return row;
+    const query=assessmentDefinitionQuery(id,version);return assessmentDefinitionFromRows(this.db.prepare(query.text).all({$1:id,$2:version}));
   }
   private correctedKey(id:string,version:number) {
     return this.db.prepare('SELECT id,revision,accepted_options FROM faro_key_corrections WHERE assessment_id=? AND assessment_version=? ORDER BY revision DESC LIMIT 1').get(id,version) as {id:string;revision:number;accepted_options:string}|undefined;
@@ -68,7 +64,7 @@ export class AssessmentService extends FaroStore {
   }
   list(userId: string, offerId: string) {
     new OfferService(this.database, this.clock).assigned(userId, offerId);
-    return this.db.prepare('SELECT id,version,state,origin,content,approved_at FROM faro_assessments WHERE offer_id=? ORDER BY created_at DESC').all(offerId);
+    const query=assessmentListQuery(offerId);return this.db.prepare(query.text).all({$1:offerId});
   }
   read(userId:string,id:string,version:number) {
     const row=this.definition(id,version);
@@ -81,44 +77,25 @@ export class AssessmentService extends FaroStore {
       const prior=this.read(userId,id,version);
       const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(id) as {version:number};
       if(integer(body.expectedVersion,1)!==version||latest.version!==version)throw new HttpError(409,'Odśwież najnowszą wersję assessmentu.','VERSION_CONFLICT');
-      return this.create(userId,prior.offer_id,{...object(body.data),origin:prior.origin},id);
+      return this.createOwned(userId,prior.offer_id,{...object(body.data),origin:prior.origin},id);
     });
   }
-  parse(body: Record<string, unknown>): Definition {
-    const type=body.type===undefined?'QUIZ':choice(body.type,['QUIZ','OPEN_ANSWER'] as const);
-    if(body.scoringMode!==undefined&&body.scoringMode!==(type==='QUIZ'?'OBJECTIVE':'HUMAN'))throw new HttpError(400,'Tryb oceny nie pasuje do typu zadania.');
-    const tasks = array(body.tasks, 50).map((raw, index) => {
-      if(type==='OPEN_ANSWER') {const task=object(raw);if('options' in task||'answer' in task)throw new HttpError(400,'Zadanie otwarte nie ma klucza wyboru.');return {id:`task-${index+1}`,prompt:text(task.prompt,1500),options:[],answer:0,points:integer(task.points,1,100),evaluationCriteria:text(task.evaluationCriteria,1500,10)};}
-      const task = object(raw), options = array(task.options, 8).map(option => text(option, 500));
-      if (options.length < 2) throw new HttpError(400, 'Zadanie wymaga przynajmniej dwóch odpowiedzi.');
-      return { id: `task-${index + 1}`, prompt: text(task.prompt, 1500), options, answer: integer(task.answer, 0, options.length - 1), points: integer(task.points, 1, 100) };
+  parse(body:Record<string,unknown>):Definition {return parseAssessment(body);}
+  create(userId:string,offerId:string,body:Record<string,unknown>,previousId?:string) {
+    return this.transaction(()=>this.createOwned(userId,offerId,body,previousId));
+  }
+  private createOwned(userId:string,offerId:string,body:Record<string,unknown>,previousId?:string) {
+    const offer=new OfferService(this.database,this.clock).assigned(userId,offerId);this.member(userId,offer.organizationId,['OWNER','ADMIN','RECRUITER','HIRING_MANAGER']);
+    const id=previousId??randomUUID(),read=assessmentLatestQuery(id,offerId),prior=this.db.prepare(read.text).get({$1:id,$2:offerId}) as {version:number|null},plan=assessmentCreatePlan(userId,offerId,body,prior.version,id,Boolean(previousId),this.now());
+    for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+    return plan.ack;
+  }
+  approve(userId:string,id:string,body:Record<string,unknown>) {
+    return this.transaction(()=>{
+      const row=this.read(userId,id,integer(body.version,1)),read=assessmentLatestQuery(id),latest=this.db.prepare(read.text).get({$1:id}) as {version:number},plan=assessmentApprovalPlan(userId,row,body,latest.version,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      return plan.ack;
     });
-    if (!tasks.length) throw new HttpError(400, 'Dodaj zadanie.');
-    for (const forbidden of ['internetAllowed','aiAllowed','globalSkillExpiry','cumulativeTestTimeLimit']) if (forbidden in body) throw new HttpError(400, 'Pole nie należy do Canonical.');
-    return { title: text(body.title, 150), type, tasks, timeLimitMinutes: integer(body.timeLimitMinutes, 1, 480), expectedMinutes: integer(body.expectedMinutes, 1, 480), rubricVersion: text(body.rubricVersion, 80), scoringMode: type==='QUIZ'?'OBJECTIVE':'HUMAN' };
-  }
-  create(userId: string, offerId: string, body: Record<string, unknown>, previousId?: string) {
-    const offers = new OfferService(this.database, this.clock), offer = offers.assigned(userId, offerId);
-    this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER','HIRING_MANAGER']);
-    const definition = this.parse(body), id = previousId ?? randomUUID();
-    const prior = this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=? AND offer_id=?').get(id, offerId) as { version: number | null };
-    if (previousId && !prior.version) throw new HttpError(404, 'Nie znaleziono assessmentu w tej rekrutacji.');
-    const version = (prior.version ?? 0) + 1;
-    this.db.prepare("INSERT INTO faro_assessments(id,version,offer_id,state,content,origin,created_at) VALUES(?,?,?,'DRAFT',?,?,?)").run(id, version, offerId, JSON.stringify(definition), body.origin === 'AI' ? 'AI' : 'HUMAN', this.now());
-    this.audit(userId, 'ASSESSMENT_DRAFT_CREATED', id);
-    return { id, version, state: 'DRAFT' };
-  }
-  approve(userId: string, id: string, body: Record<string, unknown>) {
-    const version = integer(body.version, 1), row = this.definition(id, version);
-    const offer = new OfferService(this.database, this.clock).assigned(userId, row.offer_id);
-    this.member(userId, offer.organizationId, ['OWNER','ADMIN','RECRUITER','HIRING_MANAGER']);
-    const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(id) as {version:number};
-    if(version!==latest.version)throw new HttpError(409,'Starsza wersja jest historią. Przejrzyj najnowszy szkic.','ASSESSMENT_SUPERSEDED');
-    const action = choice(body.action, ['REVIEW','APPROVE'] as const);
-    if ((action === 'REVIEW' && row.state !== 'DRAFT') || (action === 'APPROVE' && row.state !== 'IN_REVIEW')) throw new HttpError(409, 'Assessment wymaga właściwego etapu review.');
-    if (action === 'APPROVE' && body.confirmed !== true) throw new HttpError(400, 'Zatwierdź treść, rubrykę, czas i prawa do zadań.');
-    this.db.prepare('UPDATE faro_assessments SET state=?,approved_by=?,approved_at=? WHERE id=? AND version=?').run(action === 'REVIEW' ? 'IN_REVIEW' : 'APPROVED', action === 'APPROVE' ? userId : null, action === 'APPROVE' ? this.now() : null, id, version);
-    this.audit(userId, `ASSESSMENT_${action}`, id); return { id, version, state: action === 'REVIEW' ? 'IN_REVIEW' : 'APPROVED' };
   }
   assign(userId: string, processId: string, body: Record<string, unknown>) {
     this.recruitment.authorize(userId,processId);
