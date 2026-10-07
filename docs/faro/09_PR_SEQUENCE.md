@@ -410,3 +410,11 @@ CP11-BE full local2026-10-07 check PASS163 Node/35 migrations/both actual restor
 ## CP11-BF — Portable own export and ownership transfer, 2026-10-07
 
 Shared 23 explicit export reads preserve own scoped evidence and exclude import-order/MFA/session/password secrets. Native snapshot requires current authority. Shared owner deletion guard and owner transfer require active owner/successor and atomically write roles/audit. [Scope](CP11_BF_PORTABLE_PRIVATE_EXPORT_OWNERSHIP.md). Local/actual PostgreSQL acceptance pending; runtime SQLite, full plan/release PARTIAL. Continue native erasure/moderation/auth/worker/HTTP/recovery/cutover and external gates.
+
+
+## CP11-BG — Portable transactional account erasure, 2026-10-07
+
+Shared erasure plans and native owned session/MFA/password checks atomically preserve owner-transfer rules, close sole-owner intake, cancel obligations, scrub private statements and record hashed deletion tombstones with account cascades. [Scope](CP11_BG_PORTABLE_ACCOUNT_ERASURE.md). Local/actual PostgreSQL acceptance pending. BF02ce2de actual PostgreSQL18 Node22/24 FARO37654718227 SUCCESS; CI pending. Runtime SQLite; whole plan/release PARTIAL. Continue native auth/moderation/remaining worker/HTTP/recovery/cutover and external gates.
+
+
+CP11-BG local2026-10-07 full check PASS164 Node/35 migrations/lint/typecheck/both restores/38 browsers; final native validation rebuild/targeted privacy4/source70/35 PASS. Actual PostgreSQL acceptance pending. BF02ce2de exact FARO37654718227 and CI37654717684 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.

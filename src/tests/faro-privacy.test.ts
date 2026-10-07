@@ -87,3 +87,26 @@ test('shared organization ownership is transferred with reauthentication before 
     assert.equal(f.profiles.member(f.other.id,f.org.id).role,'OWNER');
   }finally{await f.close();}
 });
+
+test('erasure ledger failure rolls back account, process obligations, private statements and delivery before retry',async()=>{
+  const f=await setup();
+  try{
+    f.app.db.db.prepare("INSERT INTO faro_cases(id,organization_id,process_id,reporter_id,kind,statement,created_at) VALUES('erasure-case',?,?,?,'PROCESS','Prywatne wyjaśnienie',?)").run(f.org.id,f.process.id,f.candidate.id,new Date().toISOString());
+    f.app.db.db.exec("CREATE TRIGGER erasure_ledger_guard BEFORE INSERT ON faro_erasure_log BEGIN SELECT RAISE(ABORT,'erasure ledger failed'); END");
+    for(const account of [f.employer,f.candidate]){
+      const before=f.app.db.db.prepare('SELECT id,status,stage,revision FROM faro_interests WHERE id=?').get(f.process.id);
+      await f.request('/api/account',account.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'},500);
+      assert.ok(f.app.store.getUserById(account.id));
+      assert.deepEqual(f.app.db.db.prepare('SELECT id,status,stage,revision FROM faro_interests WHERE id=?').get(f.process.id),before);
+      assert.equal(new OfferService(f.app.db).get(f.offer.id).status,'PUBLISHED');
+      assert.equal(new AssessmentService(f.app.db).row(f.attempt.id).state,'INVITED');
+      assert.equal(f.app.db.db.prepare('SELECT revoked_at FROM faro_contact_grants WHERE process_id=?').get(f.process.id)?.revoked_at,null);
+      assert.equal(f.app.db.db.prepare("SELECT statement FROM faro_cases WHERE id='erasure-case'").get()?.statement,'Prywatne wyjaśnienie');
+      assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_erasure_log').get()?.n,0);
+      await f.request('/api/me',account.cookie);
+    }
+    f.app.db.db.exec('DROP TRIGGER erasure_ledger_guard');
+    await f.request('/api/account',f.candidate.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});
+    assert.equal(f.app.db.db.prepare("SELECT statement FROM faro_cases WHERE id='erasure-case'").get()?.statement,'Treść usunięta w ramach realizacji prawa do danych.');
+  }finally{await f.close();}
+});
