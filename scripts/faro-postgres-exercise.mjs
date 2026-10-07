@@ -1,3 +1,4 @@
+import { proveNativeCutover } from './faro-postgres-cutover-proof.mjs';
 import { proveNativeRecovery } from './faro-postgres-recovery-proof.mjs';
 import { proveNativeFileDisposal } from './faro-postgres-file-disposal-proof.mjs';
 import { proveNativeHttp } from './faro-postgres-http-proof.mjs';
@@ -653,6 +654,7 @@ try {
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
     await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));
+    await nativeProof('CUTOVER',()=>proveNativeCutover(snapshot,f,candidate,process));
     await nativeProof('RECOVERY',()=>proveNativeRecovery(snapshot,candidate,employer,org,offer));
     await nativeProof('FILE_DISPOSAL',()=>proveNativeFileDisposal(client,f.app.config.dataDir,schema));
     await nativeProof('HTTP',()=>proveNativeHttp(client,f.app.config));

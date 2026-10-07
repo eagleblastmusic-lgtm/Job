@@ -1070,3 +1070,8 @@ BP final full local check PASS170 Node/36 migrations/lint/typecheck/both actual 
 [Scope](CP11_BQ_POSTGRES_AUTHORITY_RECOVERY.md). Shared sensitive operator ledger, consistent native logical backup and atomic fail-closed recovery in isolated schemas. Existing SQLite restore shares ledger reads. Local/native acceptance pending; BP disposal acceptance pending. Retained file restoration remains separately fail-closed; production protected authority/backup/RPO/RTO and cutover still open. Whole plan/release PARTIAL; continue.
 
 BQ full local check PASS170 Node/36 migrations/lint/typecheck/both restores/38 desktop-mobile browsers; source-only71/36 and scripts/diff PASS. Native backup/recovery acceptance pending. BP27a7dc5 FARO37669744080 SUCCESS including actual PostgreSQL disposal/HTTP/browser tests, CI37669744085 pending. Continue cutover rehearsal; production RPO/RTO and external gates open.
+
+
+## CP11-BR — HTTP PostgreSQL cutover/rollback rehearsal, 2026-10-07
+
+[Scope](CP11_BR_POSTGRES_CUTOVER_REHEARSAL.md). Actual isolated listener switch preserves existing read contracts; complete native hash comparison permits read-only rollback and refuses stale-source rollback after native writes. Syntax/lint/diff PASS; actual native acceptance pending. BQ native recovery acceptance pending. BP27a7dc5 FARO37669744080/CI37669744085 SUCCESS. No production deployment/migration; default SQLite and external gates unchanged. Whole plan/release PARTIAL; continue.
