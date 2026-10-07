@@ -1,3 +1,5 @@
+import { userCreatePlan,registrationInput,registrationPlan,loginInput,requireLoginUser,sessionCreatePlan,consentWriteQueries,consentReadQuery,consentsFromRows } from './faro/authWriteModel.js';
+import { FaroStore } from './faro/base.js';
 import { sessionUserQuery,identityUser } from './faro/identityAccessModel.js';
 import { acceptedStageQuery,mutualStageQuery,stageConsentQuery,pairStagePlan } from './faro/stageAnalytics.js';
 import { randomUUID } from 'node:crypto';
@@ -28,7 +30,6 @@ interface ExperienceRow { id: string; employer: string; title: string; normalize
 interface EducationRow { id: string; institution: string; field: string | null; degree: string | null; start_date: string | null; end_date: string | null; description: string | null }
 interface ApplicationRow { id: string; job_id: string; status: ApplicationStatus; applied_at: string | null; source: string; current_stage: string; next_action: string | null; created_at: string; updated_at: string }
 interface OutcomeRow { id: string; application_id: string; outcome_type: string; occurred_at: string; source: string; confidence: number; confirmed_by_user: number; created_at: string }
-interface ConsentRow { consent_type: string; granted: number; version: string; created_at: string }
 
 export interface ConsentRecord { type: string; granted: boolean; version: string; createdAt: string }
 
@@ -74,13 +75,11 @@ export class AppStore {
   private get db() { return this.database.db; }
 
   createUser(input: { email: string; passwordHash: string; name: string; role: 'USER' | 'ADMIN' }): UserRecord {
-    const id = randomUUID();
-    const timestamp = now();
-    this.db.prepare(`INSERT INTO users(id,email,password_hash,name,locale,timezone,role,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id, input.email, input.passwordHash, input.name, 'pl-PL', 'Europe/Warsaw', input.role, timestamp, timestamp);
-    this.db.prepare(`INSERT INTO career_profiles(user_id,created_at,updated_at) VALUES(?,?,?)`).run(id, timestamp, timestamp);
-    this.db.prepare(`INSERT INTO subscriptions(id,user_id,plan,status,trial_ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`).run(randomUUID(), id, 'FREE', 'ACTIVE', null, timestamp, timestamp);
-    return { id, email: input.email, passwordHash: input.passwordHash, name: input.name, locale: 'pl-PL', timezone: 'Europe/Warsaw', role: input.role, createdAt: timestamp, updatedAt: timestamp };
+    const plan=userCreatePlan(input,now());this.identityWrite(plan.queries);return plan.user;
   }
+  private identityWrite(queries:Array<{text:string;values:readonly (string|number|null)[]}>){for(const query of queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));}
+  registerAccount(body:Record<string,unknown>,config:AppConfig,legalVersion:string){const input=registrationInput(body);return new FaroStore(this.database).transaction(()=>{if(this.getUserByEmail(input.email))throw new HttpError(409,'Konto z tym adresem już istnieje.','EMAIL_EXISTS');const plan=registrationPlan(input,config.adminEmails,config.sessionDays,legalVersion,now());this.identityWrite(plan.queries);return {user:plan.user,token:plan.token};});}
+  loginAccount(body:Record<string,unknown>,sessionDays:number){const input=loginInput(body);return new FaroStore(this.database).transaction(()=>{const user=requireLoginUser(input.password,this.getUserByEmail(input.email)),plan=sessionCreatePlan(user.id,sessionDays,now(),'LOGIN');this.identityWrite(plan.queries);return {user,token:plan.token};});}
 
   getUserByEmail(email: string): UserRecord | null {
     const row = this.db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
@@ -282,21 +281,9 @@ export class AppStore {
   }
 
   recordConsent(userId: string, type: 'TERMS' | 'PRIVACY' | 'ANALYTICS', granted: boolean, version: string): ConsentRecord {
-    const createdAt = now();
-    this.db.prepare('INSERT INTO consents(id,user_id,consent_type,granted,version,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(), userId, type, granted ? 1 : 0, version, createdAt);
-    if(type==='ANALYTICS'&&!granted)this.db.prepare("DELETE FROM analytics_events WHERE user_id=? AND event_name='FARO_MUTUAL_STAGE_COMPLETED'").run(userId);
-    this.audit(userId, 'CONSENT_RECORDED', 'consent', type, { granted, version });
-    return { type, granted, version, createdAt };
+    const createdAt=now();return new FaroStore(this.database).transaction(()=>{this.identityWrite(consentWriteQueries(userId,type,granted,version,createdAt));return {type,granted,version,createdAt};});
   }
-
-  listConsents(userId: string): ConsentRecord[] {
-    const rows = this.db.prepare('SELECT consent_type,granted,version,created_at FROM consents WHERE user_id=? ORDER BY created_at DESC').all(userId) as unknown as ConsentRow[];
-    const latest = new Map<string, ConsentRecord>();
-    for (const row of rows) {
-      if (!latest.has(row.consent_type)) latest.set(row.consent_type, { type: row.consent_type, granted: row.granted === 1, version: row.version, createdAt: row.created_at });
-    }
-    return [...latest.values()];
-  }
+  listConsents(userId:string):ConsentRecord[]{const query=consentReadQuery(userId);return consentsFromRows(this.db.prepare(query.text).all({$1:userId}));}
 
   analytics(userId: string | null, eventName: string, properties: Record<string, unknown> = {}): void {
     if(eventName.startsWith('FARO_'))throw new Error('Canonical product analytics requires its verified event producer.');

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { JobDatabase } from './db.js';
 import { loadConfig, type AppConfig } from './config.js';
 import { AppStore, type UserRecord } from './store.js';
-import { assertEmail, assertPassword, hashPassword, hashSessionToken, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, newSessionToken, normalizeEmail, parseCookies, verifyLoginPassword, verifyPassword } from './auth.js';
+import { hashSessionToken, MAX_PASSWORD_LENGTH, parseCookies, verifyPassword } from './auth.js';
 import { deleteStoredFile, storeCvUpload } from './files.js';
 import { cvToPdf } from './pdf.js';
 import { boundedStringArrayField, boundedStringField, HttpError, nullableBooleanField, nullableNumberField, readJson, sendJson, sendText, serveStatic, stringField } from './http.js';
@@ -161,21 +161,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'POST' && pathname === '/api/auth/register') {
     enforceRate(rateMap, `register:${clientIp(req, config)}`, 15, 15 * 60_000);
     const body = await readJson(req);
-    const email = normalizeEmail(stringField(body, 'email') ?? '');
-    const password = stringField(body, 'password') ?? '';
-    const name = boundedStringField(body, 'name', 80, true, 2) ?? '';
-    assertEmail(email); assertPassword(password);
-    if (body.acceptTerms !== true || body.acceptPrivacy !== true) throw new HttpError(400, 'Aby utworzyć konto, zaakceptuj warunki i informację o prywatności.', 'REQUIRED_CONSENT_MISSING');
-    if (store.getUserByEmail(email)) throw new HttpError(409, 'Konto z tym adresem już istnieje.', 'EMAIL_EXISTS');
-    const role = config.adminEmails.has(email) ? 'ADMIN' : 'USER';
-    const user = store.createUser({ email, passwordHash: hashPassword(password), name, role });
-    store.recordConsent(user.id, 'TERMS', true, LEGAL_VERSION);
-    store.recordConsent(user.id, 'PRIVACY', true, LEGAL_VERSION);
-    store.recordConsent(user.id, 'ANALYTICS', body.analyticsConsent === true, LEGAL_VERSION);
-    const token = newSessionToken();
-    const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
-    store.createSession(user.id, token.hash, expires);
-    store.analytics(user.id, 'signup_completed'); store.audit(user.id, 'ACCOUNT_CREATED', 'user', user.id);
+    const {user,token}=store.registerAccount(body,config,LEGAL_VERSION);
     res.setHeader('set-cookie', cookieForSession(token.raw, config));
     sendJson(res, 201, { user: { id: user.id, email: user.email, name: user.name, role: user.role } }); return true;
   }
@@ -183,18 +169,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
   if (method === 'POST' && pathname === '/api/auth/login') {
     enforceRate(rateMap, `login:${clientIp(req, config)}`, 20, 15 * 60_000);
     const body = await readJson(req);
-    const email = normalizeEmail(stringField(body, 'email') ?? '');
-    const password = stringField(body, 'password') ?? '';
-    if (!email || email.length > MAX_EMAIL_LENGTH || !password || password.length > MAX_PASSWORD_LENGTH) {
-      throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
-    }
-    const user = store.getUserByEmail(email);
-    if (!verifyLoginPassword(password, user?.passwordHash)) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
-    if (!user) throw new HttpError(401, 'Nieprawidłowy e-mail lub hasło.', 'INVALID_CREDENTIALS');
-    const token = newSessionToken();
-    const expires = new Date(Date.now() + config.sessionDays * 86400_000).toISOString();
-    store.createSession(user.id, token.hash, expires);
-    store.audit(user.id, 'LOGIN', 'user', user.id);
+    const {user,token}=store.loginAccount(body,config.sessionDays);
     res.setHeader('set-cookie', cookieForSession(token.raw, config));
     sendJson(res, 200, { user: { id: user.id, email: user.email, name: user.name, role: user.role } }); return true;
   }

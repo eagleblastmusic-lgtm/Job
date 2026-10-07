@@ -917,3 +917,11 @@ Shared erasure plans and native owned session/MFA/password checks atomically pre
 
 
 CP11-BG local2026-10-07 full check PASS164 Node/35 migrations/lint/typecheck/both restores/38 browsers; final native validation rebuild/targeted privacy4/source70/35 PASS. Actual PostgreSQL acceptance pending. BF02ce2de exact FARO37654718227 and CI37654717684 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BH — Portable atomic registration/login/consent, 2026-10-07
+
+Shared credential/legal-consent/user/defaults/session/audit plans make existing HTTP registration and login atomic; analytics revocation is atomic and latest-consent reads resolve tied timestamps by newest append. Native sessions preserve private credentials, controlled concurrent registration, current authority/MFA, and own-session logout. [Scope](CP11_BH_PORTABLE_AUTH_CONSENT_WRITES.md). Local/actual PostgreSQL acceptance pending; BGdb0334c published after alternate HTTP/1.1 no-thin Git transfer resolved server push failures. Runtime SQLite; whole plan/release PARTIAL. Continue native moderation/remaining worker/HTTP/recovery/cutover and external gates.
+
+
+CP11-BH local2026-10-07 full check PASS166 Node/35 migrations/lint/typecheck/both restores/38 browsers; source70/35 and syntax/diff PASS. Existing auth/consent/privacy targeted8 PASS; new actual HTTP registration/login/consent audit rollback tests included in full check. Actual PostgreSQL acceptance pending. BGdb0334c remote FARO37655614735 and CI37655614342 queued, no remote PASS claimed. Runtime SQLite; whole plan/release PARTIAL.
