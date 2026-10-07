@@ -530,3 +530,15 @@ test('watch mute deletion failure rolls back preference and pending alerts at re
     await f.request(url,f.candidate.cookie,'PUT',{alerts:false});await f.request(url,f.candidate.cookie,'DELETE');assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id)!.n,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=?").get(f.candidate.id,f.offer.id)!.n,1);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='process' AND entity_id=?").get(f.candidate.id,p.id)!.n,1);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
   }finally{await f.close();}
 });
+
+
+test('phone consent audit failure rolls back grant and audited private read returns no contact on failure',async()=>{
+  const f=await setup();try{
+    const r=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db),db=f.app.db.db,p=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'contact-audit-interest'});
+    r.change(f.employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'contact-audit-advance',nextAction:'Uzgodnienie rozmowy',dueAt:new Date(Date.now()+86400000).toISOString()});
+    const base=`/api/faro/processes/${p.id}`,preview=await f.request<{confirmationToken:string}>(`${base}/phone-preview`,f.candidate.cookie),body={phoneConfirmed:true,confirmationToken:preview.confirmationToken};
+    db.exec("CREATE TRIGGER fail_contact_audit BEFORE INSERT ON audit_logs WHEN NEW.action='PHONE_GRANTED' BEGIN SELECT RAISE(ABORT,'contact audit unavailable'); END");await f.request(`${base}/phone-grant`,f.candidate.cookie,'POST',body,500);assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_contact_grants WHERE process_id=?').get(p.id)!.n,0);db.exec('DROP TRIGGER fail_contact_audit');await f.request(`${base}/phone-grant`,f.candidate.cookie,'POST',body);
+    db.exec("CREATE TRIGGER fail_contact_read BEFORE INSERT ON audit_logs WHEN NEW.action='GRANTED_PHONE_READ' BEGIN SELECT RAISE(ABORT,'contact read audit unavailable'); END");const error=await f.request(`${base}/phone`,f.employer.cookie,'GET',undefined,500);assert.doesNotMatch(JSON.stringify(error),/48500100200/);assert.equal(db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='GRANTED_PHONE_READ' AND entity_id=?").get(p.id)!.n,0);db.exec('DROP TRIGGER fail_contact_read');assert.deepEqual(await f.request(`${base}/phone`,f.employer.cookie),{phone:'+48500100200'});
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE entity_id=? AND metadata LIKE '%48500100200%'").get(p.id)!.n,0);await f.request(`${base}/phone-grant`,f.candidate.cookie,'DELETE');await f.request(`${base}/phone`,f.employer.cookie,'GET',undefined,403);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});

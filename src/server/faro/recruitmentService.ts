@@ -1,3 +1,4 @@
+import { contactPhoneQuery,contactGrantQuery,requireContactOwner,contactPreview,requireContactConfirmation,contactWriteQueries,requireContactGrant,contactAuditQuery } from './contactModel.js';
 import { watchReadQuery,watchApplicantQuery,watchListQuery,watchStateQuery,watchAlertPlan,watchCancelQueries } from './watchModel.js';
 import { processChangePlan,processCancelQueries } from './processWriteModel.js';
 import { processReadQuery,processListReadQuery,processFromRows,processContextReadQueries,processViewFromRows,processLatestDataQuery,processClarificationFromRows,processEmploymentFromRows,type ProcessRow } from './processReadModel.js';
@@ -5,7 +6,7 @@ export type { ProcessRow } from './processReadModel.js';
 import { interestReadQueries,interestPlan,processRecruiterReadQuery,processEventQueries } from './interestWriteModel.js';
 import { commandRequest,commandReadQuery,commandReplay,commandSaveQuery } from './commandJournal.js';
 import { AppStore } from '../store.js';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { ProfileService } from './profileService.js';
 import { OfferService } from './offerService.js';
@@ -112,34 +113,23 @@ export class RecruitmentService extends FaroStore {
     });
   }
   phonePreview(userId:string,id:string) {
-    const row=this.row(id);
-    if(row.candidate_id!==userId)throw new HttpError(404,'Nie znaleziono procesu.');
-    if(!['ACTIVE','OFFERED'].includes(row.status))throw new HttpError(409,'Telefon udostępnisz dopiero po przyjęciu do kolejnego etapu.');
-    const phone=new ProfileService(this.database,this.clock).profile(userId).phone;
-    if(!phone)throw new HttpError(400,'Najpierw zapisz prywatny numer w profilu.');
-    const confirmationToken=createHash('sha256').update(JSON.stringify([userId,id,phone])).digest('hex');
-    return {phone,confirmationToken};
+    const row=this.row(id);requireContactOwner(row,userId);const query=contactPhoneQuery(userId),phone=this.db.prepare(query.text).get({$1:userId})?.phone as string|null??null;
+    return contactPreview(row,userId,phone);
   }
-  grant(userId: string, id: string, grant: boolean, body:Record<string,unknown>={}) {
+  grant(userId:string,id:string,grant:boolean,body:Record<string,unknown>={}) {
     return this.transaction(()=>{
-      const row = this.row(id);
-      if (row.candidate_id !== userId) throw new HttpError(404, 'Nie znaleziono procesu.');
-      if (grant) {
-        const preview=this.phonePreview(userId,id);
-        if(body.phoneConfirmed!==true)throw new HttpError(400,'Potwierdź udostępnienie wyświetlonego numeru.','CONFIRMATION_REQUIRED');
-        if(body.confirmationToken!==preview.confirmationToken)throw new HttpError(409,'Numer zmienił się. Otwórz aktualny podgląd.','PHONE_PREVIEW_STALE');
-        this.db.prepare('INSERT INTO faro_contact_grants(process_id,candidate_id,organization_id,granted_at) VALUES(?,?,?,?) ON CONFLICT(process_id) DO UPDATE SET granted_at=excluded.granted_at,revoked_at=NULL').run(id, userId, this.offers.get(row.offer_id).organizationId, this.now());
-      } else this.db.prepare('UPDATE faro_contact_grants SET revoked_at=? WHERE process_id=? AND candidate_id=?').run(this.now(), id, userId);
-      this.audit(userId, grant ? 'PHONE_GRANTED' : 'PHONE_REVOKED', id);
-      return { granted: grant };
+      const row=this.row(id);requireContactOwner(row,userId);
+      if(grant)requireContactConfirmation(body,this.phonePreview(userId,id));
+      for(const query of contactWriteQueries(userId,id,grant?this.offers.get(row.offer_id).organizationId:null,grant,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      return {granted:grant};
     });
   }
-  phone(userId: string, id: string) {
-    const row = this.row(id); this.offers.assigned(userId, row.offer_id);
-    const grant = this.db.prepare('SELECT process_id FROM faro_contact_grants WHERE process_id=? AND revoked_at IS NULL').get(id);
-    if (!grant || !['ACTIVE','OFFERED'].includes(row.status)) throw new HttpError(403, 'Kandydat nie udostępnia teraz numeru.', 'CONTACT_NOT_GRANTED');
-    this.audit(userId, 'GRANTED_PHONE_READ', id);
-    return { phone: new ProfileService(this.database, this.clock).profile(row.candidate_id).phone };
+  phone(userId:string,id:string) {
+    return this.transaction(()=>{
+      const row=this.row(id);this.offers.assigned(userId,row.offer_id);const read=contactGrantQuery(id);requireContactGrant(row,this.db.prepare(read.text).get({$1:id}));
+      const query=contactPhoneQuery(row.candidate_id),phone=this.db.prepare(query.text).get({$1:row.candidate_id})?.phone as string|null??null,audit=contactAuditQuery(userId,id,'GRANTED_PHONE_READ',this.now());this.db.prepare(audit.text).run(Object.fromEntries(audit.values.map((value,index)=>[`$${index+1}`,value])));
+      return {phone};
+    });
   }
   claimOutbox(limit=100,leaseMs=30000) {
     integer(limit,1,100);integer(leaseMs,1000,300000);
