@@ -1,3 +1,4 @@
+import { interviewChangeInput,interviewSchedulePlan } from './interviewScheduleModel.js';
 import { interviewProposalContextQueries,interviewProposalInput,interviewProposalPlan } from './interviewProposalModel.js';
 import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar,type InterviewRow } from './interviewReadModel.js';
 import { randomUUID } from 'node:crypto';
@@ -5,7 +6,7 @@ import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { AppStore } from '../store.js';
 import { HttpError } from '../http.js';
-import { choice, integer } from './validation.js';
+import { choice } from './validation.js';
 
 export class InterviewService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database,this.clock); }
@@ -58,26 +59,19 @@ export class InterviewService extends FaroStore {
     });
   }
   change(userId:string,id:string,body:Record<string,unknown>) {
-    this.recruitment.authorize(userId,this.row(id).process_id);
+    const authorize=()=>{const p=this.recruitment.authorize(userId,this.row(id).process_id);if(p.candidate_id!==userId)this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);};authorize();
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},()=>{
       const row=this.row(id),p=this.recruitment.authorize(userId,row.process_id),candidate=p.candidate_id===userId;
       if(!candidate)this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==p.revision)throw new HttpError(409,'Odśwież rozmowę i proces.','VERSION_CONFLICT');
-      if(p.status!=='ACTIVE'||!['PROPOSED','CONFIRMED'].includes(row.state))throw new HttpError(409,'Rozmowa nie jest aktywna.','INVALID_TRANSITION');
-      const command=choice(body.command,['CONFIRM','CANCEL','COMPLETE','DISPUTE'] as const);
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź działanie dotyczące rozmowy.','CONFIRMATION_REQUIRED');
+      const command=interviewChangeInput(row,p,body);
+      if(command==='CONFIRM'||command==='CANCEL') {
+        const plan=interviewSchedulePlan(userId,row,p,body,this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours,this.now());
+        if(command==='CONFIRM'){this.recruitment.offers.assigned(row.recruiter_id!,p.offer_id);this.available(p.candidate_id,row.recruiter_id!,row.starts_at,row.ends_at);}
+        for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+        this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);return this.view(userId,id);
+      }
       let state:InterviewRow['state']=row.state,stage=p.stage,due=p.stage_due_at,action=p.next_action,caseId:string|null=null;
-      if(command==='CONFIRM') {
-        if(!candidate||row.state!=='PROPOSED'||row.confirm_by<=this.now())throw new HttpError(409,'Potwierdzenie nie jest już dostępne.');
-        if(!row.recruiter_id)throw new HttpError(409,'Rekruter nie jest dostępny.');
-        this.recruitment.offers.assigned(row.recruiter_id,p.offer_id);
-        this.available(p.candidate_id,row.recruiter_id,row.starts_at,row.ends_at);
-        state='CONFIRMED'; stage='INTERVIEW_CONFIRMED'; due=row.ends_at; action='Rozmowa potwierdzona przez obie strony.';
-      } else if(command==='CANCEL') {
-        choice(body.reason,['RESCHEDULE','UNAVAILABLE','TECHNICAL_ISSUE'] as const);
-        state='CANCELLED'; stage='ACCEPTED_TO_NEXT_STAGE'; action='Uzgodnij nowy termin rozmowy.';
-        due=new Date(this.clock().getTime()+this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours*3600000).toISOString();
-      } else {
+      {
         if(row.state!=='CONFIRMED'||row.ends_at>this.now())throw new HttpError(409,'Najpierw musi upłynąć potwierdzony termin rozmowy.');
         if(command==='COMPLETE') {
           if(candidate?row.candidate_completed:row.employer_completed)throw new HttpError(409,'Twoje potwierdzenie zostało już zapisane.');
@@ -99,9 +93,9 @@ export class InterviewService extends FaroStore {
       }
       this.db.prepare('UPDATE faro_interviews SET state=?,revision=revision+1 WHERE id=?').run(state,id);
       this.db.prepare('UPDATE faro_interests SET stage=?,stage_due_at=?,next_action=?,revision=revision+1 WHERE id=?').run(stage,due,action,p.id);
-      this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,caseId,reason:command==='CANCEL'||command==='DISPUTE'?body.reason:null});
+      this.recruitment.event(p,userId,`INTERVIEW_${command}`,{interviewId:id,state,stage,stageDueAt:due,caseId,reason:command==='DISPUTE'?body.reason:null});
       if(state==='COMPLETED')new AppStore(this.database).faroMutualStageCompleted(id);
       return this.view(userId,id);
-    });
+    },authorize);
   }
 }

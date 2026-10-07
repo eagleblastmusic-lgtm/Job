@@ -342,3 +342,9 @@ CP11-AV2aecadd exact final acceptance2026-10-07: CI37624773883 SUCCESS, supersed
 CP11-AW7ff9387 full local check PASS162 Node/35 migrations/both actual restores/38 browsers/lint/typecheck, zero skips. Targeted interview calendar/DST/private scope PASS1; source70/35 and syntax/diff PASS. [FARO37625449062](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37625449062) SUCCESS including actual PostgreSQL18 Node22/24 scoped detail/list/calendar/current authority/collision boundary and actual image closed release. CI37625448959 pending. Draft103 unmerged, runtime SQLite and whole plan/release PARTIAL.
 
 CP11-AW draft [#103](https://github.com/eagleblastmusic-lgtm/Job/pull/103): codex/faro-cp11aw-interview-views base codex/faro-cp11av-cohort-correction, code7ff9387. Full local and FARO37625449062 PASS; CI37625448959 pending. Unmerged, whole plan/release PARTIAL.
+
+CP11-AW7ff9387 exact final acceptance2026-10-07: CI37625448959 SUCCESS, superseding pending; FARO37625449062 also SUCCESS. Actual PostgreSQL18 Node22/24 private interview views/calendar and full162 Node/35 migrations/both restores/38 browsers/image closed-release proof PASS, zero skips. Draft103 unmerged; runtime SQLite, whole plan/release PARTIAL.
+
+CP11-AX16f08d1 full local check PASS162 Node/35 migrations/both actual restores/38 browsers/lint/typecheck, zero skips. Targeted real API delivery rollback/current replay role/DST/neutral expiry PASS2; source70/35 and syntax/diff PASS. Actual PostgreSQL18 Node22/24 proposal/guards/atomic delivery/original clocks PASS in FARO37626238389; full FARO/CI37626238345 final acceptance pending. Draft104 unmerged, runtime SQLite and whole plan/release PARTIAL.
+
+CP11-AX draft [#104](https://github.com/eagleblastmusic-lgtm/Job/pull/104): codex/faro-cp11ax-interview-proposal base codex/faro-cp11aw-interview-views, code16f08d1. Full local and actual PostgreSQL22/24 PASS; full FARO/CI acceptance pending. Unmerged, whole plan/release PARTIAL.
