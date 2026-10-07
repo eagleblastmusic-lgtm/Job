@@ -130,3 +130,10 @@ test('erasure after claim prevents stale worker inbox delivery from a cached rec
     assert.equal(r.deliverClaimedOutbox(claim.id,claim.claimToken),false);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM notifications').get()!.n,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_outbox').get()!.n,0);
   }finally{await f.close();}
 });
+
+
+test('async scheduler fences overlap, awaits active work before closure and minimizes rejected diagnostics',async()=>{
+ let release!:()=>void,complete=false;const worker=new FaroWorker(()=>new Promise<void>(resolve=>{release=()=>{complete=true;resolve();};}),true,1000);
+ const first=worker.run();assert.equal(worker.run(),false);assert.equal(worker.status().runs,1);worker.stop();let idle=false;const closing=worker.idle().then(()=>{idle=true;});await Promise.resolve();assert.equal(idle,false);release();assert.equal(await first,true);await closing;assert.equal(complete,true);assert.equal(worker.run(),false);
+ const failed=new FaroWorker(async()=>{throw new Error('private recipient SQL');},false,1000);assert.equal(await failed.run(),false);assert.equal(failed.status().lastErrorCode,'WORKER_TICK_FAILED');assert.equal(JSON.stringify(failed.status()).includes('recipient'),false);await failed.idle();failed.stop();
+});

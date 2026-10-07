@@ -129,7 +129,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     }
     if (path === '/api/faro/worker/tick' && method === 'POST') {
       if (user.role !== 'ADMIN') throw new HttpError(403, 'Wymagany moderator.', 'FORBIDDEN');
-      if (!worker.run()) throw new HttpError(503, 'Cykl powiadomień nie został ukończony. Sprawdź diagnostykę.', 'WORKER_TICK_FAILED');
+      if (!await worker.run()) throw new HttpError(503, 'Cykl powiadomień nie został ukończony. Sprawdź diagnostykę.', 'WORKER_TICK_FAILED');
       return ok({ ok: true });
     }
     if (path === '/api/faro/worker/status' && method === 'GET') {

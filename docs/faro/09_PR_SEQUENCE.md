@@ -397,3 +397,11 @@ CP11-BB/BCf3fffd4 actual PostgreSQL passed corrected tick fixtures then refused 
 
 
 CP11-BD full local2026-10-07 check PASS162 Node/35 migrations/both actual restores/38 real desktop/mobile browsers/lint/typecheck, zero skips. Targeted MFA/session PASS4 includes real failure/enrollment audit rollback; source70/35 and syntax/diff PASS. Actual native PostgreSQL18 Node22/24 acceptance pending. BB/BC63f914a corrected PostgreSQL18 Node22/24 PASS in FARO37652009031; full FARO/CI37652008809 acceptance pending. Original fixture failures retained; UNIQUE/current identity/source deletion guards unchanged. Runtime SQLite and whole plan/release PARTIAL. Continue native durable outbox/worker and remaining auth/privacy/moderation/HTTP/recovery/cutover.
+
+
+## CP11-BE — Portable durable outbox and async scheduler, 2026-10-07
+
+Shared lease/budget/delivery/eligibility/backoff/reviewed retry plans; native SERIALIZABLE SKIP LOCKED claim and owned delivery, bounded conflict retry and authority-before-replay. Async scheduler fences overlap and drains active work before DB closure. [Scope](CP11_BE_PORTABLE_OUTBOX_WORKER.md). Targeted worker/recruitment PASS26 and rebuilt async worker PASS7; full local/actual PostgreSQL acceptance pending. Runtime SQLite; full plan/release PARTIAL. Continue native privacy/moderation/auth/worker/HTTP/recovery/cutover/external gates.
+
+
+CP11-BE full local2026-10-07 check PASS163 Node/35 migrations/both actual restores/38 browsers/lint/typecheck, zero skips. Worker/recruitment targeted26 and rebuilt async worker7 PASS; source70/35 and syntax/diff PASS. Actual PostgreSQL/remote acceptance pending. CP11-BD2d20ff2 exact FARO37652974322 and CI37652973856 SUCCESS, including native PostgreSQL18 Node22/24 encrypted setup/activation/OTP/recovery/rate/audit rollback proofs. Initial MFA fixture counter assertion was corrected for direct driver bigint string without changing stored evidence; full rerun supersedes failure at5f5bcbc. BB/BC63f914a FARO37652009031 and CI37652008809 SUCCESS; earlier fixture errors retained. Runtime SQLite, whole plan/release PARTIAL; continue native privacy/moderation/auth/worker/HTTP/recovery/cutover and external gates.

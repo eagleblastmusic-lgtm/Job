@@ -41,5 +41,5 @@ export function createFaroApp(overrides: Partial<AppConfig> = {}) {
       sendJson(res, failure.status, { error: { code: failure.code, message: failure.message } });
     }
   });
-  return { ...app, worker, close: async () => { worker.stop(); await app.close(); } };
+  return { ...app, worker, close: async () => { worker.stop(); await worker.idle(); await app.close(); } };
 }

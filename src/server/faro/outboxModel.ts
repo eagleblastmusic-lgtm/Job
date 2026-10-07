@@ -1,0 +1,38 @@
+import { randomUUID } from 'node:crypto';
+import { HttpError } from '../http.js';
+import { integer,choice } from './validation.js';
+import { runCommandOnce } from './commandJournal.js';
+export interface OutboxRow {recipient_id:string;entity_type:string;entity_id:string;message:string;dedupe_key:string;}
+type Query={text:string;values:(string|number|null)[]};
+export function outboxBudgetQuery(asOf:string):Query{return {text:"UPDATE faro_outbox SET status='DEAD_LETTER',error_code=CASE WHEN lease_until IS NULL THEN 'ATTEMPT_BUDGET_EXHAUSTED' ELSE 'LEASE_EXPIRED' END,claim_token=NULL,lease_until=NULL WHERE status='PENDING' AND attempts>=max_attempts AND (lease_until IS NULL OR lease_until<=$1)",values:[asOf]};}
+export function outboxDueQuery(asOf:string,limit:number,postgres=false):Query{integer(limit,1,100);return {text:"SELECT id FROM faro_outbox WHERE status='PENDING' AND attempts<max_attempts AND next_attempt_at<=$1 AND (lease_until IS NULL OR lease_until<=$1) ORDER BY next_attempt_at,id LIMIT $2"+(postgres?' FOR UPDATE SKIP LOCKED':''),values:[asOf,limit]};}
+export function outboxClaimQuery(id:string,asOf:string,leaseMs:number){integer(leaseMs,1000,300000);const claimToken=randomUUID();return {claim:{id,claimToken},query:{text:'UPDATE faro_outbox SET claim_token=$1,lease_until=$2,attempts=attempts+1 WHERE id=$3',values:[claimToken,new Date(Date.parse(asOf)+leaseMs).toISOString(),id]}};}
+export function outboxClaimedQuery(id:string,token:string,asOf:string,failure=false):Query{return {text:`SELECT ${failure?'attempts,max_attempts':'recipient_id,entity_type,entity_id,message,dedupe_key'} FROM faro_outbox WHERE id=$1 AND status='PENDING' AND claim_token=$2 AND lease_until>$3`,values:[id,token,asOf]};}
+export function outboxEligibilityQueries(row:Omit<OutboxRow,'message'>){return [{text:'SELECT alerts FROM faro_watches WHERE candidate_id=$1 AND offer_id=$2',values:[row.recipient_id,row.entity_id]},{text:'SELECT id FROM faro_interests WHERE candidate_id=$1 AND offer_id=$2 LIMIT 1',values:[row.recipient_id,row.entity_id]}];}
+export function outboxEligible(row:Omit<OutboxRow,'message'>,rows:Record<string,unknown>[][]){return row.entity_type!=='offer'||Number(rows[0]?.[0]?.alerts)===1||(!row.dedupe_key.endsWith(':closing-soon')&&Boolean(rows[1]?.length));}
+export function outboxDeliveryQueries(id:string,token:string,row:OutboxRow,asOf:string):Query[]{return [{text:"INSERT INTO notifications(id,user_id,notification_type,entity_type,entity_id,message,dedupe_key,created_at,updated_at) VALUES($1,$2,'FOLLOW_UP',$3,$4,$5,$6,$7,$7) ON CONFLICT(user_id,dedupe_key) DO NOTHING",values:[randomUUID(),row.recipient_id,row.entity_type,row.entity_id,row.message,`faro:${row.dedupe_key}`,asOf]},{text:"UPDATE faro_outbox SET status='DELIVERED',error_code=NULL,claim_token=NULL,lease_until=NULL WHERE id=$1 AND claim_token=$2",values:[id,token]}];}
+export function outboxFailureQuery(id:string,token:string,row:{attempts:number;max_attempts:number},asOf:string):Query{return {text:'UPDATE faro_outbox SET status=$1,error_code=$2,next_attempt_at=$3,claim_token=NULL,lease_until=NULL WHERE id=$4 AND claim_token=$5',values:[row.attempts>=row.max_attempts?'DEAD_LETTER':'PENDING','DELIVERY_FAILED',new Date(Date.parse(asOf)+Math.min(3600000,1000*2**Math.min(row.attempts-1,12))).toISOString(),id,token]};}
+export function outboxRetryPlan(userId:string,id:string,row:{status:string;attempts:number}|undefined,body:Record<string,unknown>,asOf:string){
+ if(!row)throw new HttpError(404,'Nie znaleziono operacji.');if(row.status!=='DEAD_LETTER'||integer(body.expectedAttempts)!==row.attempts)throw new HttpError(409,'Stan operacji zmienił się.','VERSION_CONFLICT');if(body.confirmed!==true)throw new HttpError(400,'Potwierdź sprawdzenie przyczyny niepowodzenia.','CONFIRMATION_REQUIRED');const reason=choice(body.reasonCode,['TRANSIENT_FAILURE_RESOLVED','LEASE_RECOVERY_REVIEWED'] as const);
+ return {action:`OUTBOX_RETRY_${reason}`,query:{text:"UPDATE faro_outbox SET status='PENDING',max_attempts=$1,next_attempt_at=$2,claim_token=NULL,lease_until=NULL WHERE id=$3",values:[row.attempts+5,asOf,id]},audit:{text:"INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES($1,$2,$3,'faro',$4,'{}',$5)",values:[randomUUID(),userId,`OUTBOX_RETRY_${reason}`,id,asOf]}};
+}
+interface OutboxDatabase {
+ readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;
+ query(text:string,values:readonly unknown[]):Promise<unknown>;
+ transaction<T>(work:()=>T|Promise<T>):Promise<T>;
+}
+async function outboxTransaction<T>(database:OutboxDatabase,work:()=>Promise<T>):Promise<T>{for(let attempt=0;;attempt++){try{return await database.transaction(work);}catch(error){if(attempt>=2||!['40001','40P01'].includes((error as {code?:string}).code??''))throw error;}}}
+export async function claimOutbox(database:OutboxDatabase,asOf:string,authorizeWorker:()=>void|Promise<void>,limit=100,leaseMs=30000){integer(limit,1,100);integer(leaseMs,1000,300000);return outboxTransaction(database,async()=>{
+ await authorizeWorker();const budget=outboxBudgetQuery(asOf);await database.query(budget.text,budget.values);const rows=(await database.readBatch([outboxDueQuery(asOf,limit,true)]))[0]??[],claims=[];for(const row of rows){const plan=outboxClaimQuery(row.id as string,asOf,leaseMs);await database.query(plan.query.text,plan.query.values);claims.push(plan.claim);}return claims;
+});}
+export async function deliverClaimedOutbox(database:OutboxDatabase,id:string,token:string,asOf:string,authorizeWorker:()=>void|Promise<void>){
+ let authorized=false;try{return await outboxTransaction(database,async()=>{await authorizeWorker();authorized=true;const row=(await database.readBatch([outboxClaimedQuery(id,token,asOf)]))[0]?.[0] as unknown as OutboxRow|undefined;if(!row)return false;
+  if(!outboxEligible(row,row.entity_type==='offer'?await database.readBatch(outboxEligibilityQueries(row)):[])){await database.query('DELETE FROM faro_outbox WHERE id=$1 AND claim_token=$2',[id,token]);return false;}
+  for(const query of outboxDeliveryQueries(id,token,row,asOf))await database.query(query.text,query.values);return true;
+ });}catch(error){if(!authorized)throw error;return outboxTransaction(database,async()=>{await authorizeWorker();const row=(await database.readBatch([outboxClaimedQuery(id,token,asOf,true)]))[0]?.[0] as {attempts:number;max_attempts:number}|undefined;if(row){const query=outboxFailureQuery(id,token,row,asOf);await database.query(query.text,query.values);}return false;});}
+}
+export async function retryDeadLetter(database:OutboxDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>){return runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'OUTBOX_RETRY'},asOf,async()=>{await authorize();if((await database.readBatch([{text:'SELECT role FROM users WHERE id=$1',values:[userId]}]))[0]?.[0]?.role!=='ADMIN')throw new HttpError(403,'Wymagany administrator.','FORBIDDEN');},async()=>{
+ const row=(await database.readBatch([{text:'SELECT status,attempts,recipient_id,entity_type,entity_id,message,dedupe_key FROM faro_outbox WHERE id=$1',values:[id]}]))[0]?.[0] as unknown as OutboxRow&{status:string;attempts:number}|undefined,plan=outboxRetryPlan(userId,id,row,body,asOf);
+ if(!outboxEligible(row!,row!.entity_type==='offer'?await database.readBatch(outboxEligibilityQueries(row!)):[]))throw new HttpError(409,'Operacja nie spełnia aktualnych warunków dostarczenia.','OUTBOX_NO_LONGER_ELIGIBLE');
+ for(const query of [plan.query,plan.audit])await database.query(query.text,query.values);return {id,queued:true};
+});}
