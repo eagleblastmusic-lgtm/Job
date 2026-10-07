@@ -1,3 +1,4 @@
+import { type CorrectedKey,correctedKeyQuery,cohortAttemptsQuery,cohortKeyInput,cohortEffect,cohortPreview,cohortPublicPreview } from './assessmentCohortReadModel.js';
 import { assessmentRetryPlan,attemptRetryContextQueries } from './assessmentRetryModel.js';
 import { incidentReportPlan,incidentResolutionPlan,otherActiveAttemptQuery,requireIncidentCandidate } from './assessmentIncidentModel.js';
 import { assessmentAmendmentPlan } from './assessmentAmendmentModel.js';
@@ -9,12 +10,12 @@ import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.j
 import { type AttemptRow,type IncidentRow,attemptHistoryQuery,attemptHistoryFromRows,attemptIncidentQuery,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
 import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { OfferService } from './offerService.js';
 import { HttpError } from '../http.js';
-import { text, integer, array, object } from './validation.js';
+import { integer } from './validation.js';
 import { TERMINAL } from '../../domain/faro/recruitment.js';
 export class AssessmentService extends FaroStore {
   get recruitment() { return new RecruitmentService(this.database, this.clock); }
@@ -22,32 +23,17 @@ export class AssessmentService extends FaroStore {
     const query=assessmentDefinitionQuery(id,version);return assessmentDefinitionFromRows(this.db.prepare(query.text).all({$1:id,$2:version}));
   }
   private correctedKey(id:string,version:number) {
-    return this.db.prepare('SELECT id,revision,accepted_options FROM faro_key_corrections WHERE assessment_id=? AND assessment_version=? ORDER BY revision DESC LIMIT 1').get(id,version) as {id:string;revision:number;accepted_options:string}|undefined;
+    const query=correctedKeyQuery(id,version);return this.db.prepare(query.text).get({$1:id,$2:version}) as CorrectedKey|undefined;
   }
   previewKeyCorrection(userId:string,id:string,version:number,body:Record<string,unknown>) {
-    const definition=this.read(userId,id,version),content=JSON.parse(definition.content) as Definition;
-    if(content.type!=='QUIZ')throw new HttpError(409,'Odpowiedzi otwarte wymagają indywidualnego ręcznego przeglądu, bez klucza quizu.','NO_OBJECTIVE_KEY');
-    if(definition.state!=='APPROVED')throw new HttpError(409,'Korekta dotyczy zatwierdzonej przypisanej wersji.');
-    const reason=text(body.reason,1000,10),raw=object(body.acceptedOptions),key:Record<string,number[]>={};
-    if(Object.keys(raw).length!==content.tasks.length||Object.keys(raw).some(k=>!content.tasks.some(t=>t.id===k)))throw new HttpError(400,'Podaj wspólny klucz wszystkich zadań.');
-    for(const task of content.tasks) {const options=array(raw[task.id],task.options.length).map(v=>integer(v,0,task.options.length-1));if(!options.length||new Set(options).size!==options.length)throw new HttpError(400,'Wybierz poprawne odpowiedzi bez duplikatów.');key[task.id]=options.sort((a,b)=>a-b);}
-    const previous=this.correctedKey(id,version),original=Object.fromEntries(content.tasks.map(t=>[t.id,[t.answer]]));
-    if(JSON.stringify(key)===JSON.stringify(previous?JSON.parse(previous.accepted_options):original))throw new HttpError(409,'Wspólny klucz nie zmienił się.');
-    const rows=this.db.prepare('SELECT a.id FROM faro_attempts a WHERE a.assessment_id=? AND a.assessment_version=? ORDER BY a.id').all(id,version) as Array<{id:string}>;
+    const definition=this.read(userId,id,version),previous=this.correctedKey(id,version),{content,key,reason}=cohortKeyInput(definition,previous,body),query=cohortAttemptsQuery(id,version),rows=this.db.prepare(query.text).all({$1:id,$2:version}) as Array<{id:string}>;
     if(rows.length>500)throw new HttpError(409,'Grupa wymaga osobnego kontrolowanego przeglądu operacyjnego.');
-    const effects=rows.map(({id:attemptId})=>{
-      const attempt=this.row(attemptId),process=this.recruitment.row(attempt.process_id),history=this.resultHistory(attemptId).at(-1),answers=JSON.parse(attempt.answers) as Record<string,number>;
-      this.recruitment.offers.assigned(userId,process.offer_id);
-      const breakdown=content.tasks.map(t=>({taskId:t.id,earned:answers[t.id]===undefined?null:key[t.id]!.includes(answers[t.id]!)?t.points:0,possible:t.points}));
-      return {attemptId,state:attempt.state,validity:history?.validity??null,manual:history?.result.review==='AMENDED',before:history?.result.earned??null,after:attempt.state==='FINALIZED'&&history?.validity==='VALID'?breakdown.reduce((sum,t)=>sum+(t.earned??0),0):null,attempt,processRevision:process.revision,history,breakdown};
-    });
-    const blocked=effects.some(e=>['INVITED','STARTED','SCORED_PENDING_REVIEW'].includes(e.state)),manualCount=effects.filter(e=>e.manual&&e.validity==='VALID').length;
-    const token=createHash('sha256').update(JSON.stringify({userId,id,version,definition,previous,key,reason,effects})).digest('hex');
-    return {token,key,reason,blocked,manualCount,effects};
+    const effects=rows.map(({id:attemptId})=>{const attempt=this.row(attemptId),process=this.recruitment.row(attempt.process_id);this.recruitment.offers.assigned(userId,process.offer_id);return cohortEffect(content,key,attempt,process.revision,this.resultHistory(attemptId).at(-1));});
+    return cohortPreview(userId,id,version,definition,previous,key,reason,effects);
   }
   keyCorrectionPreview(userId:string,id:string,version:number,body:Record<string,unknown>) {
     const p=this.previewKeyCorrection(userId,id,version,body);
-    return {token:p.token,blocked:p.blocked,manualCount:p.manualCount,affected:p.effects.filter(e=>e.after!==null).length,attempts:p.effects.map(e=>({id:e.attemptId,state:e.state,validity:e.validity,individualAmendment:e.manual,before:e.before,after:e.after}))};
+    return cohortPublicPreview(p);
   }
   correctCohortKey(userId:string,id:string,version:number,body:Record<string,unknown>) {
     this.read(userId,id,version);
