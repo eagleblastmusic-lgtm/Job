@@ -517,3 +517,16 @@ test('terminal command audit failure rolls back live assessment, process and jou
     assert.equal(r.row(p.id).status,'REJECTED');assert.equal(r.row(p.id).response_due_at,processBefore.response_due_at);assert.equal(r.row(p.id).first_response_at,processBefore.first_response_at);assert.equal(r.row(p.id).snapshot,processBefore.snapshot);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='REJECT'").get(p.id)!.n,1);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
   }finally{await f.close();}
 });
+
+
+test('watch mute deletion failure rolls back preference and pending alerts at real API while applicant updates remain independent',async()=>{
+  const f=await setup();try{
+    const r=new RecruitmentService(f.app.db),profiles=new ProfileService(f.app.db),db=f.app.db.db,url=`/api/faro/offers/${f.offer.id}/watch`;
+    await f.request(url,f.candidate.cookie,'POST');r.enqueue(f.candidate.id,'offer',f.offer.id,'Zmiana oferty','watch-regular');r.enqueue(f.candidate.id,'offer',f.offer.id,'Kończąca się oferta','watch:closing-soon');
+    db.exec("CREATE TRIGGER fail_watch_delete BEFORE DELETE ON faro_outbox WHEN OLD.entity_type='offer' BEGIN SELECT RAISE(ABORT,'watch cancellation unavailable'); END");
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:false},500);assert.equal(db.prepare('SELECT alerts FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id)!.alerts,1);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=?").get(f.candidate.id,f.offer.id)!.n,2);
+    db.exec('DROP TRIGGER fail_watch_delete');await f.request(url,f.candidate.cookie,'PUT',{alerts:false});assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=?").get(f.candidate.id,f.offer.id)!.n,0);
+    const p=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'watch-independent-interest'});r.enqueue(f.candidate.id,'offer',f.offer.id,'Warunki zgłoszenia','applicant-update');r.enqueue(f.candidate.id,'offer',f.offer.id,'Opcjonalne przypomnienie','applicant:closing-soon');
+    await f.request(url,f.candidate.cookie,'PUT',{alerts:false});await f.request(url,f.candidate.cookie,'DELETE');assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_watches WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id)!.n,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='offer' AND entity_id=?").get(f.candidate.id,f.offer.id)!.n,1);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE recipient_id=? AND entity_type='process' AND entity_id=?").get(f.candidate.id,p.id)!.n,1);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
