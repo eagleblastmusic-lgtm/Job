@@ -1,8 +1,9 @@
+import { pendingInterviewsQuery,interviewExpiryQueries,interviewReminderQueries } from './interviewTickModel.js';
 import { interviewOutcomePlan,interviewModeratorQuery,interviewCaseNotifications } from './interviewOutcomeModel.js';
 import { processRecruiterReadQuery } from './interestWriteModel.js';
 import { interviewChangeInput,interviewSchedulePlan } from './interviewScheduleModel.js';
 import { interviewProposalContextQueries,interviewProposalInput,interviewProposalPlan } from './interviewProposalModel.js';
-import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar,type InterviewRow } from './interviewReadModel.js';
+import { interviewReadQuery,interviewFromRows,interviewListQuery,interviewView,interviewSlotQuery,requireInterviewSlot,interviewCalendar } from './interviewReadModel.js';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { AppStore } from '../store.js';
@@ -34,27 +35,14 @@ export class InterviewService extends FaroStore {
 
   tick() {
     this.transaction(()=>{
-      const pending=this.db.prepare("SELECT * FROM faro_interviews WHERE state IN ('PROPOSED','CONFIRMED')").all() as unknown as InterviewRow[];
-      for(const row of pending) {
-        const p=this.recruitment.row(row.process_id);
-        if(p.status!=='ACTIVE')continue;
+      const pending=this.db.prepare(pendingInterviewsQuery().text).all() as Array<{id:string}>;
+      for(const item of pending) {
+        const row=this.row(item.id),p=this.recruitment.row(row.process_id);if(p.status!=='ACTIVE')continue;
+        const assigned=this.db.prepare(processRecruiterReadQuery(p.offer_id).text).all({$1:p.offer_id});
         if(row.state==='PROPOSED'&&row.confirm_by<=this.now()) {
-          this.db.prepare("UPDATE faro_interviews SET state='CANCELLED',revision=revision+1 WHERE id=?").run(row.id);
-          const due=new Date(this.clock().getTime()+this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours*3600000).toISOString();
-          this.db.prepare("UPDATE faro_interests SET stage='ACCEPTED_TO_NEXT_STAGE',stage_due_at=?,next_action='Propozycja terminu wygasła. Uzgodnijcie nowy termin.',revision=revision+1 WHERE id=?").run(due,p.id);
+          for(const query of interviewExpiryQueries(row,p,this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
           this.recruitment.event(p,null,'INTERVIEW_PROPOSAL_EXPIRED',{interviewId:row.id});
-          continue;
-        }
-        const deadline=row.state==='PROPOSED'?row.confirm_by:row.starts_at;
-        const outcome=row.state==='CONFIRMED'&&row.ends_at<=this.now();
-        if(!outcome&&(deadline<=this.now()||Date.parse(deadline)>this.clock().getTime()+24*3600000))continue;
-        const recipients=row.state==='PROPOSED'?[p.candidate_id]:[p.candidate_id,...(row.recruiter_id?[row.recruiter_id]:[])];
-        for(const recipient of recipients) {
-          if(recipient!==p.candidate_id) {
-            try { this.recruitment.offers.assigned(recipient,p.offer_id); } catch { continue; }
-          }
-          this.recruitment.enqueue(recipient,'process',p.id,outcome?'Potwierdź odbycie rozmowy lub zgłoś rozbieżność.':row.state==='PROPOSED'?'Zbliża się termin potwierdzenia propozycji rozmowy.':'Zbliża się potwierdzona rozmowa.',`interview:${row.id}:${outcome?'outcome':row.state}:${deadline}`);
-        }
+        }else for(const query of interviewReminderQueries(row,p,assigned,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       }
     });
   }

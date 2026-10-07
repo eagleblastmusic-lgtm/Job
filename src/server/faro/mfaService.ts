@@ -1,3 +1,4 @@
+import { privilegedMemberQuery,verifiedMfaQuery,mfaAccessQueries,mfaAccessState,requireMfaAccess } from './identityAccessModel.js';
 import { createCipheriv,createDecipheriv,createHash,createHmac,randomBytes,timingSafeEqual } from 'node:crypto';
 import type { AppConfig } from '../config.js';
 import type { UserRecord } from '../store.js';
@@ -16,11 +17,11 @@ export function totp(secret:Buffer,counter:number,digits=6,algorithm='sha1') {
 export class MfaService extends FaroStore {
   constructor(db:JobDatabase,readonly config:AppConfig,clock:()=>Date=()=>new Date()){super(db,clock);}
   row(userId:string){return this.db.prepare('SELECT * FROM faro_mfa WHERE user_id=?').get(userId) as unknown as MfaRow|undefined;}
-  privileged(user:UserRecord){return user.role==='ADMIN'||Boolean(this.db.prepare("SELECT 1 FROM faro_members WHERE user_id=? AND active=1 AND role IN ('OWNER','ADMIN','RECRUITER','HIRING_MANAGER')").get(user.id));}
-  verified(tokenHash:string){return Boolean(this.db.prepare('SELECT 1 FROM faro_mfa_sessions v JOIN sessions s ON s.token_hash=v.token_hash WHERE v.token_hash=? AND v.verified_until>? AND s.expires_at>?').get(tokenHash,this.now(),this.now()));}
+  privileged(user:UserRecord){const query=privilegedMemberQuery(user.id);return user.role==='ADMIN'||Boolean(this.db.prepare(query.text).get({$1:user.id}));}
+  verified(tokenHash:string){const query=verifiedMfaQuery(tokenHash,this.now());return Boolean(this.db.prepare(query.text).get({$1:tokenHash,$2:query.values[1]!}));}
   required(user:UserRecord){return Boolean(this.row(user.id)?.active_cipher)||(this.config.faroRequirePrivilegedMfa&&this.privileged(user));}
-  status(user:UserRecord,tokenHash:string){const row=this.row(user.id);return {configured:Boolean(this.config.faroMfaEncryptionKey),enabled:Boolean(row?.active_cipher),required:this.required(user),verified:this.verified(tokenHash),pending:Boolean(row?.pending_until&&row.pending_until>this.now()),recoveryRemaining:Number(this.db.prepare('SELECT COUNT(*) n FROM faro_mfa_recovery WHERE user_id=? AND used_at IS NULL').get(user.id)!.n)};}
-  assertAccess(user:UserRecord,tokenHash:string){if(this.required(user)&&!this.verified(tokenHash))throw new HttpError(403,'Potwierdź dostęp drugim składnikiem.','MFA_REQUIRED');}
+  status(user:UserRecord,tokenHash:string){const asOf=this.now(),rows=mfaAccessQueries(user.id,tokenHash,asOf).map(query=>this.db.prepare(query.text).all(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value]))));return mfaAccessState(user,rows,this.config.faroRequirePrivilegedMfa,Boolean(this.config.faroMfaEncryptionKey),asOf);}
+  assertAccess(user:UserRecord,tokenHash:string){requireMfaAccess({required:this.required(user),verified:this.verified(tokenHash)});}
   private actor(user:UserRecord,tokenHash:string){if(!this.db.prepare('SELECT 1 FROM sessions WHERE user_id=? AND token_hash=? AND expires_at>?').get(user.id,tokenHash,this.now()))throw new HttpError(401,'Zaloguj się, aby kontynuować.','UNAUTHENTICATED');}
   private key(){if(!this.config.faroMfaEncryptionKey)throw new HttpError(503,'MFA wymaga skonfigurowanego chronionego klucza serwera.','MFA_UNAVAILABLE');return Buffer.from(this.config.faroMfaEncryptionKey,'hex');}
   private encrypt(userId:string,secret:Buffer){const nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.key(),nonce);cipher.setAAD(Buffer.from(`faro-mfa-v1:${userId}`));const payload=Buffer.concat([cipher.update(secret),cipher.final()]);return [nonce,cipher.getAuthTag(),payload].map(b=>b.toString('hex')).join('.');}

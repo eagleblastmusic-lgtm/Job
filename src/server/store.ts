@@ -1,3 +1,4 @@
+import { sessionUserQuery,identityUser } from './faro/identityAccessModel.js';
 import { acceptedStageQuery,mutualStageQuery,stageConsentQuery,pairStagePlan } from './faro/stageAnalytics.js';
 import { randomUUID } from 'node:crypto';
 import { PrivacyService } from './faro/privacyService.js';
@@ -100,8 +101,7 @@ export class AppStore {
   }
 
   getUserBySession(tokenHash: string): UserRecord | null {
-    const row = this.db.prepare(`SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?`).get(tokenHash, now()) as UserRow | undefined;
-    return row ? this.mapUser(row) : null;
+    const query=sessionUserQuery(tokenHash,now());return identityUser(this.db.prepare(query.text).all({$1:tokenHash,$2:query.values[1]!}));
   }
 
   deleteSession(tokenHash: string): void { this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash); }

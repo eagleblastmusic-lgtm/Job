@@ -1,3 +1,4 @@
+import { revokeSessionsQueries } from './identityAccessModel.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AppConfig } from '../config.js';
 import type { JobDatabase } from '../db.js';
@@ -42,14 +43,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     const ok = (data: unknown, status = 200) => { sendJson(res, status, data); return true; };
     if(mfaPath){const mfa=new MfaService(db,config),tokenHash=hashSessionToken(parseCookies(req.headers.cookie).job_session!);if(!mfaPath[1]&&method==='GET')return ok(mfa.status(user,tokenHash));if(method==='POST'){const command=mfaPath[1];if(command==='setup')return ok(mfa.setup(user,tokenHash,body));if(command==='confirm')return ok(mfa.confirm(user,tokenHash,body));if(command==='verify')return ok(mfa.verify(user,tokenHash,body));if(command==='recover')return ok(mfa.recover(user,tokenHash,body));}}
     if(path==='/api/faro/sessions/revoke-all'&&method==='POST') {
-      if(body.confirmed!==true)throw new HttpError(400,'Potwierdź wylogowanie wszystkich sesji.','CONFIRMATION_REQUIRED');
-      if(typeof body.password!=='string'||!body.password||body.password.length>MAX_PASSWORD_LENGTH)throw new HttpError(400,'Podaj aktualne hasło.','VALIDATION_ERROR');
-      const password=body.password;
-      if(!verifyPassword(password,user.passwordHash))throw new HttpError(401,'Podaj poprawne aktualne hasło.','REAUTH_FAILED');
-      profiles.transaction(()=>{
-        db.db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
-        store.audit(user.id,'SESSIONS_REVOKED','user',user.id);
-      });
+      profiles.transaction(()=>{for(const query of revokeSessionsQueries(user,body,profiles.now()))db.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));});
       res.setHeader('set-cookie','job_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
       return ok({ok:true});
     }

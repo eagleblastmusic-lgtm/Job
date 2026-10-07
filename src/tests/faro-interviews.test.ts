@@ -172,7 +172,8 @@ test('unconfirmed expiry is neutral; confirmed no-show opens review; withdrawal 
     const expired=f.interviews.propose(f.employer.id,f.first,f.proposal);
     f.interviews.tick();f.interviews.tick();
     assert.equal((f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE dedupe_key LIKE 'interview:%'").get() as {n:number}).n,1);
-    f.setNow('2026-10-24T20:00:00Z');f.interviews.tick();
+    f.setNow('2026-10-24T20:00:00Z');const expiryBefore={...f.recruitment.row(f.first)};
+    f.app.db.db.exec("CREATE TRIGGER tick_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'tick delivery failed'); END");assert.throws(()=>f.interviews.tick(),/tick delivery failed/);assert.equal(f.interviews.row(expired.id).state,'PROPOSED');assert.deepEqual({...f.recruitment.row(f.first)},expiryBefore);assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='INTERVIEW_PROPOSAL_EXPIRED'").get()!.n,0);f.app.db.db.exec('DROP TRIGGER tick_delivery_failure');f.interviews.tick();f.interviews.tick();assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE kind='INTERVIEW_PROPOSAL_EXPIRED'").get()!.n,1);
     assert.equal(f.interviews.row(expired.id).state,'CANCELLED');assert.equal((f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_cases').get() as {n:number}).n,0);
     const meeting=f.interviews.propose(f.employer.id,f.first,{...f.proposal,confirmBy:'2026-10-24T22:30:00Z',expectedVersion:4,idempotencyKey:'replacement'});
     f.interviews.change(f.candidate.id,meeting.id,{command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:5,idempotencyKey:'confirm-replacement'});
