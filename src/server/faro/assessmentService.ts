@@ -1,4 +1,4 @@
-import { parseAssessment,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
+import { parseAssessment,assessmentEditInput,assessmentDefinitionQuery,assessmentDefinitionFromRows,assessmentListQuery,assessmentLatestQuery,assessmentCreatePlan,assessmentApprovalPlan,type Definition } from './assessmentDefinitionModel.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
@@ -76,9 +76,8 @@ export class AssessmentService extends FaroStore {
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,version,operation:'ASSESSMENT_EDIT'},()=>{
       const prior=this.read(userId,id,version);
       const latest=this.db.prepare('SELECT MAX(version) version FROM faro_assessments WHERE id=?').get(id) as {version:number};
-      if(integer(body.expectedVersion,1)!==version||latest.version!==version)throw new HttpError(409,'Odśwież najnowszą wersję assessmentu.','VERSION_CONFLICT');
-      return this.createOwned(userId,prior.offer_id,{...object(body.data),origin:prior.origin},id);
-    });
+      return this.createOwned(userId,prior.offer_id,assessmentEditInput(prior,latest.version,body),id);
+    },()=>{this.read(userId,id,version);});
   }
   parse(body:Record<string,unknown>):Definition {return parseAssessment(body);}
   create(userId:string,offerId:string,body:Record<string,unknown>,previousId?:string) {

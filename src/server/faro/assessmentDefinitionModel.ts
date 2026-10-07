@@ -1,3 +1,4 @@
+import { runCommandOnce } from './commandJournal.js';
 import { randomUUID } from 'node:crypto';
 import { HttpError } from '../http.js';
 import { text,integer,array,object,choice } from './validation.js';
@@ -57,4 +58,19 @@ export async function createAssessment(database:AssessmentDatabase,userId:string
 }
 export async function approveAssessment(database:AssessmentDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
   return database.transaction(async()=>{await authorize();const row=assessmentDefinitionFromRows((await database.readBatch([assessmentDefinitionQuery(id,integer(body.version,1))]))[0]??[]);await assignedOwned(database,userId,row.offer_id);const latest=(await database.readBatch([assessmentLatestQuery(id)]))[0]?.[0]?.version as number,plan=assessmentApprovalPlan(userId,row,body,latest,asOf);for(const query of plan.queries)await database.query(query.text,query.values);return plan.ack;});
+}
+
+export function assessmentEditInput(row:DefinitionRow,latest:number,body:Record<string,unknown>) {
+  if(integer(body.expectedVersion,1)!==row.version||latest!==row.version)throw new HttpError(409,'Odśwież najnowszą wersję assessmentu.','VERSION_CONFLICT');
+  return {...object(body.data),origin:row.origin};
+}
+export async function editAssessment(database:AssessmentDatabase,userId:string,id:string,version:number,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
+  let prior:DefinitionRow;
+  return runCommandOnce(database,userId,body.idempotencyKey,{...body,id,version,operation:'ASSESSMENT_EDIT'},asOf,async()=>{
+    await authorize();prior=assessmentDefinitionFromRows((await database.readBatch([assessmentDefinitionQuery(id,version)]))[0]??[]);await assignedOwned(database,userId,prior.offer_id);
+  },async()=>{
+    const latest=(await database.readBatch([assessmentLatestQuery(id)]))[0]?.[0]?.version as number,data=assessmentEditInput(prior,latest,body),plan=assessmentCreatePlan(userId,prior.offer_id,data,latest,id,true,asOf);
+    for(const query of plan.queries)await database.query(query.text,query.values);
+    return plan.ack;
+  });
 }
