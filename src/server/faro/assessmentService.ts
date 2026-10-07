@@ -1,3 +1,4 @@
+import { assessmentFinalizeQueries } from './assessmentReviewModel.js';
 import { attemptAnswerQueries } from './assessmentAnswerModel.js';
 import { requireAttemptCandidate,attemptStartQueries } from './assessmentStartModel.js';
 import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
@@ -252,24 +253,11 @@ export class AssessmentService extends FaroStore {
     return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},()=>{
       const row=this.row(id),process=this.recruitment.row(row.process_id);
       this.recruitment.offers.assigned(userId,process.offer_id);
-      if(integer(body.expectedVersion,1)!==row.revision||integer(body.processVersion,1)!==process.revision)throw new HttpError(409,'Próba lub proces zmieniły się. Odśwież wynik.','VERSION_CONFLICT');
-      if(TERMINAL.includes(process.status))throw new HttpError(409,'Proces został zakończony.','PROCESS_TERMINAL');
-      if(this.incident(id)?.state==='OPEN')throw new HttpError(409,'Najpierw rozpatrz zgłoszenie techniczne.','INCIDENT_REVIEW_REQUIRED');
-      if(row.state!=='SCORED_PENDING_REVIEW'||!row.result||body.confirmed!==true)throw new HttpError(409,'Wynik wymaga świadomego review.');
-      const note=text(body.note,1000,10),result={...JSON.parse(row.result) as Record<string,unknown>,review:'FINALIZED',reviewNote:note};
       const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition;
-      if(definition.type==='OPEN_ANSWER') {
-        const scores=object(body.scores),answers=JSON.parse(row.answers) as Record<string,string>;
-        if(Object.keys(scores).length!==definition.tasks.length||Object.keys(scores).some(k=>!definition.tasks.some(t=>t.id===k)))throw new HttpError(400,'Oceń każde zadanie przypisanej rubryki.');
-        const breakdown=definition.tasks.map(t=>{if(answers[t.id]===undefined){if(scores[t.id]!==null)throw new HttpError(400,'Brak odpowiedzi pozostaje odrębny od zera.');return {taskId:t.id,earned:null,possible:t.points};}return {taskId:t.id,earned:integer(scores[t.id],0,t.points),possible:t.points};});
-        Object.assign(result,{breakdown,earned:breakdown.reduce((sum,t)=>sum+(t.earned??0),0),comparisonStatus:'HUMAN_RUBRIC_REVIEW'});
-      }
-      this.db.prepare("UPDATE faro_attempts SET state='FINALIZED',result=?,reviewer_id=?,reviewed_at=?,revision=revision+1 WHERE id=?").run(JSON.stringify(result),userId,this.now(),id);
-      this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,created_at) VALUES(?,1,'VALID',?,?)").run(id,JSON.stringify(result),this.now());
-      this.audit(userId,'ASSESSMENT_RESULT_REVIEWED',id);
+      for(const query of assessmentFinalizeQueries(userId,row,process,definition,this.incident(id),body,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       this.recruitment.event(process,userId,'ASSESSMENT_FINALIZED',{attemptId:id});
       return this.overview(userId,id);
-    });
+    },()=>{this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);});
   }
   invalidateResult(userId:string,id:string,body:Record<string,unknown>) {
     this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);

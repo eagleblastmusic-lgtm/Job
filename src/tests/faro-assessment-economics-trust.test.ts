@@ -500,6 +500,10 @@ test('human assessment result review is revision guarded and idempotent; termina
     await f.request(url,f.employer.cookie,'POST',body,409);
     assert.equal(service.row(a.id).state,'SCORED_PENDING_REVIEW');assert.equal(service.overview(f.candidate.id,a.id).result,null);
     const current={...body,processVersion:r.row(f.interest.id).revision};
+    const reviewBefore={...service.row(a.id)};
+    f.app.db.db.exec("CREATE TRIGGER review_audit_failure BEFORE INSERT ON audit_logs WHEN NEW.action='ASSESSMENT_RESULT_REVIEWED' BEGIN SELECT RAISE(ABORT,'review audit failed'); END");
+    await f.request(url,f.employer.cookie,'POST',current,500);assert.deepEqual({...service.row(a.id)},reviewBefore);assert.equal(service.resultHistory(a.id).length,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,current.idempotencyKey)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER review_audit_failure');
     const result=await f.request<{state:string;revision:number}>(url,f.employer.cookie,'POST',current);
     assert.equal(result.state,'FINALIZED');assert.equal(result.revision,body.expectedVersion+1);
     assert.deepEqual(await f.request(url,f.employer.cookie,'POST',current),result);
