@@ -9,3 +9,6 @@ CP11-BB/BC full local check2026-10-07 PASS162 Node/35 migrations/both actual res
 
 
 CP11-BB/BC0111676 real PostgreSQL failed23505 because new tick fixture created two simultaneous active appointments in one process, contrary to existing faro_one_active_interview. Corrected proof expires the proposal before inserting the confirmed appointment, retaining all expiry/reminder/rollback/authority/terminal assertions and the UNIQUE index. Full local162/35/both restores/38 browsers remains valid; actual corrected PostgreSQL/remote acceptance pending.
+
+
+CP11-BB/BCf3fffd4 actual PostgreSQL passed corrected tick fixtures then refused identity fixture because its candidate had already been erased by the earlier cascade test. Moved the complete identity/revocation proof before deliberate candidate deletion; no erased account/session is recreated, no authority guard relaxed, and the original deletion cascade proof remains. Real corrected acceptance pending.
