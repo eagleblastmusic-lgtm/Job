@@ -28,9 +28,12 @@ interface AttemptReadDatabase {
  readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;
  transaction<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean}):Promise<T>;
 }
+export async function requireAttemptEmployerOwned(database:AttemptReadDatabase,userId:string,process:ProcessRow) {
+ const offer=offerFromRows((await database.readBatch([offerReadQuery(process.offer_id)]))[0]??[]),access=await database.readBatch([membershipReadQuery(userId,offer.organizationId),offerAssignedReadQuery(userId,process.offer_id)]);const member=membershipFromRows(access[0]??[]);requireOfferAssignment(access[1]??[]);return member.role;
+}
 async function attemptProcessOwned(database:AttemptReadDatabase,userId:string,processId:string) {
  const process=processFromRows((await database.readBatch([processReadQuery(processId)]))[0]??[]);let role:string|null=null;
- if(process.candidate_id!==userId){const offer=offerFromRows((await database.readBatch([offerReadQuery(process.offer_id)]))[0]??[]),access=await database.readBatch([membershipReadQuery(userId,offer.organizationId),offerAssignedReadQuery(userId,process.offer_id)]);role=membershipFromRows(access[0]??[]).role;requireOfferAssignment(access[1]??[]);}
+ if(process.candidate_id!==userId)role=await requireAttemptEmployerOwned(database,userId,process);
  return {process,role};
 }
 export async function attemptViewOwned(database:AttemptReadDatabase,userId:string,id:string,asOf:string) {
