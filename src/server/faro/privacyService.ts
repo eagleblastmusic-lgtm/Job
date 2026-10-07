@@ -1,3 +1,4 @@
+import { ownExportQueries,ownExportFromRows,deletableOwnershipQuery,requireDeletableOwnership,transferOwnerQueries } from './privacyReadModel.js';
 import { createHash } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
@@ -6,32 +7,10 @@ import { RecruitmentService } from './recruitmentService.js';
 /** Account data rights do not grant organization-wide candidate export. */
 export class PrivacyService extends FaroStore {
   exportOwn(userId: string) {
-    const own: Record<string, unknown> = { exportVersion: 'faro-data-rights-v1', exportedAt: this.now() };
-    own.faro_mfa_security=this.db.prepare('SELECT activated_at,pending_until FROM faro_mfa WHERE user_id=?').all(userId);
-    own.faro_mfa_recovery_uses=this.db.prepare('SELECT used_at FROM faro_mfa_recovery WHERE user_id=? ORDER BY used_at').all(userId);
-    for (const table of ['faro_profiles','faro_activities','faro_proposals','faro_claims','faro_learning','faro_members'] as const) {
-      own[table] = this.db.prepare(`SELECT * FROM ${table} WHERE user_id=?`).all(userId);
-    }
-    for (const table of ['faro_interests','faro_watches','faro_contact_grants','faro_economics'] as const) {
-      own[table] = this.db.prepare(`SELECT * FROM ${table} WHERE candidate_id=?`).all(userId);
-    }
-    own.faro_events = this.db.prepare('SELECT e.kind,e.data,e.occurred_at,e.process_id FROM faro_events e JOIN faro_interests p ON p.id=e.process_id WHERE p.candidate_id=?').all(userId);
-    own.faro_restriction_appeals=this.db.prepare('SELECT id,organization_id,appeal,appealed_at FROM faro_restrictions WHERE appeal_by=?').all(userId);
-    own.faro_interviews = this.db.prepare('SELECT i.id,i.process_id,i.state,i.revision,i.starts_at,i.ends_at,i.confirm_by,i.timezone,i.location,i.meeting_url,i.candidate_completed,i.employer_completed FROM faro_interviews i JOIN faro_interests p ON p.id=i.process_id WHERE p.candidate_id=? OR i.recruiter_id=?').all(userId,userId);
-    own.faro_attempts = this.db.prepare('SELECT a.id,a.process_id,a.assessment_id,a.assessment_version,a.state,a.deadline,a.started_at,a.expires_at,a.answers,a.result,a.revision,a.reviewed_at,a.attempt_number,a.retry_of,a.retry_reason,a.retry_authorized_at FROM faro_attempts a JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
-    own.faro_result_history = this.db.prepare('SELECT h.attempt_id,h.revision,h.validity,h.result,h.reason_code,h.reason,h.created_at FROM faro_result_history h JOIN faro_attempts a ON a.id=h.attempt_id JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
-    own.faro_attempt_incidents=this.db.prepare('SELECT i.id,i.attempt_id,i.category,i.statement,i.reported_at,i.observed_state,i.observed_revision,i.original_deadline,i.original_started_at,i.original_expires_at,i.state,i.revision,i.resolution,i.reason,i.resolved_at FROM faro_attempt_incidents i JOIN faro_attempts a ON a.id=i.attempt_id JOIN faro_interests p ON p.id=a.process_id WHERE p.candidate_id=?').all(userId);
-    own.faro_cases = this.db.prepare('SELECT c.id,c.kind,c.state,CASE WHEN c.reporter_id=? THEN c.statement ELSE NULL END statement,c.public_reason decision,c.review_at,CASE WHEN c.appeal_by=? THEN c.appeal ELSE NULL END appeal,c.created_at FROM faro_cases c LEFT JOIN faro_interests p ON p.id=c.process_id WHERE c.reporter_id=? OR p.candidate_id=?').all(userId,userId,userId,userId);
-    own.faro_case_explanations=this.db.prepare('SELECT case_id,participant,statement,created_at FROM faro_case_explanations WHERE user_id=?').all(userId);
-    own.notifications = this.db.prepare('SELECT id,entity_type,entity_id,message,read_at,created_at FROM notifications WHERE user_id=?').all(userId);
-    own.faro_outbox = this.db.prepare('SELECT entity_type,entity_id,message,status FROM faro_outbox WHERE recipient_id=?').all(userId);
-    own.faro_organizations = this.db.prepare('SELECT o.id,o.name,o.verification,m.role,m.active FROM faro_organizations o JOIN faro_members m ON m.organization_id=o.id WHERE m.user_id=?').all(userId);
-    return own;
+    return ownExportFromRows(ownExportQueries(userId).map(query=>this.db.prepare(query.text).all({$1:userId})),this.now());
   }
-  assertDeletable(userId: string) {
-    const sharedOwnership = this.db.prepare("SELECT m.organization_id FROM faro_members m WHERE m.user_id=? AND m.active=1 AND m.role='OWNER' AND EXISTS(SELECT 1 FROM faro_members other WHERE other.organization_id=m.organization_id AND other.user_id<>m.user_id AND other.active=1) LIMIT 1").get(userId);
-    if (sharedOwnership) throw new HttpError(409, 'Przenieś własność organizacji na aktywnego członka przed usunięciem konta.', 'OWNERSHIP_TRANSFER_REQUIRED');
-  }
+  assertDeletable(userId:string){const query=deletableOwnershipQuery(userId);requireDeletableOwnership(this.db.prepare(query.text).all({$1:userId}));}
+
   /** Called inside the transaction that deletes users; cascade handles personal rows. */
   eraseDerivatives(userId: string, isolatedRecovery = false) {
     // Offline replay targets an isolated restore, never an HTTP-provided flag.
@@ -77,10 +56,7 @@ export class PrivacyService extends FaroStore {
   transferOwner(userId: string, orgId: string, successorId: string) {
     return this.transaction(() => {
       this.member(userId,orgId,['OWNER']); this.member(successorId,orgId);
-      if (userId === successorId) throw new HttpError(400,'Wybierz innego aktywnego członka.');
-      this.db.prepare("UPDATE faro_members SET role='ADMIN' WHERE organization_id=? AND user_id=?").run(orgId,userId);
-      this.db.prepare("UPDATE faro_members SET role='OWNER' WHERE organization_id=? AND user_id=?").run(orgId,successorId);
-      this.audit(userId,'ORGANIZATION_OWNERSHIP_TRANSFERRED',orgId);
+      for(const query of transferOwnerQueries(userId,orgId,successorId,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       return { ok:true };
     });
   }

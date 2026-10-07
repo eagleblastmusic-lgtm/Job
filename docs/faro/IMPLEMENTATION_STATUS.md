@@ -947,3 +947,8 @@ Shared lease/budget/delivery/eligibility/backoff/reviewed retry plans; native SE
 
 
 CP11-BE full local2026-10-07 check PASS163 Node/35 migrations/both actual restores/38 browsers/lint/typecheck, zero skips. Worker/recruitment targeted26 and rebuilt async worker7 PASS; source70/35 and syntax/diff PASS. Actual PostgreSQL/remote acceptance pending. CP11-BD2d20ff2 exact FARO37652974322 and CI37652973856 SUCCESS, including native PostgreSQL18 Node22/24 encrypted setup/activation/OTP/recovery/rate/audit rollback proofs. Initial MFA fixture counter assertion was corrected for direct driver bigint string without changing stored evidence; full rerun supersedes failure at5f5bcbc. BB/BC63f914a FARO37652009031 and CI37652008809 SUCCESS; earlier fixture errors retained. Runtime SQLite, whole plan/release PARTIAL; continue native privacy/moderation/auth/worker/HTTP/recovery/cutover and external gates.
+
+
+## CP11-BF — Portable own export and ownership transfer, 2026-10-07
+
+Shared 23 explicit export reads preserve own scoped evidence and exclude import-order/MFA/session/password secrets. Native snapshot requires current authority. Shared owner deletion guard and owner transfer require active owner/successor and atomically write roles/audit. [Scope](CP11_BF_PORTABLE_PRIVATE_EXPORT_OWNERSHIP.md). Local/actual PostgreSQL acceptance pending; runtime SQLite, full plan/release PARTIAL. Continue native erasure/moderation/auth/worker/HTTP/recovery/cutover and external gates.

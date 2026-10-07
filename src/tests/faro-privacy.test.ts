@@ -78,6 +78,7 @@ test('shared organization ownership is transferred with reauthentication before 
     await f.request('/api/account',f.employer.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'},409);
     await f.request(`/api/faro/organizations/${f.org.id}/owner`,f.other.cookie,'POST',{successorId:f.employer.id,password:'Bezpieczne123'},404);
     await f.request(`/api/faro/organizations/${f.org.id}/owner`,f.employer.cookie,'POST',{successorId:f.other.id,password:'BledneHaslo123'},401);
+    f.app.db.db.exec("CREATE TRIGGER owner_transfer_audit_guard BEFORE INSERT ON audit_logs WHEN NEW.action='ORGANIZATION_OWNERSHIP_TRANSFERRED' BEGIN SELECT RAISE(ABORT,'owner transfer audit failed'); END");await f.request(`/api/faro/organizations/${f.org.id}/owner`,f.employer.cookie,'POST',{successorId:f.other.id,password:'Bezpieczne123'},500);assert.equal(f.profiles.member(f.employer.id,f.org.id).role,'OWNER');assert.equal(f.profiles.member(f.other.id,f.org.id).role,'RECRUITER');f.app.db.db.exec('DROP TRIGGER owner_transfer_audit_guard');
     await f.request(`/api/faro/organizations/${f.org.id}/owner`,f.employer.cookie,'POST',{successorId:f.other.id,password:'Bezpieczne123'});
     assert.equal(f.profiles.member(f.other.id,f.org.id).role,'OWNER');
     await f.request('/api/account',f.employer.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});
