@@ -1,3 +1,4 @@
+import { requireAttemptCandidate,attemptStartQueries } from './assessmentStartModel.js';
 import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
 import { type AttemptRow,type IncidentRow,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
 import { assignmentRequest,assignmentCorrectionQuery,assignmentExistingQuery,assessmentAssignmentPlan } from './assessmentAssignmentModel.js';
@@ -220,8 +221,7 @@ export class AssessmentService extends FaroStore {
   }
   candidate(userId: string, row: AttemptRow) {
     const process = this.recruitment.row(row.process_id);
-    if (process.candidate_id !== userId) throw new HttpError(404, 'Nie znaleziono próby.');
-    if (TERMINAL.includes(process.status)) throw new HttpError(409, 'Proces został zakończony.');
+    requireAttemptCandidate(userId,process);
     return process;
   }
   start(userId: string, id: string) {
@@ -229,12 +229,9 @@ export class AssessmentService extends FaroStore {
     this.expire(id);
     return this.transaction(() => {
       const row = this.row(id); this.candidate(userId, row);
-      if (row.state==='STARTED') return this.overview(userId, id);
-      if (row.state !== 'INVITED' || row.deadline <= this.now()) throw new HttpError(409, 'Zaproszenie nie jest już aktywne.', 'ATTEMPT_EXPIRED');
-      const definition = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
-      const expires = new Date(Math.min(Date.parse(row.deadline), this.clock().getTime() + definition.timeLimitMinutes * 60000)).toISOString();
-      this.db.prepare("UPDATE faro_attempts SET state='STARTED',started_at=?,expires_at=?,revision=revision+1 WHERE id=?").run(this.now(), expires, id);
-      this.audit(userId, 'ATTEMPT_STARTED', id); return this.overview(userId, id);
+      const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition;
+      for(const query of attemptStartQueries(userId,row,definition,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      return this.overview(userId,id);
     });
   }
   save(userId: string, id: string, body: Record<string, unknown>, submit: boolean) {

@@ -341,6 +341,10 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ASSESSMENT_ASSIGNED'").get(f.interest.id)!.n,1);
     const before = await f.request<{ state: string; taskCount: number; tasks: unknown[]; revision: number }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie);
     assert.equal(before.state, 'INVITED'); assert.equal(before.taskCount, 1); assert.equal(before.tasks.length, 0);
+    const invitedBefore={...definition.row(attempt.id)};
+    f.app.db.db.exec("CREATE TRIGGER start_audit_failure BEFORE INSERT ON audit_logs WHEN NEW.action='ATTEMPT_STARTED' BEGIN SELECT RAISE(ABORT,'start audit failed'); END");
+    await f.request(`/api/faro/attempts/${attempt.id}`,f.candidate.cookie,'POST',{},500);assert.deepEqual({...definition.row(attempt.id)},invitedBefore);assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM audit_logs WHERE action='ATTEMPT_STARTED' AND entity_id=?").get(attempt.id)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER start_audit_failure');
     const started = await f.request<{ state: string; startedAt: string; expiresAt: string; revision: number; tasks: Array<{ options: string[] }> }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie, 'POST', {});
     assert.equal(started.state, 'STARTED'); assert.ok(started.startedAt); assert.ok(started.expiresAt); assert.equal(started.tasks[0]!.options.length, 2);
     const replay = await f.request<{ startedAt: string; expiresAt: string }>(`/api/faro/attempts/${attempt.id}`, f.candidate.cookie, 'POST', {});

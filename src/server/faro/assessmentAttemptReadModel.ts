@@ -33,7 +33,7 @@ async function attemptProcessOwned(database:AttemptReadDatabase,userId:string,pr
  if(process.candidate_id!==userId){const offer=offerFromRows((await database.readBatch([offerReadQuery(process.offer_id)]))[0]??[]),access=await database.readBatch([membershipReadQuery(userId,offer.organizationId),offerAssignedReadQuery(userId,process.offer_id)]);role=membershipFromRows(access[0]??[]).role;requireOfferAssignment(access[1]??[]);}
  return {process,role};
 }
-async function attemptViewOwned(database:AttemptReadDatabase,userId:string,id:string,asOf:string) {
+export async function attemptViewOwned(database:AttemptReadDatabase,userId:string,id:string,asOf:string) {
  const row=attemptFromRows((await database.readBatch([attemptReadQuery(id)]))[0]??[]),{process,role}=await attemptProcessOwned(database,userId,row.process_id),definition=assessmentDefinitionFromRows((await database.readBatch([assessmentDefinitionQuery(row.assessment_id,row.assessment_version)]))[0]??[]);
  return attemptView(row,process,JSON.parse(definition.content) as Definition,userId,asOf,await database.readBatch(attemptContextQueries(row)),role);
 }
