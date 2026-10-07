@@ -1,0 +1,16 @@
+import { HttpError } from '../http.js';
+import { date } from './validation.js';
+import { reliabilitySnapshot,type ReliabilityInterest,type ReliabilityEvent } from '../../domain/faro/reliability.js';
+import { membershipReadQuery,membershipFromRows } from './organizationReadModel.js';
+import { firstField } from './stageAnalytics.js';
+export function reliabilityWindow(from:string,to:string,asOf:string){const start=from||to?date(from):new Date(Date.parse(asOf)-30*86400000).toISOString(),end=from||to?date(to):asOf;if(start>=end||end>asOf||Date.parse(end)-Date.parse(start)>366*86400000)throw new HttpError(400,'Wybierz przeszłe okno do 366 dni.','INVALID_METRICS_WINDOW');return {start,end};}
+export function reliabilityQueries(orgId:string,start:string,end:string,postgres=false){
+ const interview=postgres?`(${firstField('e.data::json','interviewId')} #>> '{}')`:"json_extract(e.data,'$.interviewId')",state=postgres?`(${firstField('e.data::json','state')} #>> '{}')`:"json_extract(e.data,'$.state')";
+ return [
+ {text:`SELECT p.id,p.created_at "createdAt",p.response_due_at "responseDueAt",p.first_response_at "firstResponseAt",p.status,(SELECT MIN(occurred_at) FROM faro_events WHERE process_id=p.id AND kind='WITHDRAW') "withdrawnAt" FROM faro_interests p JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=$1 AND p.created_at>=$2 AND p.created_at<$3 ORDER BY p.created_at LIMIT 10001`,values:[orgId,start,end]},
+ {text:`SELECT e.process_id "processId",e.kind,e.occurred_at "createdAt",EXISTS(SELECT 1 FROM faro_interviews i WHERE i.id=${interview} AND i.process_id=p.id AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND ${state}='COMPLETED') "mutuallyCompleted" FROM faro_events e JOIN faro_interests p ON p.id=e.process_id JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=$1 AND p.created_at>=$2 AND p.created_at<$3 AND e.kind IN ('ADVANCE','ASSESSMENT_ASSIGNED','INTERVIEW_CONFIRM','INTERVIEW_COMPLETE','REJECT')`,values:[orgId,start,end]}
+ ];
+}
+export function reliabilityFromRows(rows:Record<string,unknown>[][],start:string,end:string,asOf:string){if((rows[0]?.length??0)>10000)throw new HttpError(400,'Zawęź okno raportu. Nie pokazujemy uciętych statystyk.','METRICS_WINDOW_TOO_LARGE');const interests=(rows[0]??[]) as unknown as ReliabilityInterest[],events=(rows[1]??[]).map(row=>({...row,mutuallyCompleted:row.mutuallyCompleted===1||row.mutuallyCompleted===true})) as unknown as ReliabilityEvent[];return reliabilitySnapshot(interests,events,start,end,asOf);}
+interface ReliabilityDatabase {readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;transaction<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean}):Promise<T>;}
+export async function readReliability(database:ReliabilityDatabase,userId:string,orgId:string,from:string,to:string,asOf:string,authorize:()=>void|Promise<void>){const {start,end}=reliabilityWindow(from,to,asOf);return database.transaction(async()=>{await authorize();membershipFromRows((await database.readBatch([membershipReadQuery(userId,orgId)]))[0]??[],['OWNER','ADMIN']);return reliabilityFromRows(await database.readBatch(reliabilityQueries(orgId,start,end,true)),start,end,asOf);},{readOnly:true});}

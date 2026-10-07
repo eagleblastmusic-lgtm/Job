@@ -22,7 +22,7 @@ export function compactStageTerms(raw:string) {
 }
 const sqliteAccepted="SELECT p.candidate_id,p.offer_id,e.occurred_at FROM faro_interests p JOIN faro_events e ON e.process_id=p.id JOIN faro_events o ON o.process_id=p.id JOIN faro_offer_versions v ON v.offer_id=p.offer_id AND v.version=json_extract(e.data,'$.employmentOffer.sourceVersion') WHERE p.id=$1 AND p.status='HIRED' AND e.kind='ACCEPT_OFFER' AND e.actor_id=p.candidate_id AND o.kind='OFFER' AND o.actor_id<>p.candidate_id AND json_extract(e.data,'$.stage')='TERMINAL' AND json_extract(e.data,'$.employmentOffer.revision') IS NOT NULL AND json_extract(e.data,'$.employmentOffer')=json_extract(o.data,'$.employmentOffer') AND v.publication_proof<>'NONE' ORDER BY e.occurred_at DESC,e.rowid DESC LIMIT 1";
 // Closed internal expressions/keys, never user supplied. First duplicate key matches SQLite.
-function firstField(expression:string,key:string) {return `(SELECT value FROM json_each(CASE WHEN json_typeof(${expression})='object' THEN ${expression} ELSE '{}'::json END) WITH ORDINALITY AS field(key,value,position) WHERE key='${key}' ORDER BY position LIMIT 1)`;}
+export function firstField(expression:string,key:string) {return `(SELECT value FROM json_each(CASE WHEN json_typeof(${expression})='object' THEN ${expression} ELSE '{}'::json END) WITH ORDINALITY AS field(key,value,position) WHERE key='${key}' ORDER BY position LIMIT 1)`;}
 export function acceptedStageQuery(id:string,postgres=false) {
   if(!postgres)return {text:sqliteAccepted,values:[id]};
   const text=`WITH events AS (

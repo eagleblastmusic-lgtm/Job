@@ -1,3 +1,6 @@
+import { proveNativeModerationRead } from './faro-postgres-moderation-read-proof.mjs';
+import { readReliability } from '../dist/server/faro/reliabilityReadModel.js';
+import { TrustService } from '../dist/server/faro/trustService.js';
 import { proveNativeWorker } from './faro-postgres-worker-proof.mjs';
 import { proveNativeAuth } from './faro-postgres-auth-proof.mjs';
 import { proveNativeErasure } from './faro-postgres-erasure-proof.mjs';
@@ -80,6 +83,7 @@ try {
     await compare(client,snapshot,schema);await client.query(`SET search_path TO ${identifier(schema)}`);
     const asOf='2026-10-06T00:00:00.000Z',reference=new ProfileService(f.app.db,()=>new Date(asOf)),wire=value=>JSON.parse(JSON.stringify(value));
     const exportAuthority=id=>async()=>assert.equal((await client.readBatch([{text:'SELECT id FROM users WHERE id=$1',values:[id]}]))[0]?.[0]?.id,id);
+    const metricsAsOf=new Date(Date.now()+1000).toISOString();assert.deepEqual(await readReliability(client,employer.id,org.id,'','',metricsAsOf,()=>{}),new TrustService(f.app.db,()=>new Date(metricsAsOf)).reliability(employer.id,org.id,'',''));
     for(const account of [candidate,employer]){const exported=await exportOwnData(client,account.id,asOf,exportAuthority(account.id)),expected=new PrivacyService(f.app.db,()=>new Date(asOf)).exportOwn(account.id);assert.deepEqual(exported,wire(expected));const serialized=JSON.stringify(exported);for(const forbidden of ['__faro_source_rowid','password_hash','active_cipher','pending_cipher','code_hash','token_hash'])assert.equal(serialized.includes(forbidden),false);}
     await assert.rejects(()=>exportOwnData(client,candidate.id,asOf,()=>{throw new Error('EXPORT_AUTHORITY_REFUSED');}),/EXPORT_AUTHORITY_REFUSED/);
     const attemptReference=new AssessmentService(f.app.db,()=>new Date(asOf)),fixtureAttempt=snapshot.tables.find(t=>t.name==='faro_attempts').rows[0].id;
@@ -629,6 +633,7 @@ try {
     await assert.rejects(()=>mutateMfa(client,{...nativeMfaConfig,faroMfaEncryptionKey:'22'.repeat(32)},recoverMfaToken,'verify',{code:totp(nativeSecret,mfaCounterValue+2)},'2026-10-06T00:01:00.000Z'),error=>error.code==='MFA_UNAVAILABLE');
     for(let i=0;i<4;i++)await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='REAUTH_FAILED');await assert.rejects(()=>mutateMfa(client,nativeMfaConfig,recoverMfaToken,'verify',{code:'invalid'},verifyAt),error=>error.code==='MFA_RATE_LIMITED');
     const mfaAudit=JSON.stringify((await client.query('SELECT metadata FROM audit_logs WHERE user_id=$1',[employer.id])).rows);for(const value of [nativeSetup.secret,pendingMfa,'Bezpieczne123',...nativeEnabled.recoveryCodes])assert.equal(mfaAudit.includes(value),false);
+    await nativeProof('MODERATION_READ',()=>proveNativeModerationRead(client,employer.id,offer.id,asOf));
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
     await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));

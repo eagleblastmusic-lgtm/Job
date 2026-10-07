@@ -1,0 +1,12 @@
+# CP11-BJ — Portable private moderation/restriction/reliability reads (2026-10-07)
+
+Shared explicit case/restriction queries exclude PostgreSQL import metadata. Shared case projections retain own reporter statements, own participant explanations, bilateral appointment/stale-offer visibility and public reason masking. Native owned reads require current authority and minimized moderation audit, preserve historical organization affiliation as a conflict after membership revocation, and allow unrestricted private evidence only to an independent administrator. Organization restriction reads retain owner/admin appeal versus independent moderator review rights; a failed mandatory read audit returns no records.
+
+Shared reliability window/queries/projection preserve original response-deadline cohort, retained-record disclosure, descriptive-only output, distinct mutual completion, approved chronology and the 10,000-record refusal instead of truncation. Native read-only SERIALIZABLE snapshot checks owner/admin membership and current authority; quoted aliases preserve wire casing, and imported duplicate event JSON keys keep first-key semantics.
+
+Existing private moderation/interview/assessment targeted PASS24; rebuilt reliability/restriction/assessment targeted PASS22. Added real HTTP read-audit failure regression verifies no private report appears in errors, then correct moderator/participant masking on retry. Disposable native proof covers reporter/candidate/employer/outsider scope, both own explanation boundaries, independent versus historically affiliated administrator, restriction permissions/audit rollback, descriptive wire comparison and native chronology/duplicate-key/mutual-completion/10,001-row refusal. Full local/actual PostgreSQL acceptance pending.
+
+BG/BH corrected d037202 exact FARO37656902529 and CI37656902613 SUCCESS, including PostgreSQL18 Node22/24 full native erasure/auth proof. Original fixture23502 failure retained; constraints unchanged. BI5de2b8a FARO37657263026 SUCCESS including native two-client/restart deadline-worker proof; CI pending. Runtime remains SQLite; native moderation writes, HTTP cutover, PostgreSQL restore/migration and external gates remain open. Whole plan/release PARTIAL; direct main.
+
+
+CP11-BJ local full check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; source70/35 and diff PASS. Actual PostgreSQL acceptance pending. BI5de2b8a exact FARO37657263026 and CI37657262955 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.

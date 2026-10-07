@@ -1,3 +1,5 @@
+import { reliabilityWindow,reliabilityQueries,reliabilityFromRows } from './reliabilityReadModel.js';
+import { caseReadQuery,caseFromRows,caseListQuery,caseExplanationsQuery,caseVisible,caseView,restrictionReadQuery,restrictionFromRows,restrictionsReadQuery,restrictionView,type CaseRow,type RestrictionRow } from './trustReadModel.js';
 import { staleOffersQuery,staleOfferQueries,closingOffersQuery,upcomingOffersQuery,pendingProcessesQuery,offerDeadlineQuery,processDeadlineQueries } from './trustTickModel.js';
 import { processRecruiterReadQuery } from './interestWriteModel.js';
 import { randomUUID } from 'node:crypto';
@@ -5,15 +7,11 @@ import { FaroStore } from './base.js';
 import { RecruitmentService } from './recruitmentService.js';
 import { InterviewService } from './interviewService.js';
 import { AssessmentService } from './assessmentService.js';
-import { reliabilitySnapshot,type ReliabilityInterest,type ReliabilityEvent } from '../../domain/faro/reliability.js';
 import { HttpError } from '../http.js';
 import { text, choice, date, integer } from './validation.js';
-interface CaseRow {id:string;organization_id:string;process_id:string|null;reporter_id:string|null;kind:string;state:string;revision:number;explanation_due_at:string|null;public_reason:string|null;statement:string;decision:string|null;review_at:string|null;created_at:string;}
-interface RestrictionRow {id:string;organization_id:string;source_case_id:string|null;source_reporter_id:string|null;source_candidate_id:string|null;state:string;scope:string;reason_code:string;restoration_condition:string|null;created_at:string|null;review_at:string|null;revision:number;appeal:string|null;appealed_at:string|null;restoration_reason:string|null;restored_at:string|null;}
 export class TrustService extends FaroStore {
   private restriction(id:string) {
-    const row=this.db.prepare('SELECT * FROM faro_restrictions WHERE id=?').get(id) as unknown as RestrictionRow|undefined;
-    if(!row)throw new HttpError(404,'Nie znaleziono ograniczenia.');return row;
+    const query=restrictionReadQuery(id);return restrictionFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   private restrictionModerator(userId:string,row:RestrictionRow) {
     return !!this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId)&&row.source_reporter_id!==userId&&row.source_candidate_id!==userId&&!this.affiliated(userId,row.organization_id)&&(!row.source_case_id||!this.involved(userId,this.caseRow(row.source_case_id)));
@@ -23,9 +21,9 @@ export class TrustService extends FaroStore {
     if(!own&&!this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId))throw new HttpError(404,'Nie znaleziono organizacji.');
     if(!own&&this.affiliated(userId,orgId))throw new HttpError(404,'Nie znaleziono organizacji.');
     if(!own)this.audit(userId,'MODERATION_RESTRICTIONS_READ',orgId);
-    const rows=this.db.prepare('SELECT * FROM faro_restrictions WHERE organization_id=? ORDER BY rowid DESC').all(orgId) as unknown as RestrictionRow[];
+    const query=restrictionsReadQuery(orgId),rows=this.db.prepare(query.text).all({$1:orgId}) as unknown as RestrictionRow[];
     if(!own&&rows.some(row=>!this.restrictionModerator(userId,row)))throw new HttpError(404,'Nie znaleziono niezależnego przeglądu.');
-    return rows.map(row=>({id:row.id,scope:row.scope,state:row.state,reasonCode:row.reason_code,restorationCondition:row.restoration_condition,createdAt:row.created_at,reviewAt:row.review_at,revision:row.revision,appeal:row.appeal,appealedAt:row.appealed_at,restorationReason:row.restoration_reason,restoredAt:row.restored_at,canAppeal:!!own&&row.state==='ACTIVE'&&!row.appeal,canReview:row.state==='ACTIVE'&&this.restrictionModerator(userId,row)}));
+    return rows.map(row=>restrictionView(row,Boolean(own),this.restrictionModerator(userId,row)));
   }
   private notifyRestriction(row:RestrictionRow) {
     const recipients=this.db.prepare("SELECT user_id FROM faro_members WHERE organization_id=? AND active=1 AND role IN ('OWNER','ADMIN')").all(row.organization_id) as Array<{user_id:string}>;
@@ -56,16 +54,10 @@ export class TrustService extends FaroStore {
   reliability(userId:string,orgId:string,from:string,to:string) {
     this.member(userId,orgId,['OWNER','ADMIN']);
     const asOf=this.now();
-    const start=from||to?date(from):new Date(Date.parse(asOf)-30*86400000).toISOString(),end=from||to?date(to):asOf;
-    if(start>=end||end>asOf||Date.parse(end)-Date.parse(start)>366*86400000)throw new HttpError(400,'Wybierz przeszłe okno do 366 dni.','INVALID_METRICS_WINDOW');
-    return this.transaction(()=>{
-      this.member(userId,orgId,['OWNER','ADMIN']);
-      const rows=this.db.prepare("SELECT p.id,p.created_at createdAt,p.response_due_at responseDueAt,p.first_response_at firstResponseAt,p.status,(SELECT MIN(occurred_at) FROM faro_events WHERE process_id=p.id AND kind='WITHDRAW') withdrawnAt FROM faro_interests p JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=? AND p.created_at>=? AND p.created_at<? ORDER BY p.created_at LIMIT 10001").all(orgId,start,end) as unknown as ReliabilityInterest[];
-      if(rows.length>10000)throw new HttpError(400,'Zawęź okno raportu. Nie pokazujemy uciętych statystyk.','METRICS_WINDOW_TOO_LARGE');
-      const events=this.db.prepare("SELECT e.process_id processId,e.kind,e.occurred_at createdAt,EXISTS(SELECT 1 FROM faro_interviews i WHERE i.id=json_extract(e.data,'$.interviewId') AND i.process_id=p.id AND i.state='COMPLETED' AND i.candidate_completed=1 AND i.employer_completed=1 AND json_extract(e.data,'$.state')='COMPLETED') mutuallyCompleted FROM faro_events e JOIN faro_interests p ON p.id=e.process_id JOIN faro_offers o ON o.id=p.offer_id WHERE o.organization_id=? AND p.created_at>=? AND p.created_at<? AND e.kind IN ('ADVANCE','ASSESSMENT_ASSIGNED','INTERVIEW_CONFIRM','INTERVIEW_COMPLETE','REJECT')").all(orgId,start,end) as unknown as Array<Omit<ReliabilityEvent,'mutuallyCompleted'>&{mutuallyCompleted:number}>;
-      return reliabilitySnapshot(rows,events.map(e=>({...e,mutuallyCompleted:e.mutuallyCompleted===1})),start,end,asOf);
-    });
+    const {start,end}=reliabilityWindow(from,to,asOf);
+    return this.transaction(()=>{this.member(userId,orgId,['OWNER','ADMIN']);return reliabilityFromRows(reliabilityQueries(orgId,start,end).map(query=>this.db.prepare(query.text).all({$1:orgId,$2:start,$3:end})),start,end,asOf);});
   }
+
   notifyModerators(id:string,message:string,key:string,entityType='case') {
     const recipients=this.db.prepare("SELECT id FROM users WHERE role='ADMIN'").all() as Array<{id:string}>;
     for(const recipient of recipients)new RecruitmentService(this.database,this.clock).enqueue(recipient.id,entityType,id,message,key);
@@ -82,8 +74,7 @@ export class TrustService extends FaroStore {
     });
   }
   caseRow(id:string) {
-    const row=this.db.prepare('SELECT * FROM faro_cases WHERE id=?').get(id) as unknown as CaseRow|undefined;
-    if(!row)throw new HttpError(404,'Nie znaleziono sprawy.');return row;
+    const query=caseReadQuery(id);return caseFromRows(this.db.prepare(query.text).all({$1:id}));
   }
   participant(userId:string,row:CaseRow):'CANDIDATE'|'EMPLOYER' {
     if(!row.process_id) {this.member(userId,row.organization_id,['OWNER','ADMIN']);return 'EMPLOYER';}
@@ -95,7 +86,7 @@ export class TrustService extends FaroStore {
   }
   list(userId: string) {
     const admin=Boolean(this.db.prepare("SELECT id FROM users WHERE id=? AND role='ADMIN'").get(userId));
-    const rows=(admin?this.db.prepare('SELECT * FROM faro_cases ORDER BY created_at DESC LIMIT 200').all():this.db.prepare("SELECT c.* FROM faro_cases c LEFT JOIN faro_interests p ON p.id=c.process_id WHERE c.reporter_id=? OR (c.kind IN ('NO_SHOW_CASE','INTERVIEW_DISCREPANCY') AND (p.candidate_id=? OR EXISTS(SELECT 1 FROM faro_assignments a JOIN faro_members m ON m.user_id=a.user_id AND m.organization_id=c.organization_id AND m.active=1 WHERE a.offer_id=p.offer_id AND a.user_id=?))) OR (c.kind='STALE_OFFER' AND EXISTS(SELECT 1 FROM faro_members m WHERE m.organization_id=c.organization_id AND m.user_id=? AND m.active=1 AND m.role IN ('OWNER','ADMIN'))) ORDER BY c.created_at DESC LIMIT 200").all(userId,userId,userId,userId)) as unknown as CaseRow[];
+    const query=caseListQuery(userId,admin),rows=this.db.prepare(query.text).all(admin?{}:{$1:userId}) as unknown as CaseRow[];
     if(admin)this.audit(userId,'MODERATION_CASES_READ','cases');
     const result:Record<string,unknown>[]=[];
     for(const row of rows) {
@@ -103,12 +94,10 @@ export class TrustService extends FaroStore {
       let participant:'CANDIDATE'|'EMPLOYER'|null=null;
       if(!moderator) {
         try {participant=this.participant(userId,row);}catch{if(row.reporter_id!==userId)continue;}
-        // Other process reports stay private; only appointment disputes are bilateral.
-        if(row.reporter_id!==userId&&!['NO_SHOW_CASE','INTERVIEW_DISCREPANCY','STALE_OFFER'].includes(row.kind))continue;
       }
-      const explanations=moderator?this.db.prepare('SELECT participant,statement,created_at FROM faro_case_explanations WHERE case_id=? ORDER BY created_at,rowid').all(row.id):this.db.prepare('SELECT participant,statement,created_at FROM faro_case_explanations WHERE case_id=? AND user_id=? ORDER BY created_at,rowid').all(row.id,userId);
-      result.push(moderator?{...row,canModerate:true,explanations}:{id:row.id,kind:row.kind,state:row.state,revision:row.revision,explanation_due_at:row.explanation_due_at,review_at:row.review_at,created_at:row.created_at,participant,canModerate:false,
-        statement:row.reporter_id===userId?row.statement:null,decision:row.public_reason,explanations});
+      if(!caseVisible(row,userId,moderator,participant))continue;
+      const query=caseExplanationsQuery(row.id,moderator?null:userId),explanations=this.db.prepare(query.text).all(moderator?{$1:row.id}:{$1:row.id,$2:userId});
+      result.push(caseView(row,userId,moderator,participant,explanations));
     }
     return result.slice(0,200);
   }

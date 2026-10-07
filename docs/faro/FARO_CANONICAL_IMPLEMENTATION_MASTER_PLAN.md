@@ -933,3 +933,11 @@ Shared stale/close/watch/process deadline plans, native owned SERIALIZABLE phase
 
 
 CP11-BI local2026-10-07 full check PASS167 Node/35 migrations/lint/typecheck/both restores/38 browsers. Worker/recruitment targeted27 PASS before added rollback regression; source70/35 and syntax/diff PASS. Phase-only native diagnostics retain no SQL, credentials or record values. BG/BH original runs refused incomplete notification fixture23502; corrected d037202 acceptance pending. Runtime SQLite; whole plan/release PARTIAL.
+
+
+## CP11-BJ — Portable private moderation/restriction/reliability reads, 2026-10-07
+
+Shared explicit reads and case masking, native current-authority/audited access and historical conflict exclusion; shared descriptive reliability with wire casing, first JSON keys and no truncated samples. [Scope](CP11_BJ_PORTABLE_MODERATION_RELIABILITY_READS.md). Targeted private moderation24 and rebuilt reliability/restriction/assessment22 PASS; full local/actual PostgreSQL acceptance pending. Corrected BG/BH d037202 FARO37656902529/CI37656902613 SUCCESS; BI5de2b8a FARO37657263026 SUCCESS, CI pending. Runtime SQLite; whole plan/release PARTIAL; continue native moderation writes/HTTP/recovery/cutover/external gates.
+
+
+CP11-BJ local full check PASS168 Node/35 migrations/lint/typecheck/both restores/38 browsers; source70/35 and diff PASS. Actual PostgreSQL acceptance pending. BI5de2b8a exact FARO37657263026 and CI37657262955 SUCCESS. Runtime SQLite; whole plan/release PARTIAL.
