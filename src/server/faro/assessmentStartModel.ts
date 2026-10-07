@@ -21,7 +21,7 @@ interface StartDatabase {
  query(text:string,values:readonly unknown[]):Promise<unknown>;
  transaction<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean}):Promise<T>;
 }
-async function candidateOwned(database:StartDatabase,userId:string,id:string,authorize:()=>void|Promise<void>) {
+export async function candidateOwned(database:StartDatabase,userId:string,id:string,authorize:()=>void|Promise<void>) {
  await authorize();const row=attemptFromRows((await database.readBatch([attemptReadQuery(id)]))[0]??[]),process=processFromRows((await database.readBatch([processReadQuery(row.process_id)]))[0]??[]);requireAttemptCandidate(userId,process);return row;
 }
 export async function startAttempt(database:StartDatabase,userId:string,id:string,asOf:string,authorize:()=>void|Promise<void>) {

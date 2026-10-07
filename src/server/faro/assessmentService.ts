@@ -1,3 +1,4 @@
+import { attemptAnswerQueries } from './assessmentAnswerModel.js';
 import { requireAttemptCandidate,attemptStartQueries } from './assessmentStartModel.js';
 import { dueAttemptsQuery,attemptExpiryQueries } from './assessmentExpiryModel.js';
 import { type AttemptRow,type IncidentRow,attemptReadQuery,attemptFromRows,attemptContextQueries,attemptView,attemptListQuery } from './assessmentAttemptReadModel.js';
@@ -239,26 +240,9 @@ export class AssessmentService extends FaroStore {
     this.expire(id);
     return this.transaction(()=>{
     const row = this.row(id), process = this.candidate(userId, row);
-    if(row.state==='EXPIRED')throw new HttpError(409,'Czas próby upłynął.','ATTEMPT_EXPIRED');
-    if (row.state !== 'STARTED') throw new HttpError(409, 'Próba nie jest aktywna.');
-    if (!row.expires_at || row.expires_at <= this.now()) {
-      throw new HttpError(409, 'Czas próby upłynął.', 'ATTEMPT_EXPIRED');
-    }
-    if (integer(body.expectedVersion, 1) !== row.revision) throw new HttpError(409, 'Odpowiedzi zmieniły się.', 'VERSION_CONFLICT');
-    const definition = JSON.parse(this.definition(row.assessment_id, row.assessment_version).content) as Definition;
-    const raw = object(body.answers), answers: Record<string, number|string> = {};
-    for (const [key, value] of Object.entries(raw)) {
-      const task = definition.tasks.find(t => t.id === key); if (!task) throw new HttpError(400, 'Nieznane zadanie.');
-      answers[key] = definition.type==='OPEN_ANSWER'?text(value,5000):integer(value, 0, task.options.length - 1);
-    }
-    const breakdown = definition.tasks.map(task => ({ taskId: task.id, earned: answers[task.id] === undefined||definition.type==='OPEN_ANSWER' ? null : answers[task.id] === task.answer ? task.points : 0, possible: task.points }));
-    const result = { breakdown, earned: definition.type==='OPEN_ANSWER'?null:breakdown.reduce((sum, task) => sum + (task.earned ?? 0), 0), possible: breakdown.reduce((sum, task) => sum + task.possible, 0), unanswered:definition.tasks.filter(t=>answers[t.id]===undefined).length, assessmentVersion: row.assessment_version, rubricVersion: definition.rubricVersion, review: 'PENDING' };
-      this.db.prepare('UPDATE faro_attempts SET answers=?,revision=revision+1,state=?,result=? WHERE id=?').run(JSON.stringify(answers), submit ? 'SCORED_PENDING_REVIEW' : 'STARTED', submit ? JSON.stringify(result) : null, id);
-      if (submit) {
-        const offer=this.recruitment.offers.version(process.offer_id,process.offer_version);
-        this.db.prepare("UPDATE faro_interests SET stage='ASSESSMENT_COMPLETED',stage_due_at=?,revision=revision+1 WHERE id=?").run(new Date(this.clock().getTime()+offer.decisionHours*3600000).toISOString(),row.process_id);
-        this.recruitment.event(process, userId, 'ATTEMPT_SUBMITTED', { attemptId: id });
-      }
+    const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition,decisionHours=submit?this.recruitment.offers.version(process.offer_id,process.offer_version).decisionHours:null;
+    for(const query of attemptAnswerQueries(row,definition,body,submit,decisionHours,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+    if(submit)this.recruitment.event(process,userId,'ATTEMPT_SUBMITTED',{attemptId:id});
     return this.overview(userId, id);
     });
   }

@@ -352,6 +352,10 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(definition.overview(f.employer.id,attempt.id).reviewTasks.length,0);
     const saved = await f.request<{ state: string; revision: number }>(`/api/faro/attempts/${attempt.id}/answers`, f.candidate.cookie, 'PUT', { expectedVersion: started.revision, answers: { 'task-1': 1 } });
     assert.equal(saved.state, 'STARTED');
+    const savedBefore={...definition.row(attempt.id)},submitProcessBefore={...definition.recruitment.row(f.interest.id)};
+    f.app.db.db.exec("CREATE TRIGGER submit_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'submit delivery failed'); END");
+    await f.request(`/api/faro/attempts/${attempt.id}/submit`,f.candidate.cookie,'POST',{expectedVersion:saved.revision,answers:{'task-1':1}},500);assert.deepEqual({...definition.row(attempt.id)},savedBefore);assert.deepEqual({...definition.recruitment.row(f.interest.id)},submitProcessBefore);assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ATTEMPT_SUBMITTED'").get(f.interest.id)!.n,0);
+    f.app.db.db.exec('DROP TRIGGER submit_delivery_failure');
     const submitted = await f.request<{ state: string; result: unknown }>(`/api/faro/attempts/${attempt.id}/submit`, f.candidate.cookie, 'POST', { expectedVersion: saved.revision, answers: { 'task-1': 1 } });
     assert.equal(submitted.state, 'SCORED_PENDING_REVIEW'); assert.equal(submitted.result, null);
     assert.ok(definition.recruitment.row(f.interest.id).stage_due_at);
@@ -365,6 +369,7 @@ test('assessment lifecycle is approved before assignment and timer is server-aut
     assert.equal(final.state, 'FINALIZED'); assert.equal(final.result.review, 'FINALIZED');
     const old = definition.row(attempt.id);
     f.app.db.db.prepare("UPDATE faro_attempts SET state='STARTED',expires_at=? WHERE id=?").run(new Date(Date.now() - 1000).toISOString(), attempt.id);
+    await f.request(`/api/faro/attempts/${attempt.id}/answers`,f.employer.cookie,'PUT',{expectedVersion:old.revision,answers:{'task-1':0}},404);assert.equal(definition.row(attempt.id).state,'STARTED');
     await f.request(`/api/faro/attempts/${attempt.id}/answers`, f.candidate.cookie, 'PUT', { expectedVersion: old.revision, answers: { 'task-1': 0 } }, 409);
     assert.equal(definition.row(attempt.id).state, 'EXPIRED');
     assert.equal('ranking' in final.result, false);
