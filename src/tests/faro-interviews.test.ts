@@ -129,9 +129,15 @@ test('interview confirmation reserves participants atomically, scopes API, freez
     const confirm={command:'CONFIRM',confirmed:true,expectedVersion:1,processVersion:3,idempotencyKey:'confirm'};
     await f.request(`/api/faro/processes/${f.first}/interviews`,f.other.cookie,'GET',undefined,404);
     assert.throws(()=>f.interviews.change(f.employer.id,first.id,confirm));
+    const confirmationBefore={...f.recruitment.row(f.first)};
+    f.app.db.db.exec("CREATE TRIGGER schedule_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'schedule delivery failed'); END");
+    await f.request(`/api/faro/interviews/${first.id}`,f.candidate.cookie,'POST',confirm,500);assert.equal(f.interviews.row(first.id).state,'PROPOSED');assert.equal(f.interviews.row(first.id).revision,1);assert.deepEqual({...f.recruitment.row(f.first)},confirmationBefore);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.candidate.id,confirm.idempotencyKey)!.n,0);f.app.db.db.exec('DROP TRIGGER schedule_delivery_failure');
     const confirmed=f.interviews.change(f.candidate.id,first.id,confirm);assert.equal(confirmed.state,'CONFIRMED');
     assert.throws(()=>f.interviews.change(f.other.id,second.id,{...confirm,idempotencyKey:'second-confirm'}),code('SLOT_CONFLICT'));
     assert.equal(f.interviews.row(second.id).revision,1);assert.equal(f.recruitment.row(f.second).revision,3);
+    const cancellation={command:'CANCEL',confirmed:true,reason:'RESCHEDULE',expectedVersion:1,processVersion:3,idempotencyKey:'second-cancel'},cancellationBefore={...f.recruitment.row(f.second)};
+    f.app.db.db.exec("CREATE TRIGGER cancel_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'cancel delivery failed'); END");await f.request(`/api/faro/interviews/${second.id}`,f.other.cookie,'POST',cancellation,500);assert.equal(f.interviews.row(second.id).state,'PROPOSED');assert.deepEqual({...f.recruitment.row(f.second)},cancellationBefore);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.other.id,cancellation.idempotencyKey)!.n,0);f.app.db.db.exec('DROP TRIGGER cancel_delivery_failure');
+    const cancelled=f.interviews.change(f.other.id,second.id,cancellation);assert.equal(cancelled.state,'CANCELLED');assert.deepEqual(f.interviews.change(f.other.id,second.id,cancellation),cancelled);assert.deepEqual({...f.recruitment.row(f.second)},{...cancellationBefore,stage:'ACCEPTED_TO_NEXT_STAGE',stage_due_at:'2026-10-27T08:00:00.000Z',next_action:'Uzgodnij nowy termin rozmowy.',revision:4});
     const calendar=f.interviews.calendar(f.candidate.id,first.id).content;
     assert.match(calendar,/DTSTART:20261025T003000Z/);assert.match(calendar,/DTEND:20261025T013000Z/);
     assert.doesNotMatch(calendar,/Anna|Jan|MeetingCandidate|ATTENDEE|PHONE|recruiter_id/);
