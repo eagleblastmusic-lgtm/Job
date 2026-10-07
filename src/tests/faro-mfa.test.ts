@@ -28,11 +28,13 @@ test('encrypted MFA gates private APIs, fences OTP replay, recovers once and rev
     const user=await f.user('MfaUser'),other=await f.user('MfaOther');
     const login=async()=>{const response=await fetch(`${f.base}/api/auth/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:user.email,password:'Bezpieczne123'})});assert.equal(response.status,200);return response.headers.get('set-cookie')!.split(';')[0]!;};
     const old=await login(),path='/api/faro/security/mfa';
+    f.app.db.db.exec("CREATE TRIGGER failure_audit_guard BEFORE INSERT ON audit_logs WHEN NEW.action='MFA_CONFIRMATION_FAILED' BEGIN SELECT RAISE(ABORT,'failure audit rollback'); END");await f.request(path+'/setup',user.cookie,'POST',{password:'WrongPassword123'},500);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_mfa_limits WHERE user_id=?').get(user.id)!.n,0);f.app.db.db.exec('DROP TRIGGER failure_audit_guard');
     await f.request(path+'/setup',user.cookie,'POST',{password:'WrongPassword123'},401);
     const setup=await f.request<{secret:string}>(path+'/setup',user.cookie,'POST',{password:'Bezpieczne123'}),secret=decodeSecret(setup.secret);
     const stored=f.app.db.db.prepare('SELECT pending_cipher FROM faro_mfa WHERE user_id=?').get(user.id)!;
     assert.equal(String(stored.pending_cipher).includes(setup.secret),false);assert.equal(String(stored.pending_cipher).includes(secret.toString('hex')),false);
     const enrolledCounter=Math.floor(Date.now()/30000);
+    f.app.db.db.exec("CREATE TRIGGER enrollment_audit_guard BEFORE INSERT ON audit_logs WHEN NEW.action='MFA_ENABLED' BEGIN SELECT RAISE(ABORT,'enrollment audit rollback'); END");await f.request(path+'/confirm',user.cookie,'POST',{code:totp(secret,enrolledCounter)},500);assert.equal(f.app.db.db.prepare('SELECT active_cipher FROM faro_mfa WHERE user_id=?').get(user.id)!.active_cipher,null);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_mfa_recovery WHERE user_id=?').get(user.id)!.n,0);await f.request('/api/me',old);f.app.db.db.exec('DROP TRIGGER enrollment_audit_guard');
     const confirmed=await f.request<{recoveryCodes:string[]}>(path+'/confirm',user.cookie,'POST',{code:totp(secret,enrolledCounter)});assert.equal(confirmed.recoveryCodes.length,8);
     await f.request('/api/me',old,'GET',undefined,401);
     const second=await login();

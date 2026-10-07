@@ -386,3 +386,14 @@ CP11-BB/BC full local check2026-10-07 PASS162 Node/35 migrations/both actual res
 
 
 CP11-BB/BC0111676 real PostgreSQL failed23505 because new tick fixture created two simultaneous active appointments in one process, contrary to existing faro_one_active_interview. Corrected proof expires the proposal before inserting the confirmed appointment, retaining all expiry/reminder/rollback/authority/terminal assertions and the UNIQUE index. Full local162/35/both restores/38 browsers remains valid; actual corrected PostgreSQL/remote acceptance pending.
+
+
+## CP11-BD — Portable encrypted MFA mutations, 2026-10-07
+
+Shared SQLite/native crypto and MFA write plans implement setup/activation/counter verification/one-use recovery with current-session authority, atomically persisted failure evidence, secret-bound encryption and other-session revocation. [Scope](CP11_BD_PORTABLE_MFA_WRITES.md). Targeted MFA/session PASS4; full local and actual PostgreSQL acceptance pending. Direct main; runtime SQLite, whole plan/release PARTIAL. Continue native auth registration/login/privacy/moderation/worker/HTTP/recovery/cutover and external gates.
+
+
+CP11-BB/BCf3fffd4 actual PostgreSQL passed corrected tick fixtures then refused identity fixture because its candidate had already been erased by the earlier cascade test. Moved the complete identity/revocation proof before deliberate candidate deletion; no erased account/session is recreated, no authority guard relaxed, and the original deletion cascade proof remains. Real corrected acceptance pending.
+
+
+CP11-BD full local2026-10-07 check PASS162 Node/35 migrations/both actual restores/38 real desktop/mobile browsers/lint/typecheck, zero skips. Targeted MFA/session PASS4 includes real failure/enrollment audit rollback; source70/35 and syntax/diff PASS. Actual native PostgreSQL18 Node22/24 acceptance pending. BB/BC63f914a corrected PostgreSQL18 Node22/24 PASS in FARO37652009031; full FARO/CI37652008809 acceptance pending. Original fixture failures retained; UNIQUE/current identity/source deletion guards unchanged. Runtime SQLite and whole plan/release PARTIAL. Continue native durable outbox/worker and remaining auth/privacy/moderation/HTTP/recovery/cutover.
