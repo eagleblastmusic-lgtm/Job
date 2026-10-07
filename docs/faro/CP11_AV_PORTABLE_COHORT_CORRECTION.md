@@ -1,0 +1,9 @@
+# CP11-AV — Portable atomic cohort key correction (2026-10-07)
+
+Existing SQLite correction and native PostgreSQL share the exact preview token, blocked active cohort, explicit human confirmation/manual replacement and eligible VALID final result guards. Native owned SERIALIZABLE command verifies current session and assigned membership before fresh work or exact cached acknowledgement. SQLite now rechecks authority inside command journal as well.
+
+Shared explicit writes append a human key correction and a new VALID result history revision for each eligible attempt, increment only affected attempt revisions and leave original answers/result/timers, invalid evidence, definition and process decisions/clocks unchanged. Missing answers remain null. Required minimized per-attempt event/audit/outbox and journal acknowledgement are in the same transaction. No partial group write can survive required delivery failure; journal retains only correctionId/affected.
+
+Rebuilt actual API cohort regression extended with outbox trigger: complete rollback of correction/history/attempts/events/journal, unchanged process decisions and successful retry/replay PASS1. Source70/35 and syntax/diff PASS. Native PostgreSQL18 Node22/24 checks stale token/explicit manual replacement/current authority, actual delivery CHECK failure with complete rollback, retry/replay once, original evidence/clocks, appended history/missing answer, private candidate view and minimized event/journal. Full local/remote acceptance pending; first AU invalidation fixture failure retained in AU scope and corrected without relaxing CHECK.
+
+Runtime SQLite, dependent drafts unmerged and whole CP11/master plan/release PARTIAL. Continue remaining native lifecycle/auth/MFA/interview/privacy/worker/recovery/operator integration and external acceptance. Locked login/CV/EHV unchanged; no provider, advanced execution or release enablement.

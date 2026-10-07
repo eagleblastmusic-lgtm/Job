@@ -1,3 +1,4 @@
+import { cohortCorrectionPlan } from './assessmentCohortWriteModel.js';
 import { type CorrectedKey,correctedKeyQuery,cohortAttemptsQuery,cohortKeyInput,cohortEffect,cohortPreview,cohortPublicPreview } from './assessmentCohortReadModel.js';
 import { assessmentRetryPlan,attemptRetryContextQueries } from './assessmentRetryModel.js';
 import { incidentReportPlan,incidentResolutionPlan,otherActiveAttemptQuery,requireIncidentCandidate } from './assessmentIncidentModel.js';
@@ -39,21 +40,11 @@ export class AssessmentService extends FaroStore {
     this.read(userId,id,version);
     const ack=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,version,operation:'ASSESSMENT_COHORT_KEY_CORRECTION'},()=>{
       const p=this.previewKeyCorrection(userId,id,version,body);
-      if(p.token!==body.previewToken)throw new HttpError(409,'Grupa lub klucz zmieniły się. Ponów podgląd.','VERSION_CONFLICT');
-      if(p.blocked)throw new HttpError(409,'Najpierw zakończ lub rozpatrz aktywne próby. Nie zmieniamy ich klucza w trakcie.');
-      if(body.confirmed!==true||p.manualCount>0&&body.replaceIndividualAmendments!==true)throw new HttpError(400,'Potwierdź wspólną korektę i świadome zastąpienie indywidualnych korekt.');
-      if(!p.effects.some(e=>e.after!==null))throw new HttpError(409,'Brak aktualnych zatwierdzonych wyników do korekty.');
-      const correctionId=randomUUID(),revision=(this.correctedKey(id,version)?.revision??0)+1;
-      this.db.prepare('INSERT INTO faro_key_corrections VALUES(?,?,?,?,?,?,?,?)').run(correctionId,id,version,revision,JSON.stringify(p.key),p.reason,this.now(),userId);
-      for(const effect of p.effects) {
-        if(effect.after===null)continue;
-        const result={...effect.history!.result,breakdown:effect.breakdown,earned:effect.after,possible:effect.breakdown.reduce((sum,t)=>sum+t.possible,0),unanswered:effect.breakdown.filter(t=>t.earned===null).length,review:'COHORT_CORRECTED',reviewNote:p.reason,comparisonStatus:'COHORT_KEY_CORRECTION',scoringRevision:correctionId};
-        this.db.prepare("INSERT INTO faro_result_history(attempt_id,revision,validity,result,reason_code,reason,created_at) VALUES(?,?,'VALID',?,'HUMAN_AMENDMENT',?,?)").run(effect.attemptId,effect.history!.revision+1,JSON.stringify(result),p.reason,this.now());
-        this.db.prepare('UPDATE faro_attempts SET revision=revision+1 WHERE id=?').run(effect.attemptId);
-        this.recruitment.event(this.recruitment.row(effect.attempt.process_id),userId,'ASSESSMENT_COHORT_CORRECTED',{attemptId:effect.attemptId,scoringRevision:correctionId});
-      }
-      return {correctionId,affected:p.effects.filter(e=>e.after!==null).length};
-    });
+      const plan=cohortCorrectionPlan(userId,id,version,p,this.correctedKey(id,version)?.revision??0,body,this.now());
+      for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
+      for(const effect of plan.effects)this.recruitment.event(this.recruitment.row(effect.attempt.process_id),userId,'ASSESSMENT_COHORT_CORRECTED',{attemptId:effect.attemptId,scoringRevision:plan.ack.correctionId});
+      return plan.ack;
+    },()=>{this.read(userId,id,version);});
     this.read(userId,id,version);return ack;
   }
   list(userId: string, offerId: string) {
