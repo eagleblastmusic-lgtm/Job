@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { faroFixture, offerInput } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { OfferService, type OfferRecord } from '../server/faro/offerService.js';
+import { AssessmentService } from '../server/faro/assessmentService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
 import { explainOffer, explainConditions, DEFAULT_CONSTRAINTS, sortOffers } from '../domain/faro/offers.js';
 import { parseOffer } from '../server/faro/offerService.js';
@@ -493,5 +494,26 @@ test('interest notification integrity failure rolls back process, projection, ev
     assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_events WHERE process_id=?').get(result.id)!.n,1);
     assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_outbox WHERE entity_type='process' AND entity_id=?").get(result.id)!.n,2);
     assert.deepEqual(f.app.db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+  }finally{await f.close();}
+});
+
+
+test('terminal command audit failure rolls back live assessment, process and journal before real API retry and replay',async()=>{
+  const f=await setup();try{
+    const r=new RecruitmentService(f.app.db),a=new AssessmentService(f.app.db),profiles=new ProfileService(f.app.db),db=f.app.db.db;
+    const p=r.interest(f.candidate.id,f.offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(f.candidate.id).confirmationToken,idempotencyKey:'terminal-interest'});
+    const dueAt=new Date(Date.now()+86400000).toISOString();
+    r.change(f.employer.id,p.id,{command:'ADVANCE',expectedVersion:1,idempotencyKey:'terminal-advance',nextAction:'Przegląd deklaracji w zadaniu',dueAt});
+    const definition=a.create(f.employer.id,f.offer.id,{title:'Zadanie do ręcznego przeglądu',type:'OPEN_ANSWER',scoringMode:'HUMAN',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'terminal-regression-v1',tasks:[{prompt:'Jak wyjaśnisz klientowi rozwiązanie?',evaluationCriteria:'Jasne wyjaśnienie kolejnych kroków.',points:2}]});
+    a.approve(f.employer.id,definition.id,{version:1,action:'REVIEW'});a.approve(f.employer.id,definition.id,{version:1,action:'APPROVE',confirmed:true});
+    const attempt=a.assign(f.employer.id,p.id,{assessmentId:definition.id,version:1,deadline:dueAt,expectedVersion:2,idempotencyKey:'terminal-assignment'});a.start(f.candidate.id,attempt.id);
+    const processBefore={...r.row(p.id)},attemptBefore={...db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(attempt.id)!};assert.equal(attemptBefore.state,'STARTED');
+    const body={command:'REJECT',expectedVersion:3,idempotencyKey:'terminal-reject',reason:{code:'POSITION_FILLED'}},url=`/api/faro/processes/${p.id}/commands`;
+    db.exec("CREATE TRIGGER fail_terminal_audit BEFORE INSERT ON audit_logs WHEN NEW.action='REJECT' BEGIN SELECT RAISE(ABORT,'terminal audit unavailable'); END");
+    await f.request(url,f.employer.cookie,'POST',body,500);
+    assert.deepEqual({...r.row(p.id)},processBefore);assert.deepEqual({...db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(attempt.id)!},attemptBefore);assert.equal(db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,body.idempotencyKey)!.n,0);
+    db.exec('DROP TRIGGER fail_terminal_audit');const ack=await f.request(url,f.employer.cookie,'POST',body);assert.deepEqual(await f.request(url,f.employer.cookie,'POST',body),ack);
+    const after=db.prepare('SELECT * FROM faro_attempts WHERE id=?').get(attempt.id)!;assert.equal(after.state,'WITHDRAWN');assert.equal(after.revision,Number(attemptBefore.revision)+1);assert.equal(after.started_at,attemptBefore.started_at);assert.equal(after.expires_at,attemptBefore.expires_at);
+    assert.equal(r.row(p.id).status,'REJECTED');assert.equal(r.row(p.id).response_due_at,processBefore.response_due_at);assert.equal(r.row(p.id).first_response_at,processBefore.first_response_at);assert.equal(r.row(p.id).snapshot,processBefore.snapshot);assert.equal(db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='REJECT'").get(p.id)!.n,1);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
   }finally{await f.close();}
 });
