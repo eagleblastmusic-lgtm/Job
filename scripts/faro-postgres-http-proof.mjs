@@ -24,7 +24,7 @@ export async function proveNativeHttp(database,config){
   await database.query('ALTER TABLE users RENAME TO health_users_held');try{const blocked=await json('/api/health','','GET',undefined,503);assert.equal(blocked.database,'unavailable');assert.equal(blocked.storage,'ok');}finally{await database.query('ALTER TABLE health_users_held RENAME TO users');}
   assert.equal((await json('/api/health')).database,'ok');
   app.config.appOrigin=base;
-  const smoke=await promisify(execFile)(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account','--operator-confirmed','--expect-faro-open'],{env:{...process.env,STAGING_URL:base,STAGING_ALLOW_HTTP:'1'}});assert.match(smoke.stdout,/ACCOUNT_CLEANUP_PASS/);
+  let smoke;try{smoke=await promisify(execFile)(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account','--operator-confirmed','--expect-faro-open'],{env:{...process.env,STAGING_URL:base,STAGING_ALLOW_HTTP:'1'}});}catch(error){console.error(error.stderr?.match(/FARO_SMOKE_FAILURE step=[A-Z]+; no response records logged\./)?.[0]??'FARO_SMOKE_CHILD_FAILED');throw error;}assert.match(smoke.stdout,/ACCOUNT_CLEANUP_PASS/);
   const retired=await json('/api/profile','','GET',undefined,410);assert.equal(retired.error.code,'RETIRED_FEATURE');
   await json('/api/faro/profile','','GET',undefined,401);
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
