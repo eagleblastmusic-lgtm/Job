@@ -1,0 +1,11 @@
+# CP11-CR — Render connector and refreshed free staging
+
+Actual acceptance2026-10-08: Render MCP tools became available and authenticated requests succeeded in the user-confirmed Bartosz workspace tea-dadn9u2d0e5s73dkborg. list_services/get_service confirmed exactly one free Docker web service, Frankfurt, main, auto-deploy off; list_postgres_instances returned no instances. Dashboard environment inspection confirmed SQLite and disabled worker, no PostgreSQL connection/key variables, secret files or linked environment groups. This supersedes prior missing-tool statements; no OAuth scope rejection occurred.
+
+Existing authorized free staging only was refreshed through trigger_deploy. Source1f003663e256ae182160c5072810c5483ff74370 had FARO37799063032/CI37799063088 SUCCESS. Deploy dep-db3tb60473hc73bstvl0 Live after1m14s. Actual HTTPS SYNTHETIC_ACCOUNT smoke PASS and ACCOUNT_CLEANUP_PASS; release NOT_ACCEPTED. Filtered application-error logs after Live returned no entries. Auto-deploy remains off. No database, paid resource, configuration change or production activation.
+
+Current PostgreSQL access boundary: connector query_render_postgres explicitly uses read-only transactions. It cannot run schema creation/import/migrations. No database write connection is available to the local operator tools. A protected FARO_PG_REHEARSAL_URL for an isolated staging database or authenticated Render CLI is needed before actual schema preparation and connection. Do not create an expiring unused database or change the working runtime to an unprepared target. Never paste secrets into chat, command literals or Git. Free Render permission remains valid; paid database and production deployment still require user approval.
+
+Free Postgres is1GB, one/workspace, expires after30 days, no platform backups; free web lacks persistent disk, shell and one-off jobs. Source: https://render.com/docs/free (verified2026-10-08). These are staging constraints, not a reason to buy resources or infer production RPO/RTO.
+
+Whole plan/release PARTIAL. Native HTTP/browser technical acceptance does not close protected production custody/persistence, provider/taxonomy/executor decisions or independent external owners/acceptances.

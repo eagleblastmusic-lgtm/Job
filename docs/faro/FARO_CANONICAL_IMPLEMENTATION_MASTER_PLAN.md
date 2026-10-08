@@ -1153,3 +1153,8 @@ Render discovery now confirms the connector is installed and enabled. This sessi
 
 
 CQ actual acceptance2026-10-08:396a5e9 FARO37798340585 and CI37798340448 SUCCESS, every required job. PostgreSQL18 Node22/24 native HTTP verifies owned confirmed learning removal, stale-value refusal, real audit-failure rollback and idempotency;26 native desktop/mobile browser cases/version include learning add/remove. Local full180 Node,38 browsers, both restores and remote contracts/container/recovery PASS. No Render configuration/deploy change; default SQLite and external release dependencies remain open. Whole plan/release PARTIAL.
+
+
+## CP11-CR — Restored Render connector and staging refresh (2026-10-08)
+
+[Actual evidence](CP11_CR_RENDER_CONNECTOR_STAGING_REFRESH.md). Authenticated MCP inventory confirms the existing free staging and zero PostgreSQL instances; Dashboard confirms SQLite/worker disabled. Supersedes missing-tool statements. Accepted main1f00366 FARO37799063032/CI37799063088 deployed free service as dep-db3tb60473hc73bstvl0 Live; actual synthetic HTTPS smoke/account cleanup PASS, no app error entries. No paid resource, database or production activation. Native schema preparation still needs protected write-capable PostgreSQL connection/CLI: connector SQL is read-only. Whole plan/release PARTIAL; external decisions/evidence unchanged.

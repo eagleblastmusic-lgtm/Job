@@ -76,3 +76,8 @@ CN/CO final9c42699 acceptance2026-10-08: FARO37793582627 and CI37793582723 SUCCE
 
 
 Latest technical acceptance2026-10-08:396a5e9 FARO37798340585/CI37798340448 SUCCESS (PostgreSQL18 Node22/24, native browser/HTTP learning removal, rollback and retained recovery/container checks). This is engineering evidence, not independent security/manual accessibility/legal/user acceptance. Render connector discovery reports installed/enabled, but this session exposes no Render operations; no denied OAuth scope is established. Paid PostgreSQL and production deploy remain unauthorized. External owners/decisions remain MISSING/UNASSIGNED; whole plan/release PARTIAL.
+
+
+## CP11-CR — Restored Render connector and staging refresh (2026-10-08)
+
+[Actual evidence](CP11_CR_RENDER_CONNECTOR_STAGING_REFRESH.md). Authenticated MCP inventory confirms the existing free staging and zero PostgreSQL instances; Dashboard confirms SQLite/worker disabled. Supersedes missing-tool statements. Accepted main1f00366 FARO37799063032/CI37799063088 deployed free service as dep-db3tb60473hc73bstvl0 Live; actual synthetic HTTPS smoke/account cleanup PASS, no app error entries. No paid resource, database or production activation. Native schema preparation still needs protected write-capable PostgreSQL connection/CLI: connector SQL is read-only. Whole plan/release PARTIAL; external decisions/evidence unchanged.
