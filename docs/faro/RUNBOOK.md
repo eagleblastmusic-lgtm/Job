@@ -1,5 +1,13 @@
 # Local operations and recovery
 
+## Current free staging verification
+
+The user-authorized free Render staging explicitly selects PostgreSQL18; production recruitment and worker gates remain closed. See [hosted configuration](CP11_CW_HOSTED_POSTGRES_STAGING_ACCEPTANCE.md) and [actual retained-account restart proof](CP11_CX_HOSTED_RESTART_PERSISTENCE.md). Free database expiry and ephemeral private-file storage mean this remains disposable staging.
+
+Use existing `scripts/staging-smoke.mjs` with `STAGING_URL=https://faro-free-staging.onrender.com`. Default invocation performs public reads only; `--synthetic-account --operator-confirmed` adds one disposable account and erases it on completion. Add `--restart-proof` for a retained-account probe: keep the process running at `FARO_SMOKE_RESTART_READY`, restart only the authorized staging service, observe its new listener in Render logs, then send the exact line `RESTARTED` to stdin within180 seconds. A newline is required. The harness checks the original session, changed optional consent, fresh login and own export before reauthenticated cleanup. Its confirmation line alone is not proof of a restart; record the actual external service event/new listener together with the harness outcome. Credentials stay in memory; do not print or persist them. No production data or service belongs in this workflow.
+
+## Local runtime
+
 Build with `npm run build`, then start `node dist/server/index.js` with `NODE_ENV=development`, `APP_ORIGIN`, `DATA_DIR` and `DATABASE_PATH` pointing to the chosen local environment. Never reuse real production data for fixtures. `/api/health` verifies availability; it does not certify completed legal/product gates.
 
 `npm run backup:data -- --data-dir <dir> --database <db> --output <new-backup-dir>` uses the existing consistent SQLite snapshot utility. Keep backup access restricted. Upload copies are separate from database snapshot; write quiescence is needed for consistent file/database recovery.

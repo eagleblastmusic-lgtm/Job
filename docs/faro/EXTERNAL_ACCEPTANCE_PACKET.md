@@ -101,3 +101,6 @@ CV actual acceptance2026-10-08:99e6bc9 FARO37827730169 and CI37827730617 SUCCESS
 ## CP11-CX — Hosted retained account/session/consent restart (2026-10-08)
 
 [Scope and actual proof](CP11_CX_HOSTED_RESTART_PERSISTENCE.md). Existing smoke now supports confirmed bounded restart proof with in-memory credentials and reauthenticated cleanup. Actual Render process thhhx retained prepared schema at21:32:46 and listener at21:32:47; same account/original session/changed consent/fresh login/export/closed gate PASS, account cleanup PASS. Targeted8/full Node185/build/lint/typecheck/syntax/diff PASS; new remote CI pending. No application/migration/UI change; existing native/browser/recovery evidence reused. No paid resources/production operations; whole plan/release PARTIAL.
+
+
+CX exact remote acceptance2026-10-08:3bd851c FARO37833117398 and CI37833117392 SUCCESS, every required job. PostgreSQL18 Node22/24, native desktop/mobile browser contracts, default browsers, full contracts/container/recovery accepted. Local185 Node/8 smoke regressions and actual hosted retained-account restart/cleanup PASS. Follow-up changes only update operator/deployment documentation and this evidence; accepted runtime/harness inputs unchanged. Full plan/release PARTIAL; production custody/provider/executor and independent external decisions remain open.

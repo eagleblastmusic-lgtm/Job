@@ -1,6 +1,6 @@
 # Deployment gates
 
-The implementation runs locally on Node with SQLite. The existing repository deployment configuration is not evidence of suitable persistent production storage. PostgreSQL remains a target requiring an actual adapter, migration/cutover rehearsal and backup verification. No public deployment is performed by the current implementation work.
+Current scope (2026-10-08): the user-authorized free Render staging runs the accepted PostgreSQL18 adapter at https://faro-free-staging.onrender.com, deployed main6577cfb in Bartosz's workspace. CW records actual configuration/startup/schema retention; CX records account/session/changed-consent persistence across an observed hosted restart and test-account cleanup. Default local configuration remains SQLite. Actual isolated PostgreSQL migration/cutover/backup/recovery and browser acceptance are recorded in the checkpoint register. Production persistence, independent custody and measured production RPO/RTO still require their own acceptance; free staging does not close them. The dated sections below preserve earlier evidence and limitations.
 
 `createFaroApi` intentionally returns 503 `RELEASE_GATES_OPEN` in production. Removing this check is not a substitute for resolving launch gates. Authentication screens may load while Canonical operations remain blocked.
 
