@@ -1,3 +1,4 @@
+import { symlink, mkdir } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -102,4 +103,17 @@ test('required malware scan fails closed before writing when no scanner exists',
     await expectUploadError(() => storeCvUpload({ dataDir: dir, userId: 'user-1', filename: 'cv.txt', mimeType: 'text/plain', base64: encoded('candidate data'), maxBytes: 1024, requireMalwareScan: true }), 'UPLOAD_MALWARE_SCAN_UNAVAILABLE');
     await assert.rejects(readdir(join(dir, 'uploads', 'user-1')), error => (error as NodeJS.ErrnoException).code === 'ENOENT');
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+
+test('disposal refuses redirected parent directories and preserves an external private sentinel',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'job-disposal-parent-'));
+ try{
+  const dataDir=join(root,'data'),outside=join(root,'outside');await mkdir(join(dataDir,'uploads'),{recursive:true});await mkdir(outside);
+  const sentinel=join(outside,'private.txt');await writeFile(sentinel,'external private sentinel');
+  await symlink(outside,join(dataDir,'uploads','owner'),process.platform==='win32'?'junction':'dir');
+  await assert.rejects(()=>deleteStoredFile(dataDir,'uploads/owner/private.txt'),/Redirected/);
+  assert.equal(await readFile(sentinel,'utf8'),'external private sentinel');
+  await deleteStoredFile(dataDir,'uploads/missing/private.txt');
+ }finally{await rm(root,{recursive:true,force:true});}
 });

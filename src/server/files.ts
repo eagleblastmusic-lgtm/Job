@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { basename, extname, isAbsolute, relative, resolve } from 'node:path';
+import { chmod, mkdir, readFile, unlink, writeFile, lstat } from 'node:fs/promises';
+import { basename, extname, isAbsolute, relative, resolve, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { HttpError } from './http.js';
@@ -168,6 +168,10 @@ export async function storeCvUpload(input: { dataDir: string; userId: string; fi
 export async function deleteStoredFile(dataDir: string, storageKey: string): Promise<void> {
   const path = resolveStoredFilePath(dataDir, storageKey);
   try {
+    const root=resolve(dataDir),parents=[root];
+    let parent=dirname(path);
+    while(parent!==root){parents.push(parent);const next=dirname(parent);if(next===parent)throw new Error('Invalid upload disposal parent.');parent=next;}
+    for(const directory of parents.reverse()){const info=await lstat(directory);if(!info.isDirectory()||info.isSymbolicLink())throw new Error('Redirected upload disposal directory refused.');}
     await unlink(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
