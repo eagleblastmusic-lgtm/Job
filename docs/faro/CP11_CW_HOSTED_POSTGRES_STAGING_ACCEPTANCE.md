@@ -1,0 +1,23 @@
+# CP11-CW — Hosted free PostgreSQL staging acceptance (2026-10-08)
+
+Goal: apply the already accepted CV configuration in Bartosz's workspace and verify the actual hosted runtime. Status: PASS for this staging checkpoint; the full Canonical plan and production release remain PARTIAL.
+
+Applied `deploy/render.faro-free-staging.yaml` from main `6577cfb113e09c2d6a99f286b148db0e5439828a` through the existing authenticated Render Dashboard. Workspace `tea-dadn9u2d0e5s73dkborg`, Blueprint `exs-db3pb5ei0phs73b36i2g`, sync `exe-db3upn2j9qps73fhmn60`. Preview associated the existing free database `dpg-db3u3su7bikc73ado7v0-a`, updated the existing free web service `srv-db3pb9rncjis73banf90`, its Docker command, private database connection and scoped bootstrap variables, and generated independent protected MFA/rate keys provider-side. No new resources, paid plans, external database access or production operations. Blueprint remains Sync paused; automatic deployment remains off in the accepted manifest.
+
+Deploy [dep-db3upqeb7d7c739nefig](https://dashboard.render.com/web/srv-db3pb9rncjis73banf90/deploys/dep-db3upqeb7d7c739nefig) succeeded in 1m22s, Live at 21:21:32 Europe/Warsaw. Actual startup log at 21:21:22: `FARO_FREE_STAGING_EMPTY_SCHEMA_PREPARED; no application source data migrated.` HTTP listener started at 21:21:23. PostgreSQL18 version/database/user/schema and protected-key validation are enforced by the accepted startup script before this log and HTTP startup.
+
+Actual HTTPS verification using existing `scripts/staging-smoke.mjs` at https://faro-free-staging.onrender.com:
+
+- PUBLIC_READ_ONLY PASS: readiness/database/private-storage and legal contract.
+- SYNTHETIC_ACCOUNT PASS: registration/session, FREE subscription, analytics consent, closed Canonical gate (`503 RELEASE_GATES_OPEN`), retired endpoint, own export.
+- `FARO_SMOKE_ACCOUNT_CLEANUP_PASS`: test account removed and session rejected.
+
+Restarted only this free staging service through Dashboard. New process `fb727` at 21:22:26 logged `FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no migration or reset.` Listener resumed at 21:22:27. Repeated SYNTHETIC_ACCOUNT smoke and cleanup PASS after observing the new listener. This proves hosted restart retains the prepared schema; the earlier CI separately proves retained ledger/data/session contracts. No retained-user persistence claim is inferred from the disposable smoke alone. A Dashboard screenshot recording initialization and retained-schema startup is retained locally outside the repository; dashboard pixels are not published to GitHub.
+
+Reused and re-read actual successful [FARO CI 37827730169](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37827730169) and [CI 37827730617](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/37827730617), both head `99e6bc994647b244ccfd4524684bc10b57bfb8f5`. Delta from that accepted runtime to deployed `6577cfb` is documentation only. Existing accepted evidence: 181 Node tests, PostgreSQL18 Node22/24 bootstrap/refusal/restart/HTTP/closed-gate proofs, 28 native browser cases per Node version, 38 default browser cases, container/recovery checks. No runtime change in CW; no redundant local suite required.
+
+Connector requests repeatedly returned authentication-request messages instead of data despite an authenticated Dashboard. Stopped retries and completed the work through that existing session; integration reinstall or another user approval is not needed for this completed staging operation. This supersedes CV's missing-connector/browser blocker and statements that hosted staging still uses SQLite.
+
+Risk/rollback: free PostgreSQL expires 2026-11-07 18:33 UTC, has no provider backups; free web private files remain ephemeral. Keep this environment disposable. A previous SQLite image is not a PostgreSQL data rollback: any future rollback must deliberately select the engine/configuration and preserve or reconcile writes. Production cutover, durable private storage, independent backup/current-authority custody and measured production RPO/RTO remain outside this staging acceptance.
+
+Remaining full-plan dependencies still require their real owners/evidence: licensed and validated ESCO/provider AI/tax/transport/notification integrations; an approved safe advanced file/code/SQL executor architecture; independent security/privacy/manual accessibility/user research and KRAZ/GDPR/DPIA/retention/moderation/minor-population decisions. CI or free staging cannot substitute for these decisions. Production release gates remain closed, worker disabled. No paid resource or production operation authorized or performed.
