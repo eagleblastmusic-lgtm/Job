@@ -1224,3 +1224,6 @@ CP03-G exact final acceptance2026-10-09: a308e44 FARO37855259036 and CI378552589
 ## CP11-CY — Strict calendar dates
 
 [Scope](CP11_CY_STRICT_CALENDAR_DATES.md). Shared Canonical date validator rejects impossible calendar/clock/offset inputs before Date.parse UTC normalization; valid leap dates/fractions/cross-day offsets retained. Actual economics refusal preserves stored scenario; native exercise uses same regression. Local targeted24/build/lint/typecheck/syntax/diff PASS; full local and required CI pending. No client/schema/migration/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.
+
+
+CY exact final acceptance2026-10-09:054196a FARO37856922577 and CI37856922591 SUCCESS, every required job. PostgreSQL18 Node22/24 rejects invalid economics dates without overwriting prior state; native/default desktop/mobile browsers, full contracts and container/recovery checks accepted. Local full188 Node/targeted24/build/lint/typecheck/syntax/diff PASS, zero skips. Historical timestamps unchanged; no migration/client/hosted configuration or production operation. Staging remains accepted f08e62f; full plan/release PARTIAL and external dependencies unchanged.
