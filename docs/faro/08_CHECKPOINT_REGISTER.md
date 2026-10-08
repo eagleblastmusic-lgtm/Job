@@ -1228,3 +1228,8 @@ CN/CO final9c42699 acceptance2026-10-08: FARO37793582627 and CI37793582723 SUCCE
 
 
 CX exact remote acceptance2026-10-08:3bd851c FARO37833117398 and CI37833117392 SUCCESS, every required job. PostgreSQL18 Node22/24, native desktop/mobile browser contracts, default browsers, full contracts/container/recovery accepted. Local185 Node/8 smoke regressions and actual hosted retained-account restart/cleanup PASS. Follow-up changes only update operator/deployment documentation and this evidence; accepted runtime/harness inputs unchanged. Full plan/release PARTIAL; production custody/provider/executor and independent external decisions remain open.
+
+
+## CP03-E — Complete-alias local skill suggestions
+
+[Scope](CP03_E_LOCAL_SUGGESTION_BOUNDARIES.md). Existing local producer now requires complete normalized aliases and stores v2 provenance, avoiding administrative/PostScript/NoSQL substring suggestions while retaining historical proposals/claims/snapshots. Real API untrusted-description/foreign-decision/confirmation/rejection/privacy regression and final targeted7 PASS; full Node186 before sentence-boundary follow-up, build/typecheck/lint/diff PASS. Final required native/broader CI pending. No external AI/provider/paid resource/production operation; full graph/evidence/provider and external acceptances remain open. Whole plan/release PARTIAL.

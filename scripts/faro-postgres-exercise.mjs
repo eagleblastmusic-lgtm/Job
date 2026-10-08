@@ -267,8 +267,9 @@ try {
     const updatedLearning=await saveProfileLearning(client,candidate.id,{skillId:declaration.skillId,mode:'SELF_DEVELOPING',practice:{quantity:2,unit:'MONTHS'}},asOf);assert.equal(updatedLearning.learning.length,2);assert.equal(updatedLearning.learning.find(item=>item.mode==='SELF_DEVELOPING').practice.quantity,2);
     await assert.rejects(()=>saveProfileLearning(client,candidate.id,{skillId:'unknown',mode:'SELF_DEVELOPING',practice:{quantity:1,unit:'TASKS'}},asOf),error=>error.status===400);
     const privateActivity="Obsługa klienta — <script>prywatny tekst</script> 'quoted'";
+    const unmatched=await recordProfileActivity(client,candidate.id,{description:'administracja kadrami, warsztat, adres i PostScript',source:'WORK'},asOf);assert.deepEqual(unmatched.proposals,originalProfile.proposals);assert.deepEqual(unmatched.claims,redeclared.claims);
     const recorded=await recordProfileActivity(client,candidate.id,{description:privateActivity,source:'WORK'},asOf);assert.deepEqual(recorded.claims,redeclared.claims);assert.ok(recorded.activities.some(item=>item.description===privateActivity));
-    const proposal=recorded.proposals.find(item=>!originalProfile.proposals.some(previous=>previous.id===item.id)&&item.skill_id===declaration.skillId);assert.ok(proposal);assert.equal(proposal.status,'PENDING');assert.equal(proposal.model_version,'local-question-rules-v1');
+    const proposal=recorded.proposals.find(item=>!originalProfile.proposals.some(previous=>previous.id===item.id)&&item.skill_id===declaration.skillId);assert.ok(proposal);assert.equal(proposal.status,'PENDING');assert.equal(proposal.model_version,'local-question-rules-v2');
     await assert.rejects(()=>decideProfileProposal(client,employer.id,proposal.id,{status:'REJECTED'},asOf),error=>error.status===404);
     await assert.rejects(()=>decideProfileProposal(client,candidate.id,proposal.id,{...declaration,status:'ACCEPTED',confirmed:false},asOf),error=>error.code==='CONFIRMATION_REQUIRED');
     assert.equal((await readProfile(client,candidate.id,asOf)).proposals.find(item=>item.id===proposal.id).status,'PENDING');

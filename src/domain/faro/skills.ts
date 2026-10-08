@@ -14,10 +14,21 @@ export interface Claim {
 export interface Learning { skillId: string; mode: 'SELF_DEVELOPING' | 'WANTS_TO_LEARN'; practice: Practice; }
 export interface Availability { kind: 'UNKNOWN' | 'IMMEDIATE' | 'AFTER_PERIOD' | 'ON_DATE'; value: string | null; updatedAt: string; }
 export function skillById(id: string) { return SKILL_CATALOG.find(skill => skill.id === id); }
+export const LOCAL_SUGGESTION_VERSION = 'local-question-rules-v2';
+function containsAlias(text:string,alias:string) {
+  const needle=normalizeText(alias);
+  let offset=text.indexOf(needle);
+  while(offset!==-1){
+    const before=text[offset-1],after=text[offset+needle.length];
+    if((before===undefined||!/[a-z0-9+]/.test(before))&&(after===undefined||!/[a-z0-9+]/.test(after)))return true;
+    offset=text.indexOf(needle,offset+1);
+  }
+  return false;
+}
 export function suggestSkills(description: string) {
   const text = normalizeText(description);
-  return SKILL_CATALOG.filter(skill => skill.aliases.some(alias => text.includes(normalizeText(alias))))
-    .map(skill => ({ skillId: skill.id, rationale: `Czy wykonywano czynność: ${skill.label}? Opis nie jest dowodem kompetencji.`, modelVersion: 'local-question-rules-v1' }));
+  return SKILL_CATALOG.filter(skill => skill.aliases.some(alias => containsAlias(text,alias)))
+    .map(skill => ({ skillId: skill.id, rationale: `Czy wykonywano czynność: ${skill.label}? Opis nie jest dowodem kompetencji.`, modelVersion: LOCAL_SUGGESTION_VERSION }));
 }
 
 /** No free text, arbitrary metadata, URLs or private activity descriptions cross this boundary. */
