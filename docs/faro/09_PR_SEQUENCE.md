@@ -629,3 +629,8 @@ CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCC
 
 
 CM final103a4e4 actual acceptance2026-10-08: FARO37791470294/CI37791470540 SUCCESS, every job including PostgreSQL18 Node22/24 native browser acceptance and container/recovery. Local full Node179 PASS, zero skips; four smoke regressions retained. Free staging remains isolated and production Faro gated; whole plan/release PARTIAL.
+
+
+## CP11-CN/CO — Native cutover writes/restart and recovered HTTP (2026-10-08)
+
+[Cutover scope](CP11_CN_CUTOVER_WRITE_RESTART.md): actual common-listener profile writes preserve Origin/Sec-Fetch-Site rejection, read-only rollback and stale-source refusal; restarted listener with a fresh PostgreSQL connection must retain session/account/profile/process contracts. [Recovery scope](CP11_CO_RECOVERED_HTTP_RUNTIME.md): actual HTTP boots against recovered schema and retained physical files, rejects stale sessions/erased login, allows fresh retained login/export and keeps production Faro closed. Source72 tables/37 migrations, syntax/lint/diff PASS; actual native/required CI acceptance pending. No production runtime or Render configuration change; free staging still SQLite, whole plan/release PARTIAL.

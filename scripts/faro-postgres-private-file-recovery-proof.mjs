@@ -11,6 +11,7 @@ import {readProtectedBackup,writeProtectedBackup} from './faro-backup-envelope.m
 import {eraseAccount} from '../dist/server/faro/privacyErasureModel.js';
 import {hashSessionToken} from '../dist/server/auth.js';
 import {createConnectedPgFaroApp} from '../dist/server/pgFaroApp.js';
+import {MfaCodec,totp} from '../dist/server/faro/mfaCrypto.js';
 
 /** Actual encrypted offline CLI backup and restore of retained vs erased/stale private files. */
 export async function proveNativePrivateFileRecovery(snapshot,candidate,employer){
@@ -47,7 +48,7 @@ export async function proveNativePrivateFileRecovery(snapshot,candidate,employer
   const runtimeDb=clientFromEnvironment();let runtime;
   try{
    await runtimeDb.connect();await runtimeDb.query(`SET search_path TO ${identifier(target)}`);
-   runtime=createConnectedPgFaroApp(runtimeDb,{nodeEnv:'production',dataDir:filesTarget,faroWorkerEnabled:false,faroRequirePrivilegedMfa:false,faroRateLimitKey:'61'.repeat(32)});
+   runtime=createConnectedPgFaroApp(runtimeDb,{nodeEnv:'production',dataDir:filesTarget,faroWorkerEnabled:false,faroMfaEncryptionKey:'78'.repeat(32),faroRateLimitKey:'61'.repeat(32)});
    await new Promise(done=>runtime.server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${runtime.server.address().port}`;runtime.config.appOrigin=base;
    const request=async(path,cookie='',method='GET',body,status=200)=>{const response=await fetch(base+path,{method,redirect:'error',signal:AbortSignal.timeout(10000),headers:{cookie,origin:base,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});assert.equal(response.status,status,'recovered runtime HTTP contract');assert.equal(response.headers.get('cache-control'),'no-store');return {value:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]??''};};
    const healthy=(await request('/api/health')).value;assert.equal(healthy.database,'ok');assert.equal(healthy.storage,'ok');
@@ -56,6 +57,10 @@ export async function proveNativePrivateFileRecovery(snapshot,candidate,employer
    await request('/api/auth/login','','POST',{email:erasedUser.email,password:'Bezpieczne123'},401);
    const login=await request('/api/auth/login','','POST',{email:retainedUser.email,password:'Bezpieczne123'});assert.ok(login.cookie.startsWith('job_session='));
    assert.equal((await request('/api/me',login.cookie)).value.user.id,employer.id);
+   assert.equal((await request('/api/export',login.cookie,'GET',undefined,403)).value.error.code,'MFA_REQUIRED');
+   await request('/api/faro/security/mfa/setup',login.cookie,'POST',{password:'Bezpieczne123'});
+   const pending=(await runtimeDb.query('SELECT pending_cipher FROM faro_mfa WHERE user_id=$1',[employer.id])).rows[0].pending_cipher,secret=new MfaCodec(runtime.config).decrypt(employer.id,pending);
+   try{await request('/api/faro/security/mfa/confirm',login.cookie,'POST',{code:totp(secret,Math.floor(Date.now()/30000))});}finally{secret.fill(0);}
    const exported=(await request('/api/export',login.cookie)).value;assert.equal(exported.user.id,employer.id);assert.deepEqual(exported.uploaded_files.map(row=>row.id),['retained-file']);
    assert.equal((await request('/api/faro/profile',login.cookie,'GET',undefined,503)).value.error.code,'RELEASE_GATES_OPEN');
    console.log('FARO_POSTGRES_RECOVERED_HTTP_PASS recovered storage readiness, erased login/session refusal, fresh retained login/export, closed production gate; synthetic only.');
