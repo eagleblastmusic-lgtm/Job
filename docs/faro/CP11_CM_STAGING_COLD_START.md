@@ -1,0 +1,7 @@
+# CP11-CM — Bounded staging cold-start acceptance
+
+DELTA_REQUIRED: Render free instances can take over50 seconds to wake; the previous10-second initial HTTP timeout could falsely fail a healthy sleeping instance. Initial public health read now permits60 seconds per request and a90-second overall readiness budget; transport failures and502/503/504 retry with1-second spacing. Other statuses, invalid JSON or readiness contract failures stop the test. No account mutation or later endpoint retries added; private failure output remains neutral.
+
+Actual subprocess regression against a controlled loopback HTTP server: initial503 followed by healthy200 completes PASS; later legal503 fails at LEGAL after exactly one legal request. Both prove zero writes in default mode. Build,2 regressions, lint, typecheck, diff and actual Render PUBLIC_READ_ONLY HTTPS smoke PASS. Runtime, migrations and deployed image unchanged; remote acceptance pending for this change.
+
+Previous e4af343 FARO37782384722/CI37782384342 SUCCESS;397e215 FARO37781293663/CI37781293592 SUCCESS. Actual free staging remains Live with auto-deploy and Blueprint automatic sync disabled. Whole plan/release PARTIAL: production storage/custody/cutover/RPO/RTO, validated/licensed graph/providers, approved advanced assessment executor and independent human/legal/security/accessibility acceptances still require their real inputs and evidence.

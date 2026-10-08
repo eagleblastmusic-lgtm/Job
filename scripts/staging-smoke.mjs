@@ -12,6 +12,24 @@ const expectOpen=process.argv.includes('--expect-faro-open');
 if(expectOpen&&!synthetic)throw new Error('Open Faro probe requires synthetic account mode.');
 let cookie='',created=false,step='HEALTH';
 const password=`SyntheticSmoke${randomUUID()}9`,email=`faro-smoke-${randomUUID()}@example.pl`;
+// Retry only the initial public readiness read; never replay account mutations.
+async function readiness(){
+ const deadline=Date.now()+90000;
+ while(true){
+  let response;
+  try{response=await fetch(new URL('/api/health',base),{redirect:'error',signal:AbortSignal.timeout(Math.max(1,Math.min(60000,deadline-Date.now())))});}catch(error){
+   if(Date.now()>=deadline)throw error;
+   await new Promise(resolve=>setTimeout(resolve,1000));continue;
+  }
+  if([502,503,504].includes(response.status)){
+   await response.body?.cancel();
+   if(Date.now()>=deadline)throw new Error('Staging readiness deadline exceeded.');
+   await new Promise(resolve=>setTimeout(resolve,1000));continue;
+  }
+  assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+  return response.json();
+ }
+}
 async function request(path,method='GET',body,status=200){
  const response=await fetch(new URL(path,base),{method,redirect:'error',signal:AbortSignal.timeout(10000),headers:{origin:base.origin,...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
  assert.equal(response.status,status,`Smoke status ${method} ${path}`);
@@ -19,7 +37,7 @@ async function request(path,method='GET',body,status=200){
  const payload=await response.json();const token=response.headers.get('set-cookie')?.split(';')[0];if(token)cookie=token;return payload;
 }
 try{
- const health=await request('/api/health');assert.equal(health.ok,true);assert.equal(health.database,'ok');assert.equal(health.storage,'ok');
+ const health=await readiness();assert.equal(health.ok,true);assert.equal(health.database,'ok');assert.equal(health.storage,'ok');
  step='LEGAL';const legal=await request('/api/legal');assert.ok(legal.legalVersion);assert.equal(legal.termsUrl,'/terms.html');assert.equal(legal.privacyUrl,'/privacy.html');
  if(synthetic){
   step='REGISTER';const registered=await request('/api/auth/register','POST',{name:'SmokeFixture',email,password,acceptTerms:true,acceptPrivacy:true,analyticsConsent:false},201);created=true;assert.equal(registered.user.role,'USER');assert.ok(cookie.startsWith('job_session='));
