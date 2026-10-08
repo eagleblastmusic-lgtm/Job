@@ -1218,3 +1218,6 @@ CP03-F exact acceptance2026-10-09: f08e62f FARO37853704003 and CI37853704140 SUC
 ## CP03-G — Atomic declaration withdrawal audit
 
 [Scope](CP03_G_DECLARATION_WITHDRAWAL_AUDIT.md). Existing owner-scoped withdrawal now commits revoked_at and minimal SKILL_WITHDRAWN audit together on SQLite/PostgreSQL. Actual API audit-failure rollback, preserved profile/projection/history and single audit after rejected replay PASS; build/profile5/lint/typecheck/syntax/diff PASS. Required native/broader CI pending. No schema/client/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.
+
+
+CP03-G exact final acceptance2026-10-09: a308e44 FARO37855259036 and CI37855258998 SUCCESS, every required job. PostgreSQL18 Node22/24 actual withdrawal/audit-failure rollback/one-event proof, native and default desktop/mobile browsers, contracts and container/recovery checks accepted. Local profile5/build/lint/typecheck/syntax/diff PASS. No migration/client/hosted configuration change; staging remains accepted f08e62f with successful HTTPS smoke/cleanup. Whole plan/release PARTIAL; provider/license/independent validation and production custody dependencies unchanged.
