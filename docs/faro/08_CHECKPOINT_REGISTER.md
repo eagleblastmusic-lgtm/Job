@@ -1200,3 +1200,8 @@ CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCC
 ## CP11-CK actual free staging acceptance (2026-10-08)
 
 [Actual evidence](CP11_CK_FREE_RENDER_STAGING.md). Inspected confirmed Bartosz workspace inventory/configuration and Hobby/no-card/no-pending-charge billing state before applying only the free staging manifest. Docker/Free/Frankfurt service srv-db3pb9rncjis73banf90 deployed main397e215; deploy dep-db3pbajncjis73banhbg Live in1m13s. URL https://faro-free-staging.onrender.com . Actual PUBLIC_READ_ONLY and SYNTHETIC_ACCOUNT HTTPS smoke PASS; test-account cleanup PASS; Faro production gate still503 RELEASE_GATES_OPEN. Auto-deploy off and Blueprint Auto Sync No. This supersedes earlier absent-access statements. No paid resource, database, disk or production activation. Disposable SQLite staging does not close production persistence/custody/cutover/RPO/RTO, licensed provider/graph/executor decisions or independent external acceptances; whole plan/release PARTIAL.
+
+
+## CP11-CM — Bounded staging cold-start acceptance (2026-10-08)
+
+[Scope](CP11_CM_STAGING_COLD_START.md). Initial public health waits within90 seconds,60-second per-request cap, retries only transport/502/503/504. Account writes and later endpoint reads are not replayed. All4 smoke regressions/build/lint/typecheck/diff and actual Render public HTTPS smoke PASS. Existing account cleanup and production-gate tests retained after correcting an initial test-file replacement. Remote acceptance pending. Whole plan/release PARTIAL.
