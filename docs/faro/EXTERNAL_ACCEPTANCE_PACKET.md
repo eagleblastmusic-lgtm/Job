@@ -89,3 +89,6 @@ Latest technical acceptance2026-10-08:396a5e9 FARO37798340585/CI37798340448 SUCC
 
 
 CS finalf375f8a acceptance2026-10-08: FARO37820553760 and CI37820553769 SUCCESS, every required job. Actual remote logs confirm28 native PostgreSQL18 browser cases on each Node22/24 and38 default browser cases, contracts/recovery/container accepted. Local PostgreSQL18.6/Node24.19.0 native full exercise and28 browsers PASS; own cluster STOPPED/CLEANUP_PASS. No Render credentials required for local migration verification. No paid database or production migration/deploy performed. Wider provider/taxonomy/executor decisions, actual infrastructure custody/RPO/RTO and independent external owners/evidence remain open; entire plan/release PARTIAL.
+
+
+CV actual acceptance2026-10-08:99e6bc9 FARO37827730169 and CI37827730617 SUCCESS, every required job. Actual logs confirm staging bootstrap/restart/foreign-sentinel refusal/HTTP/closed gate on PostgreSQL18 Node22/24,28 native browser cases each and38 default browser cases; contracts/full181 Node/container/recovery PASS. Local bounded staging start PASS and owned cluster STOPPED/CLEANUP_PASS. Hosted Blueprint remains unapplied due unavailable connector/browser attachment; no hosted PostgreSQL HTTP or production acceptance claimed. Whole plan/release PARTIAL.

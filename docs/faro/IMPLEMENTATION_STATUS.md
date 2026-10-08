@@ -1182,3 +1182,6 @@ See [offline staging preparation](CP11_CT_OFFLINE_POSTGRES_PREPARATION.md) and [
 ## CP11-CV — Free PostgreSQL staging start (2026-10-08)
 
 [Implementation and actual bounded proof](CP11_CV_FREE_POSTGRES_STAGING_START.md). Approved free PostgreSQL18 instance exists with empty external allowlist. Prepared Blueprint private connection/key wiring and empty-only scoped bootstrap; actual local restart/nonempty refusal/HTTP/closed release gate PASS. Hosted configuration not applied: active session lost connector tools and browser attachment. CU2b8a4fe FARO37825102239/CI37825102288 SUCCESS, all jobs. New required remote acceptance pending. No paid resource/production migration; whole plan/release PARTIAL.
+
+
+CV actual acceptance2026-10-08:99e6bc9 FARO37827730169 and CI37827730617 SUCCESS, every required job. Actual logs confirm staging bootstrap/restart/foreign-sentinel refusal/HTTP/closed gate on PostgreSQL18 Node22/24,28 native browser cases each and38 default browser cases; contracts/full181 Node/container/recovery PASS. Local bounded staging start PASS and owned cluster STOPPED/CLEANUP_PASS. Hosted Blueprint remains unapplied due unavailable connector/browser attachment; no hosted PostgreSQL HTTP or production acceptance claimed. Whole plan/release PARTIAL.
