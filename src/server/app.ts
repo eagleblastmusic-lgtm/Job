@@ -414,7 +414,7 @@ export function createJobApp(overrides: Partial<AppConfig> = {}): AppRuntime {
       sendText(res, 404, 'Nie znaleziono strony.');
     } catch (error) {
       const http = error instanceof HttpError ? error : new HttpError(500, 'Wystąpił błąd serwera.', 'INTERNAL_ERROR');
-      if (!(error instanceof HttpError)) console.error(`[${requestId}]`, error);
+      if (!(error instanceof HttpError)) console.error(`FARO_INTERNAL_FAILURE requestId=${requestId} code=INTERNAL_ERROR`);
       if (!res.headersSent) sendJson(res, http.status, { error: { code: http.code, message: http.message, requestId } }); else res.end();
     }
   });

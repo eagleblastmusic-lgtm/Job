@@ -1095,3 +1095,8 @@ The user did not request hosting on Render. Confirmation of Bartosz workspace au
 ## CP11-CI — Post-restore physical verification (2026-10-08)
 
 [Scope](CP11_CI_POST_RESTORE_PHYSICAL_VERIFICATION.md). Re-read/hash actual destination before success and actual filesystem-write failure/owned-target cleanup native proof. Standalone3/lint/syntax/diff PASS; native pending. d2071a7 FARO37771876387/CI37771876392 SUCCESS. Work is hosting-independent; no Render hosting requested or authorized. Whole plan/release PARTIAL.
+
+
+## CP11-CJ — Private HTTP error logs (2026-10-08)
+
+[Scope](CP11_CJ_PRIVATE_HTTP_ERROR_LOGS.md). Replace raw unexpected SQLite exceptions with fixed opaque code/request correlation; real erasure-failure regression verifies log minimization plus rollback. Full Node177/build/lint/typecheck/diff PASS; remote acceptance pending. Hosting-independent work; whole plan/release PARTIAL.

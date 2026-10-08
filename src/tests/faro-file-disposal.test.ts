@@ -28,7 +28,13 @@ test('actual account erasure never unlinks a private file before its durable tra
   await mkdir(join(f.app.config.dataDir,'uploads',user.id),{recursive:true});await writeFile(path,'synthetic private file');
   f.app.db.db.prepare("INSERT INTO uploaded_files(id,user_id,kind,original_name,mime_type,storage_key,size_bytes,sha256,created_at) VALUES(?,?,'CV','synthetic.txt','text/plain',?,22,'synthetic',?)").run('disposal-file',user.id,key,asOf);
   f.app.db.db.exec("CREATE TRIGGER disposal_guard BEFORE INSERT ON faro_file_disposals BEGIN SELECT RAISE(ABORT,'disposal queue failed'); END;");
-  await f.request('/api/account',user.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'},500);assert.ok(await stat(path));assert.ok(f.app.store.getUserById(user.id));assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_file_disposals').get()!.n,0);
+  const messages:string[]=[],originalLog=console.error;
+  console.error=(...values:unknown[])=>{messages.push(values.map(String).join(' '));};
+  try{const failure=await f.request('/api/account',user.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'},500);assert.equal(JSON.stringify(failure).includes('disposal queue failed'),false);}
+  finally{console.error=originalLog;}
+  assert.equal(messages.length,1);assert.match(messages[0]!,/^FARO_INTERNAL_FAILURE requestId=[a-f0-9-]{36} code=INTERNAL_ERROR$/);
+  for(const secret of ['disposal queue failed',path,user.id,'Bezpieczne123','SELECT','INSERT','store.js'])assert.equal(messages.join(' ').includes(secret),false);
+  assert.ok(await stat(path));assert.ok(f.app.store.getUserById(user.id));assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_file_disposals').get()!.n,0);
   f.app.db.db.exec('DROP TRIGGER disposal_guard');
   await f.request('/api/account',user.cookie,'DELETE',{confirmation:'USUŃ KONTO',password:'Bezpieczne123'});await assert.rejects(()=>stat(path),error=>(error as NodeJS.ErrnoException).code==='ENOENT');assert.equal(f.app.store.getUserById(user.id),null);
  }finally{await f.close();}
