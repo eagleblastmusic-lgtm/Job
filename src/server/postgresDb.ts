@@ -6,7 +6,7 @@ function databaseError(error:unknown):Error&{code:string} {
   return Object.assign(new Error('PostgreSQL operation failed.'),{code});
 }
 function misuse(code:string){return Object.assign(new Error('Invalid PostgreSQL connection scope.'),{code});}
-/** Async connection boundary consumed by staging rehearsal. Runtime repositories still require their async conversion. */
+/** Owned asynchronous connection boundary for canonical runtime and maintenance. */
 export class PgJobDatabase {
   private readonly client:Client;
   private readonly scope=new AsyncLocalStorage<Scope>();
@@ -48,7 +48,9 @@ export class PgJobDatabase {
   }
   async readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]> {
     const work=async()=>{
-      const results=await Promise.all(queries.map(query=>this.query(query.text,query.values)));
+      const results:QueryResult[]=[];
+      // One connection sends each read only after the previous read succeeds.
+      for(const query of queries)results.push(await this.query(query.text,query.values));
       return results.map(result=>result.rows.map(row=>{
         const copy:Record<string,unknown>={...row};
         for(const field of result.fields)if(field.dataTypeID===20&&copy[field.name]!==null){

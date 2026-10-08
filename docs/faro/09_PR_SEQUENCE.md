@@ -514,3 +514,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BU — PostgreSQL security and assessment browser acceptance
 
 [Scope](CP11_BU_POSTGRES_SECURITY_ASSESSMENT_BROWSER.md). All13 authenticated browser scenarios reuse native PostgreSQL26 desktop/mobile cases per Node22/24, plus retained public reflow2. Local follow-ups12/typecheck/lint/diff PASS; actual enlarged acceptance pending. BTb9fd8b5 FARO37672177171 SUCCESS, CI pending; BS1266fc2 FARO37671648181/CI37671648045 SUCCESS. Whole plan/release PARTIAL; production/external gates open; continue.
+
+
+## CP11-BV — Ordered PostgreSQL read batches
+
+[Scope](CP11_BV_ORDERED_POSTGRES_BATCHES.md). Sequential owned-connection dispatch stops on first error; native fail-fast/rollback regression added. Local full Node171/lint/typecheck/source71 tables36 migrations/syntax/diff PASS; native pending. BU CI37672827564 SUCCESS; FARO37672827477 cancelled with native Node22 PASS, Node24 cancelled. Whole plan/release PARTIAL; continue.

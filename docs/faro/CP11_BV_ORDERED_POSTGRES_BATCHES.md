@@ -1,0 +1,5 @@
+# CP11-BV — Ordered PostgreSQL read batches (2026-10-08)
+
+The owned single connection now sends each read only after the preceding query succeeds. This removes deprecated concurrent pg client query dispatch and prevents later batch statements being submitted after a database error. Existing serializable/read-only boundaries, safe integer conversion and result ordering remain unchanged. Native regression requires undefined-column refusal, no dispatch of the later query, rollback, and successful subsequent ordered numeric reads.
+
+Local full Node171/lint/typecheck/source-only71 tables36 migrations/syntax/diff PASS. Actual native regression pending. BU1ba5d7b CI37672827564 SUCCESS; FARO37672827477 was cancelled while one PostgreSQL18 Node22 job succeeded (including enlarged browser matrix), Node24/public browser cancelled. Cancelled jobs are not PASS; current-head run will verify both versions. BTb9fd8b5 FARO37672177171/CI37672177105 SUCCESS. Default SQLite, production/external gates open; whole plan/release PARTIAL; continue.

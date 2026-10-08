@@ -107,6 +107,13 @@ try {
     await assert.rejects(()=>client.readBatch([{text:'UPDATE faro_profiles SET version=version+1 WHERE user_id=$1',values:[candidate.id]}]),error=>error.code==='25006');
     assert.equal((await readProfile(client,candidate.id,asOf)).version,reference.profile(candidate.id).version);
     await assert.rejects(()=>client.readBatch([{text:'SELECT 9007199254740993::bigint AS unsafe',values:[]}]),error=>error.code==='22003');
+    // A failed batch must never send its later statements on the owned connection.
+    const originalQuery=client.query.bind(client),sent=[];
+    client.query=async(text,values)=>{sent.push(text);return originalQuery(text,values);};
+    try{await assert.rejects(()=>client.readBatch([{text:'SELECT 1 AS first_read',values:[]},{text:'SELECT missing_batch_column FROM users',values:[]},{text:'SELECT 2 AS never_sent',values:[]}]),error=>error.code==='42703');assert.equal(sent.includes('SELECT 2 AS never_sent'),false);assert.equal(sent.at(-1),'ROLLBACK');}
+    finally{client.query=originalQuery;}
+    assert.deepEqual(await client.readBatch([{text:'SELECT 1::bigint AS n',values:[]},{text:'SELECT 2::bigint AS n',values:[]}]),[[{n:1}],[{n:2}]]);
+
     await client.transaction(async()=>assert.equal((await readProfile(client,candidate.id,asOf)).version,1));
     const listReference=new OfferService(f.app.db,()=>new Date(asOf));
     assert.deepEqual(wire(await readOfferList(client,candidate.id,asOf)),wire(listReference.list(candidate.id)));
