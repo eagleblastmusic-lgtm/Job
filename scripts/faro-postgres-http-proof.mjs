@@ -38,15 +38,15 @@ export async function proveNativeHttp(database,config){
   const offer=await json(`/api/faro/organizations/${org.id}/offers`,owner.cookie,'POST',offerInput(owner.id),201);
   await json(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'REVIEW',expectedVersion:1});
   await json(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
-  const process=await json(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'http-interest'},201);
-  await json(`/api/faro/processes/${process.id}`,owner.cookie);
+  const recruitmentProcess=await json(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'http-interest'},201);
+  await json(`/api/faro/processes/${recruitmentProcess.id}`,owner.cookie);
   await json(`/api/faro/offers/${offer.id}/watch`,candidate.cookie,'POST');assert.equal((await json('/api/faro/watches',candidate.cookie)).offers.some(row=>row.id===offer.id),true);
   const economy={salaryOptionIndex:0,netMin:400000,netMax:450000,commuteCost:10000,commuteMinutes:25,transport:'TRANSIT',source:'Synthetic private manual estimate',observedAt:new Date().toISOString(),assumptions:'Synthetic HTTP assumptions'};
   await json(`/api/faro/offers/${offer.id}/economics`,candidate.cookie,'PUT',economy);assert.equal(await json(`/api/faro/offers/${offer.id}/economics`,owner.cookie),null);
   const consent=await json('/api/consents/analytics',candidate.cookie,'PUT',{granted:true});assert.equal(consent.consent.granted,true);assert.equal((await json('/api/consents',candidate.cookie)).consents.find(row=>row.type==='ANALYTICS').granted,true);
   const me=await json('/api/me',candidate.cookie);assert.equal(me.user.id,candidate.id);assert.equal(Object.hasOwn(me.user,'passwordHash'),false);
   const exported=await json('/api/export',candidate.cookie);assert.equal(exported.user.id,candidate.id);assert.equal(exported.faro.exportVersion,'faro-data-rights-v1');assert.equal(JSON.stringify(exported).includes('__faro_source_rowid'),false);
-  await json('/api/faro/attempts',candidate.cookie);await json(`/api/faro/processes/${process.id}/interviews`,candidate.cookie);
+  await json('/api/faro/attempts',candidate.cookie);await json(`/api/faro/processes/${recruitmentProcess.id}/interviews`,candidate.cookie);
   await json('/api/faro/notifications',owner.cookie);
   await json('/api/faro/worker/tick',moderator.cookie,'POST',{});
   const workerStatus=await json('/api/faro/worker/status',moderator.cookie);assert.deepEqual(workerStatus.fileDisposals,{pending:0,ready:0,retrying:0,leased:0,failed:0,oldestRequestedAt:null});await json('/api/faro/worker/status',candidate.cookie,'GET',undefined,403);
