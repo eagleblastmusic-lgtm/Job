@@ -287,6 +287,7 @@ root.addEventListener('submit', event => {
       else if (action === 'claim') await api('/claims','POST',claim(f));
       else if (action === 'learning') await api('/learning','POST',{skillId:value(f,'skillId'),mode:value(f,'mode'),practice:practice(f)});
       else if (action === 'activity') await api('/activities','POST',{description:value(f,'description'),source:value(f,'source')});
+      else if (action === 'remove-activity') await api(`/activities/${id}`,'DELETE',{confirmed:f.has('confirmed')});
       else if (action === 'proposal') await api(`/proposals/${id}`,'POST',{...claim(f),status:'ACCEPTED'});
       else if (action === 'organization') { const o = await api<{id:string}>('/organizations','POST',{name:value(f,'name')}); orgId=o.id; }
       else if (action === 'accept-invite') await api('/invites/accept','POST',{token:value(f,'token')});

@@ -1203,3 +1203,8 @@ CX exact remote acceptance2026-10-08:3bd851c FARO37833117398 and CI37833117392 S
 
 
 CP03-E exact final acceptance: 9ccbfd2 FARO37850875499 and CI37850875593 SUCCESS, every required job. Includes contracts on Node22/24, browser, compatibility container, actual PostgreSQL18 exercises on Node22/24 and general quality/container verification. Final producer inputs accepted without weakened criteria. Hosted staging runtime remains accepted6577cfb; no staging configuration or production change. Whole plan/release PARTIAL: licensed taxonomy/provider data, reviewed evidence/advanced executor architecture and independent legal/security/accessibility/user/production custody decisions remain external dependencies.
+
+
+## CP03-F — Private activity removal
+
+[Scope](CP03_F_PRIVATE_ACTIVITY_REMOVAL.md). Existing profile now supports explicitly confirmed owned activity deletion, cascading its proposals while preserving independent declarations and recruitment snapshots. Both backends share the write contract; delete/audit rollback, foreign denial, erased export and unchanged preview token pass actual HTTP regression. Full Node187/targeted8/build/lint/typecheck/diff PASS; browser/native final CI pending. No migration, hosted configuration, paid resource or production operation; whole plan/release PARTIAL.

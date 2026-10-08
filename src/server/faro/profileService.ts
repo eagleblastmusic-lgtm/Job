@@ -1,6 +1,6 @@
 import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries,organizationInvitePlan,organizationInviteReadQuery,organizationInviteFromRows,organizationExistingMemberQuery,organizationInviteAcceptPlan,organizationRevokeQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
-import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileLearningEntryQuery,profileLearningRemovalQueries,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
+import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileLearningEntryQuery,profileLearningRemovalQueries,profileActivityQueries,profileActivityRemovalQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows,profileProjection,profilePreview } from './profileReadModel.js';
 import { FaroStore } from './base.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
@@ -56,6 +56,13 @@ export class ProfileService extends FaroStore {
     });
   }
   activity(userId:string,body:Record<string,unknown>) {const queries=profileActivityQueries(userId,body,this.now());this.transaction(()=>this.runQueries(queries));return this.profile(userId);}
+  removeActivity(userId:string,id:string,body:Record<string,unknown>) {
+    const plan=profileActivityRemovalQueries(userId,id,body,this.now());
+    return this.transaction(()=>{
+      if(!this.db.prepare(plan.remove.text).get({$1:id,$2:userId}))throw new HttpError(404,'Nie znaleziono opisu.');
+      this.runQueries([plan.audit]);return this.profile(userId);
+    });
+  }
   decideProposal(userId:string,id:string,body:Record<string,unknown>) {
     this.transaction(()=>{
       const query=profileProposalQuery(userId,id),row=this.db.prepare(query.text).get({$1:id,$2:userId});

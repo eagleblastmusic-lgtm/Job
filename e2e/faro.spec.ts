@@ -41,6 +41,15 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true}).click();
     await expect(page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true})).toHaveCount(0);
     expect((await f.request<{learning:unknown[]}>('/api/faro/profile',candidate.cookie)).learning).toHaveLength(0);
+    await page.locator('[data-form=activity] [name=description]').fill('PRIVATE_BROWSER_ERASURE SQL');
+    await page.getByRole('button',{name:'Zapisz i sprawdź propozycje',exact:true}).click();
+    await expect(page.getByText('PRIVATE_BROWSER_ERASURE SQL',{exact:true})).toBeVisible();
+    await page.getByText('Usuń prywatny opis',{exact:true}).click();
+    await page.getByLabel('Potwierdzam usunięcie tego opisu i jego propozycji.').check();
+    await page.getByRole('button',{name:'Usuń opis i propozycje',exact:true}).click();
+    await expect(page.getByText('PRIVATE_BROWSER_ERASURE SQL',{exact:true})).toHaveCount(0);
+    const removedActivity=await f.request<{activities:unknown[];proposals:unknown[]}>('/api/faro/profile',candidate.cookie);
+    expect(removedActivity.activities).toHaveLength(0);expect(removedActivity.proposals).toHaveLength(0);
     await page.getByText('Dodaj kompetencję', { exact: true }).click();
     await page.getByText('Przykłady zadań dla poziomów: Obsługa klienta',{exact:true}).click();
     await expect(page.getByText('Samodzielnie wyjaśniam typową sprawę klienta według procedury i potwierdzam uzgodniony kolejny krok.',{exact:true})).toBeVisible();

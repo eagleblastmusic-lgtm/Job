@@ -4,6 +4,31 @@ import { faroFixture } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { employerProjection } from '../domain/faro/skills.js';
 
+test('own private activity removal cascades proposals, preserves declarations and rolls back on audit failure',async()=>{
+  const f=await faroFixture();try{
+    const own=await f.user('RemoveActivity'),other=await f.user('OtherActivity');
+    await f.request('/api/faro/profile',own.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const recorded=await f.request<{activities:Array<{id:string}>;proposals:Array<{id:string}>}>('/api/faro/activities',own.cookie,'POST',{description:'PRIVATE_ERASURE_SENTINEL SQL Excel',source:'WORK'},201);
+    const id=recorded.activities[0]!.id,proposal=recorded.proposals[0]!.id,url=`/api/faro/activities/${id}`;
+    await f.request(`/api/faro/proposals/${proposal}`,own.cookie,'POST',{status:'ACCEPTED',level:'BASICS',source:'WORK',practice:{quantity:1,unit:'TASKS'},confirmed:true});
+    const before=await f.request('/api/faro/profile',own.cookie),preview=await f.request('/api/faro/profile/preview-confirmation',own.cookie);
+    await f.request(url,own.cookie,'DELETE',{confirmed:false},400);
+    await f.request(url,other.cookie,'DELETE',{confirmed:true},404);
+    f.app.db.db.exec("CREATE TRIGGER reject_activity_audit BEFORE INSERT ON audit_logs WHEN NEW.action='ACTIVITY_REMOVED' BEGIN SELECT RAISE(ABORT,'synthetic audit failure'); END");
+    await f.request(url,own.cookie,'DELETE',{confirmed:true},500);
+    assert.deepEqual(await f.request('/api/faro/profile',own.cookie),before);
+    f.app.db.db.exec('DROP TRIGGER reject_activity_audit');
+    const removed=await f.request<{activities:unknown[];proposals:unknown[];claims:unknown[] }>(url,own.cookie,'DELETE',{confirmed:true});
+    assert.equal(removed.activities.length,0);assert.equal(removed.proposals.length,0);assert.equal(removed.claims.length,1);
+    assert.deepEqual(await f.request('/api/faro/profile/preview-confirmation',own.cookie),preview);
+    await f.request(`/api/faro/proposals/${proposal}`,own.cookie,'POST',{status:'REJECTED'},404);
+    await f.request(url,own.cookie,'DELETE',{confirmed:true},404);
+    const exported=await f.request('/api/export',own.cookie);assert.doesNotMatch(JSON.stringify(exported),/PRIVATE_ERASURE_SENTINEL/);
+    const audit=f.app.db.db.prepare("SELECT metadata FROM audit_logs WHERE user_id=? AND action='ACTIVITY_REMOVED'").all(own.id);
+    assert.equal(audit.length,1);assert.equal(audit[0]!.metadata,'{}');
+  }finally{await f.close();}
+});
+
 test('activity is private, proposals require confirmation, projection is allowlisted and declaration is not verification', async () => {
   const f = await faroFixture();
   try {

@@ -117,6 +117,19 @@ export function profileActivityQueries(userId:string,body:Record<string,unknown>
   ];
 }
 export function profileProposalQuery(userId:string,id:string) {return {text:'SELECT skill_id,status FROM faro_proposals WHERE id=$1 AND user_id=$2',values:[id,userId]};}
+export function profileActivityRemovalQueries(userId:string,id:string,body:Record<string,unknown>,asOf:string) {
+  if(body.confirmed!==true)throw new HttpError(400,'Potwierdź usunięcie prywatnego opisu i jego propozycji.','CONFIRMATION_REQUIRED');
+  return {remove:{text:'DELETE FROM faro_activities WHERE id=$1 AND user_id=$2 RETURNING id',values:[id,userId]},audit:profileAuditQuery(userId,'ACTIVITY_REMOVED',id,asOf)};
+}
+export async function removeProfileActivity(database:ProfileWriteDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string) {
+  const plan=profileActivityRemovalQueries(userId,id,body,asOf);
+  return database.transaction(async()=>{
+    const rows=await database.readBatch([plan.remove]);
+    if(!rows[0]?.length)throw new HttpError(404,'Nie znaleziono opisu.');
+    await database.query(plan.audit.text,plan.audit.values);
+    return readProfile(database,userId,asOf);
+  });
+}
 export function profileProposalDecisionQueries(userId:string,id:string,body:Record<string,unknown>,row:Record<string,unknown>|undefined,asOf:string) {
   if(!row)throw new HttpError(404,'Nie znaleziono propozycji.');
   if(row.status!=='PENDING')throw new HttpError(409,'Propozycja została już rozpatrzona.');
