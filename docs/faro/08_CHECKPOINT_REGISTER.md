@@ -1108,3 +1108,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BX — Encrypted current-authority artifact
 
 [Scope](CP11_BX_ENCRYPTED_CURRENT_AUTHORITY_ARTIFACT.md). Existing CLI authority-only captures protected current ledger; actual-file native recovery proof added. Local envelope2/lint/syntax/diff PASS; native pending. BV57f6f49 FARO37763865493 SUCCESS with native26 browsers Node22/24; CI pending. BW metadata wire comparison fixed. Independent custody/physical storage/RPO/RTO/external gates remain open; whole plan/release PARTIAL; continue.
+
+
+## CP11-BY — Isolated PostgreSQL recovery CLI
+
+[Scope](CP11_BY_ISOLATED_POSTGRES_RECOVERY_CLI.md). Authenticated explicit backup/current-ledger artifacts, reviewed schema/import/reconciliation and new-target-only fail-closed cleanup. Local required-input refusal/lint/syntax/diff PASS; native CLI pending. BX native artifact proofs passed, full run37764367217 pending. BV57f6f49 FARO37763865493/CI37763865523 SUCCESS. Production/custody/physical restore/RPO/RTO and external gates open; whole plan/release PARTIAL; continue.

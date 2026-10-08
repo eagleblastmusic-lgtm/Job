@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {readProtectedBackup} from './faro-backup-envelope.mjs';
+import {writeProtectedBackup,readProtectedBackup} from './faro-backup-envelope.mjs';
 import { sealBackup,openBackup } from './faro-backup-envelope.mjs';
 import { captureNativeSnapshot } from './faro-postgres-backup.mjs';
 import assert from 'node:assert/strict';
@@ -33,6 +33,14 @@ export async function proveNativeRecovery(snapshot,candidate,employer,org,offer)
   try{const path=join(ledgerRoot,'current.authority'),result=await promisify(execFile)(process.execPath,['scripts/backup-faro-postgres.mjs','--authority-only','--output',path,'--operator-confirmed'],{env:{...process.env,FARO_PG_URL:process.env.FARO_PG_REHEARSAL_URL,FARO_PG_SCHEMA:schemas[0],FARO_BACKUP_ENCRYPTION_KEY:'97'.repeat(32)}});assert.equal(JSON.parse(result.stdout).operation,'FARO_POSTGRES_ENCRYPTED_AUTHORITY');const payload=await readProtectedBackup(path,'97'.repeat(32));assert.equal(payload.format,'FARO_CURRENT_AUTHORITY_V1');currentArtifactLedger=payload.ledger;assert.deepEqual(currentArtifactLedger,ledger);}
   finally{await rm(ledgerRoot,{recursive:true,force:true});}
 
+  const restoreRoot=await mkdtemp(join(tmpdir(),'faro-restore-artifact-')),restoreSchema=`faro_rehearsal_${randomBytes(8).toString('hex')}`;let restored=false;
+  try{
+   const source=join(restoreRoot,'stale.backup'),current=join(restoreRoot,'latest.authority');await writeProtectedBackup(source,{format:'FARO_LOGICAL_SNAPSHOT_V1',createdAt:asOf,snapshot:backup},'99'.repeat(32));await writeProtectedBackup(current,{format:'FARO_CURRENT_AUTHORITY_V1',createdAt:asOf,ledger:currentArtifactLedger},'97'.repeat(32));
+   const args=['scripts/restore-faro-postgres.mjs','--source',source,'--authority-source',current,'--target-schema',restoreSchema,'--offline-confirmed','--authority-current-confirmed'],options={env:{...process.env,FARO_PG_URL:process.env.FARO_PG_REHEARSAL_URL,FARO_BACKUP_ENCRYPTION_KEY:'99'.repeat(32),FARO_AUTHORITY_ENCRYPTION_KEY:'97'.repeat(32)}};
+   const invalid=join(restoreRoot,'incomplete.authority'),failedSchema=`faro_rehearsal_${randomBytes(8).toString('hex')}`;await writeProtectedBackup(invalid,{format:'FARO_CURRENT_AUTHORITY_V1',createdAt:asOf,ledger:{...currentArtifactLedger,erasures:[]}},'97'.repeat(32));const refused=[...args];refused[refused.indexOf('--authority-source')+1]=invalid;refused[refused.indexOf('--target-schema')+1]=failedSchema;await assert.rejects(()=>promisify(execFile)(process.execPath,refused,options),error=>error.code===1);assert.equal((await target.query('SELECT 1 FROM pg_namespace WHERE nspname=$1',[failedSchema])).rowCount,0);assert.deepEqual((await readProtectedBackup(source,'99'.repeat(32))).snapshot,JSON.parse(JSON.stringify(backup)));
+   const result=await promisify(execFile)(process.execPath,args,options);restored=true;assert.equal(JSON.parse(result.stdout).operation,'FARO_POSTGRES_ISOLATED_RECOVERY');assert.equal((await target.query(`SELECT id FROM ${identifier(restoreSchema)}.users WHERE id=$1`,[candidate.id])).rowCount,0);assert.equal((await target.query(`SELECT password_hash FROM ${identifier(restoreSchema)}.users WHERE id=$1`,[employer.id])).rows[0].password_hash,password);
+   await assert.rejects(()=>promisify(execFile)(process.execPath,args,options),error=>error.code===1);assert.equal((await target.query(`SELECT COUNT(*) n FROM ${identifier(restoreSchema)}.sessions`)).rows[0].n,'0');
+  }finally{if(restored)await authority.query(`DROP SCHEMA ${identifier(restoreSchema)} CASCADE`);await rm(restoreRoot,{recursive:true,force:true});}
   const before=(await target.readBatch([{text:'SELECT COUNT(*) n FROM users',values:[]}]))[0][0].n;
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,erasures:[]},asOf,()=>{}),/does not resolve/);assert.equal((await target.readBatch([{text:'SELECT COUNT(*) n FROM users',values:[]}]))[0][0].n,before);
   await assert.rejects(()=>reconcileRecovery(target,ledger,asOf,()=>{throw new Error('OPERATOR_REFUSED');}),/OPERATOR_REFUSED/);
