@@ -1,5 +1,15 @@
 # CP11-CK — Authorized free Render staging
 
+## Actual deployment acceptance — 2026-10-08
+
+Restored access verified through the authenticated Render Dashboard. Confirmed Bartosz's workspace (`tea-dadn9u2d0e5s73dkborg`), empty service inventory, no environment groups or Blueprint instances, Hobby plan, no card on file and no pending charges before provisioning. GitHub repository visibility independently confirmed PUBLIC; no new Git provider permissions or credentials granted.
+
+Applied only `deploy/render.faro-free-staging.yaml` from main `397e215e1c3988df57043e96b49ad0199341ce62`. Blueprint `exs-db3pb5ei0phs73b36i2g`, service `srv-db3pb9rncjis73banf90`, deploy `dep-db3pbajncjis73banhbg`. Dashboard confirms Docker / Free / Frankfurt and Live; first deploy completed in 1m13s at 2026-10-08 13:09:07 UTC. Auto-deploy is off; Blueprint Auto Sync explicitly set No and visibly confirmed Sync paused. No paid resource, disk, PostgreSQL instance, billing change or production activation performed.
+
+URL: https://faro-free-staging.onrender.com . Both actual HTTPS smoke commands returned PASS: default PUBLIC_READ_ONLY verifies database/storage readiness and legal metadata; explicit SYNTHETIC_ACCOUNT verifies registration, session, FREE plan, analytics opt-out, export and retired endpoint. Production Faro profile correctly returns 503 RELEASE_GATES_OPEN. Synthetic account deletion and subsequent 401 returned FARO_SMOKE_ACCOUNT_CLEANUP_PASS. No real user records or credentials logged. Actual build also reported zero failing Node tests.
+
+This supersedes the historical missing-access blocker below. Free disposable SQLite staging is accepted for the tested network/container/auth contracts only. Restart persistence, production PostgreSQL cutover, protected secret/backup custody, production RPO/RTO, licensed provider/graph/executor scope and independent external acceptances remain open. Whole plan/release PARTIAL.
+
 On2026-10-08 user explicitly approved free Render and continued the full plan. Prior Bartosz workspace selection remains applicable. Authorization permits free disposable staging; no paid resources, billing upgrades or production release inferred. Inspect current workspace services/databases/environment configuration before applying. No remote operation performed: current session has no Render connector, CLI or protected API authentication; integration discovery confirmed Render not installed and suggested restoration. Never request pasted API secrets in chat.
 
 [Free staging blueprint](../../deploy/render.faro-free-staging.yaml) is a separate all-free Docker web service, one instance in Frankfurt, auto-deploy off, private filesystem ephemeral, SQLite explicitly selected, production gates closed and worker disabled. No disk, database, secret or paid plan provisioned. This is initial synthetic network/container acceptance, not PostgreSQL production migration. Existing root historical render.yaml and paid review draft are not applied. Free PostgreSQL may later be used for an explicitly isolated prepared-schema rehearsal after inventory inspection; do not create a database that cannot yet be initialized/verified.

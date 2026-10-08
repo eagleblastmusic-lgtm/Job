@@ -1120,3 +1120,8 @@ No hosting on Render was requested. Workspace confirmation only authorized inspe
 
 
 CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCCESS, all jobs including PostgreSQL18 Node22/24 actual encrypted CLI backup/authority/physical restore and26 native browser executions/version. CK e331291 FARO37780567739/CI37780567753 SUCCESS. Free staging document passes official schema; no Render deployment performed or platform availability claimed. Current blocker for authorized free deployment is confirmed missing Render installation/authentication, not cost approval; integration restoration is the required user action. No paid resources, database, disk or production release authorized. Independent external decisions/secrets/custody and broader provider/graph/executor validation remain open; entire plan PARTIAL.
+
+
+## CP11-CK actual free staging acceptance (2026-10-08)
+
+[Actual evidence](CP11_CK_FREE_RENDER_STAGING.md). Inspected confirmed Bartosz workspace inventory/configuration and Hobby/no-card/no-pending-charge billing state before applying only the free staging manifest. Docker/Free/Frankfurt service srv-db3pb9rncjis73banf90 deployed main397e215; deploy dep-db3pbajncjis73banhbg Live in1m13s. URL https://faro-free-staging.onrender.com . Actual PUBLIC_READ_ONLY and SYNTHETIC_ACCOUNT HTTPS smoke PASS; test-account cleanup PASS; Faro production gate still503 RELEASE_GATES_OPEN. Auto-deploy off and Blueprint Auto Sync No. This supersedes earlier absent-access statements. No paid resource, database, disk or production activation. Disposable SQLite staging does not close production persistence/custody/cutover/RPO/RTO, licensed provider/graph/executor decisions or independent external acceptances; whole plan/release PARTIAL.

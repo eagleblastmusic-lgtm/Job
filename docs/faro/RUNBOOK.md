@@ -101,3 +101,8 @@ No hosting on Render was requested. Workspace confirmation only authorized inspe
 ## CP11-CL — Bounded backup artifact reads (2026-10-08)
 
 [Scope](CP11_CL_BOUNDED_BACKUP_ARTIFACT_READS.md). Reject oversized/redirected/changing artifacts before unbounded allocation; bounded reader/decoder/writer256MiB. Standalone4/lint/diff PASS; native actual CLI acceptance pending. Free Render approved but no connector/auth available; independent technical work continued. Whole plan/release PARTIAL.
+
+
+## CP11-CK actual free staging acceptance (2026-10-08)
+
+[Actual evidence](CP11_CK_FREE_RENDER_STAGING.md). Inspected confirmed Bartosz workspace inventory/configuration and Hobby/no-card/no-pending-charge billing state before applying only the free staging manifest. Docker/Free/Frankfurt service srv-db3pb9rncjis73banf90 deployed main397e215; deploy dep-db3pbajncjis73banhbg Live in1m13s. URL https://faro-free-staging.onrender.com . Actual PUBLIC_READ_ONLY and SYNTHETIC_ACCOUNT HTTPS smoke PASS; test-account cleanup PASS; Faro production gate still503 RELEASE_GATES_OPEN. Auto-deploy off and Blueprint Auto Sync No. This supersedes earlier absent-access statements. No paid resource, database, disk or production activation. Disposable SQLite staging does not close production persistence/custody/cutover/RPO/RTO, licensed provider/graph/executor decisions or independent external acceptances; whole plan/release PARTIAL.
