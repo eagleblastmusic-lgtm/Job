@@ -1043,3 +1043,11 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-CA — Render inspected deployment draft (2026-10-08)
 
 [Scope](CP11_CA_RENDER_DEPLOYMENT_DRAFT.md). User confirmed Bartosz workspace. Connector service listings (including previews) returned literal null without error; PostgreSQL listing explicitly returned no instances. No service IDs available for environment/config inspection; do not interpret null as independently verified empty inventory. Separate paid-resource blueprint draft passes official Render JSON Schema; no provisioning, secret update or deploy performed. Existing staging blueprint unchanged. BZ8fd8a22 FARO37766181960 and CI37766182163 SUCCESS, including PostgreSQL18 Node22/24,26 native browsers per version and durable limiter race/restart/rollback. Whole plan/release PARTIAL; actual paid resources/production deploy require explicit user approval, external gates remain open.
+
+
+## CP11-CB — Private storage readiness (2026-10-08)
+
+[Scope](CP11_CB_PRIVATE_STORAGE_READINESS.md). Shared exclusive write/sync/unlink health probe and no stale success cache; native health also detects missing application relation. Local targeted regression PASS; full local/native acceptance pending. Production/default SQLite unchanged; Render paid resources/deploy await explicit user approval; whole plan/release PARTIAL; continue.
+
+
+CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exercises/38 desktop-mobile browser cases. Final native-health change is compiled by the last full-check build; final typecheck/lint/script syntax/diff PASS. Actual PostgreSQL HTTP storage/schema regression pending remote acceptance.

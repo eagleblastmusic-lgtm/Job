@@ -1,3 +1,4 @@
+import { privateStorageReady } from './storageReadiness.js';
 import { enforceNativeRate } from './faro/requestLimitModel.js';
 import { enqueueFileDisposalsOwned,disposeFiles } from './faro/fileDisposalModel.js';
 import { createServer } from 'node:http';
@@ -43,7 +44,7 @@ export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partia
    if(!path.startsWith('/api/')){if(await serveStatic(res,publicDir,path))return;if(!path.includes('.')&&await serveStatic(res,publicDir,'/index.html'))return;sendText(res,404,'Nie znaleziono strony.');return;}
    enforceExtendedOrigin(req,config);
    const now=()=>new Date().toISOString(),tokenHash=hashSessionToken(parseCookies(req.headers.cookie).job_session??''),configured=Boolean(config.faroMfaEncryptionKey);
-   if(path==='/api/health'&&method==='GET'){try{await database.query('SELECT 1');ok({ok:true,service:'job',version:'0.1.0',database:'ok',now:now()});}catch{ok({ok:false,service:'job',version:'0.1.0',database:'unavailable',now:now()},503);}return;}
+   if(path==='/api/health'&&method==='GET'){let databaseReady=true;try{await database.query('SELECT id FROM users LIMIT 0');}catch{databaseReady=false;}const storageReady=await privateStorageReady(config.dataDir),ready=databaseReady&&storageReady;ok({ok:ready,service:'job',version:'0.1.0',database:databaseReady?'ok':'unavailable',storage:storageReady?'ok':'unavailable',now:now()},ready?200:503);return;}
    if(path==='/api/legal'&&method==='GET'){ok({legalVersion:LEGAL_VERSION,termsUrl:'/terms.html',privacyUrl:'/privacy.html'});return;}
    if(/^\/api\/auth\/(register|login)$/.test(path)&&method==='POST'){
     const registering=path.endsWith('/register');await enforceNativeRate(database,config.faroRateLimitKey,`${registering?'register':'login'}:${clientIp(req,config)}`,registering?15:20,15*60000);

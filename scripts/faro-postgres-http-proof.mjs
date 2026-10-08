@@ -1,4 +1,4 @@
-import { mkdir,writeFile,stat } from 'node:fs/promises';
+import { mkdir,writeFile,stat,rename,rm,readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { createConnectedPgFaroApp } from '../dist/server/pgFaroApp.js';
@@ -14,6 +14,12 @@ export async function proveNativeHttp(database,config){
  const json=async(...args)=>(await request(...args)).value;
  async function register(name){const response=await request('/api/auth/register','','POST',{name,email:`http-${name.toLowerCase()}@example.pl`,password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true,role:'ADMIN'},201);assert.equal(response.value.user.role,'USER');return {id:response.value.user.id,cookie:response.cookie};}
  try{
+  const healthy=await json('/api/health');assert.equal(healthy.database,'ok');assert.equal(healthy.storage,'ok');
+  assert.equal((await readdir(join(config.dataDir,'uploads'))).some(name=>name.startsWith('.faro-readiness-')),false);
+  const uploads=join(config.dataDir,'uploads'),held=join(config.dataDir,'uploads-health-held');
+  await rename(uploads,held);try{await writeFile(uploads,'synthetic storage obstruction');const blocked=await json('/api/health','','GET',undefined,503);assert.equal(blocked.database,'ok');assert.equal(blocked.storage,'unavailable');assert.equal(JSON.stringify(blocked).includes(config.dataDir),false);}finally{await rm(uploads,{force:true});await rename(held,uploads);}
+  assert.equal((await json('/api/health')).storage,'ok');
+  await database.query('ALTER TABLE users RENAME TO health_users_held');try{const blocked=await json('/api/health','','GET',undefined,503);assert.equal(blocked.database,'unavailable');assert.equal(blocked.storage,'ok');}finally{await database.query('ALTER TABLE health_users_held RENAME TO users');}
   assert.equal((await json('/api/health')).database,'ok');
   const retired=await json('/api/profile','','GET',undefined,410);assert.equal(retired.error.code,'RETIRED_FEATURE');
   await json('/api/faro/profile','','GET',undefined,401);

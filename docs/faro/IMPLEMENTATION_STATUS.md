@@ -1,6 +1,6 @@
 # IMPLEMENTATION STATUS
 
-Current execution 2026-10-07: canonical checkout and remote integration are on main. SQLite remains default; opt-in PostgreSQL HTTP and all mounted canonical models are implemented, with native recovery/disposal/cutover/MFA rotation accepted on PostgreSQL18 Node22/24. BT native workspace browser16 PASS; BU expanded security/assessment browser26 acceptance pending. Production deployment, protected backup/key custody, confirmed RPO/RTO and external acceptance remain open. The dated sections below retain historical checkpoint evidence.
+Current execution 2026-10-08: canonical checkout and remote integration are on main. SQLite remains default; opt-in PostgreSQL HTTP and all mounted canonical models are implemented. PostgreSQL18 Node22/24 acceptance includes26 native browser cases per version, recovery/disposal/cutover/MFA rotation and durable request limits (BZ8fd8a22 FARO37766181960/CI37766182163 SUCCESS). Render review blueprint CAca1dac3 is committed but not applied. Production deployment, protected backup/key custody, physical-file recovery, confirmed RPO/RTO and external acceptance remain open. The dated sections below retain historical checkpoint evidence.
 
 Source 2026-09-16.1; audited main ae4af4e. Initial plan 1.0 preserved in 8b2524a; current plan 1.2. Implementation is in progress on codex/faro-canonical. Backend deliveries and workspace b7d93b8 are partial checkpoints, not a completed Canonical product.
 
@@ -1088,3 +1088,11 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-CA — Render inspected deployment draft (2026-10-08)
 
 [Scope](CP11_CA_RENDER_DEPLOYMENT_DRAFT.md). User confirmed Bartosz workspace. Connector service listings (including previews) returned literal null without error; PostgreSQL listing explicitly returned no instances. No service IDs available for environment/config inspection; do not interpret null as independently verified empty inventory. Separate paid-resource blueprint draft passes official Render JSON Schema; no provisioning, secret update or deploy performed. Existing staging blueprint unchanged. BZ8fd8a22 FARO37766181960 and CI37766182163 SUCCESS, including PostgreSQL18 Node22/24,26 native browsers per version and durable limiter race/restart/rollback. Whole plan/release PARTIAL; actual paid resources/production deploy require explicit user approval, external gates remain open.
+
+
+## CP11-CB — Private storage readiness (2026-10-08)
+
+[Scope](CP11_CB_PRIVATE_STORAGE_READINESS.md). Shared exclusive write/sync/unlink health probe and no stale success cache; native health also detects missing application relation. Local targeted regression PASS; full local/native acceptance pending. Production/default SQLite unchanged; Render paid resources/deploy await explicit user approval; whole plan/release PARTIAL; continue.
+
+
+CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exercises/38 desktop-mobile browser cases. Final native-health change is compiled by the last full-check build; final typecheck/lint/script syntax/diff PASS. Actual PostgreSQL HTTP storage/schema regression pending remote acceptance.

@@ -1,3 +1,4 @@
+import { privateStorageReady } from './storageReadiness.js';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
 import { resolve } from 'node:path';
@@ -144,12 +145,11 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, pathname: st
 
   if (method === 'GET' && pathname === '/api/health') {
     const timestamp = new Date().toISOString();
-    try {
-      store.diagnostics();
-      sendJson(res, 200, { ok: true, service: 'job', version: '0.1.0', database: 'ok', now: timestamp });
-    } catch {
-      sendJson(res, 503, { ok: false, service: 'job', version: '0.1.0', database: 'unavailable', now: timestamp });
-    }
+    let databaseReady = true;
+    try { store.diagnostics(); } catch { databaseReady = false; }
+    const storageReady = await privateStorageReady(config.dataDir);
+    const ready = databaseReady && storageReady;
+    sendJson(res, ready ? 200 : 503, { ok: ready, service: 'job', version: '0.1.0', database: databaseReady ? 'ok' : 'unavailable', storage: storageReady ? 'ok' : 'unavailable', now: timestamp });
     return true;
   }
 
