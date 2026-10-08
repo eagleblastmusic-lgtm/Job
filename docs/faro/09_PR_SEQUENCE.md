@@ -524,3 +524,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BW — Encrypted durable PostgreSQL backup artifact
 
 [Scope](CP11_BW_ENCRYPTED_POSTGRES_BACKUP_ARTIFACT.md). Consistent native logical snapshot has authenticated exclusive durable file writer and protected-env CLI. Wrong-key/tamper/overwrite regression PASS; actual native CLI roundtrip/current-authority recovery pending. Populated uploads refuse incomplete backup. Independent custody/storage/current authority/PITR/RPO/RTO remain open. Whole plan/release PARTIAL; continue.
+
+
+## CP11-BX — Encrypted current-authority artifact
+
+[Scope](CP11_BX_ENCRYPTED_CURRENT_AUTHORITY_ARTIFACT.md). Existing CLI authority-only captures protected current ledger; actual-file native recovery proof added. Local envelope2/lint/syntax/diff PASS; native pending. BV57f6f49 FARO37763865493 SUCCESS with native26 browsers Node22/24; CI pending. BW metadata wire comparison fixed. Independent custody/physical storage/RPO/RTO/external gates remain open; whole plan/release PARTIAL; continue.
