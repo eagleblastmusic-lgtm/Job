@@ -1,3 +1,4 @@
+import {watch,chmodSync,existsSync} from 'node:fs';
 import {mkdtemp,mkdir,writeFile,readFile,rm,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -31,7 +32,13 @@ export async function proveNativePrivateFileRecovery(snapshot,candidate,employer
   const badAuthority=join(root,'missing.authority');const missing={...current,ledger:{...current.ledger}};delete missing.ledger.uploads;await writeProtectedBackup(badAuthority,missing,env.FARO_AUTHORITY_ENCRYPTION_KEY);
   const failedFiles=join(root,'failed-files');const restoreArgs=(schema,files,authority=authorityPath)=>['scripts/restore-faro-postgres.mjs','--source',backupPath,'--authority-source',authority,'--target-schema',schema,'--files-target',files,'--offline-confirmed','--authority-current-confirmed'];
   await assert.rejects(()=>run(restoreArgs(failed,failedFiles,badAuthority)),error=>error.code===1);assert.equal((await db.readBatch([{text:'SELECT schema_name FROM information_schema.schemata WHERE schema_name=$1',values:[failed]}]))[0].length,0);await assert.rejects(()=>stat(failedFiles));
-  const filesTarget=join(root,'restored-files'),result=JSON.parse((await run(restoreArgs(target,filesTarget))).stdout);targetCreated=true;assert.equal(result.restoredFiles,1);assert.equal(result.erasedSubjects,1);
+  if(process.platform!=='win32'){
+   const blockedSchema=`faro_rehearsal_${randomBytes(8).toString('hex')}`,blockedFiles=join(root,'blocked-files');let blocked=false;
+   const observer=watch(root,(_event,name)=>{if(String(name)==='blocked-files'&&existsSync(blockedFiles)){chmodSync(blockedFiles,0o500);blocked=true;}});
+   try{await assert.rejects(()=>run(restoreArgs(blockedSchema,blockedFiles)),error=>error.code===1);assert.equal(blocked,true,'real destination write refusal applied');assert.equal((await db.readBatch([{text:'SELECT schema_name FROM information_schema.schemata WHERE schema_name=$1',values:[blockedSchema]}]))[0].length,0);await assert.rejects(()=>stat(blockedFiles));}
+   finally{observer.close();if(existsSync(blockedFiles))chmodSync(blockedFiles,0o700);}
+  }
+  const filesTarget=join(root,'restored-files'),result=JSON.parse((await run(restoreArgs(target,filesTarget))).stdout);targetCreated=true;assert.equal(result.restoredFiles,1);assert.equal(result.verifiedFiles,1);assert.equal(result.erasedSubjects,1);
   assert.deepEqual(await readFile(join(filesTarget,`uploads/${employer.id}/retained-file.txt`)),retained);
   for(const [id,userId] of entries.slice(1))await assert.rejects(()=>stat(join(filesTarget,`uploads/${userId}/${id}.txt`)),error=>error.code==='ENOENT');
   assert.equal((await db.readBatch([{text:`SELECT id FROM ${identifier(target)}.uploaded_files`,values:[]}]))[0].length,1);assert.equal((await db.readBatch([{text:`SELECT id FROM ${identifier(target)}.users WHERE id=$1`,values:[candidate.id]}]))[0].length,0);

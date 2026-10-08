@@ -56,3 +56,8 @@ Technical evidence update2026-10-07: optional prepared-schema PostgreSQL HTTP ru
 
 
 Latest operations acceptance2026-10-08:0a8750e FARO37771331348 and CI37771331200 SUCCESS (all jobs), PostgreSQL18 Node22/24 including26 browser cases/version. CE disposal directory confinement, CG linked-entry backup refusal and corrected CF Canonical smoke are accepted. Runbook current operations is updated. Every external decision/owner remains MISSING/UNASSIGNED; no paid resource, deploy or release approval obtained.
+
+
+## Hosting scope correction (2026-10-08)
+
+The user did not request hosting on Render. Confirmation of Bartosz workspace authorized read-only inspection, not provider selection, provisioning or deployment. Render review draft was an assistant assumption; it is an optional unused artifact, not a project dependency or a prerequisite for technical completion. No resources/deploy were performed. Root pre-existing render.yaml is historical configuration, not release authorization. Further work remains hosting-independent; actual infrastructure acceptance eventually needs a user-selected environment. Never cite paid Render plans as the reason technical work must stop.

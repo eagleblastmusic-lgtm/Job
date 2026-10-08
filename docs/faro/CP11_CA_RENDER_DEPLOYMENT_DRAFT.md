@@ -11,3 +11,8 @@ Persistent disk limits this blueprint to one HTTP instance. Render disks cannot 
 Validation: exact draft parsed and validated with jsonschema against the official Render JSON Schema on2026-10-08; PASS. This checks document shape, not account permission, capacity, secrets, mounted permissions or runtime deploy success. Sources: [Blueprint specification](https://render.com/docs/blueprint-spec), [Persistent disks](https://render.com/docs/disks), [Official schema](https://render.com/schema/render.yaml.json).
 
 BZ8fd8a22 actual acceptance: FARO37766181960 and CI37766182163 SUCCESS; PostgreSQL18 Node22/24 including26 native browser cases per version, durable request limiter concurrent charges/restart/expiry/constraint rollback and encrypted recovery CLI proofs. No application code changed in CA, so those proofs remain current. Entire plan/release remains PARTIAL.
+
+
+## Hosting scope correction (2026-10-08)
+
+The user did not request hosting on Render. Confirmation of Bartosz workspace authorized read-only inspection, not provider selection, provisioning or deployment. Render review draft was an assistant assumption; it is an optional unused artifact, not a project dependency or a prerequisite for technical completion. No resources/deploy were performed. Root pre-existing render.yaml is historical configuration, not release authorization. Further work remains hosting-independent; actual infrastructure acceptance eventually needs a user-selected environment. Never cite paid Render plans as the reason technical work must stop.

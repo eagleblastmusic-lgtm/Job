@@ -17,9 +17,9 @@ test('encrypted private file bundle verifies bytes and restores only current aut
   const key='75'.repeat(32),cipher=sealBackup({files},key);assert.equal(cipher.includes(bytes),false);assert.equal(cipher.includes(Buffer.from(row.storage_key)),false);
   assert.deepEqual(openBackup(cipher,key).files,files);
   const refused=join(root,'refused-target');await mkdir(refused);await assert.rejects(()=>restorePrivateFiles(refused,files,[{...row,sha256:'0'.repeat(64)}]));await assert.rejects(()=>stat(join(refused,'uploads')));
-  assert.deepEqual(await restorePrivateFiles(target,files,[row]),{restoredFiles:1});assert.deepEqual(await readFile(join(target,row.storage_key)),bytes);
+  assert.deepEqual(await restorePrivateFiles(target,files,[row]),{restoredFiles:1,verifiedFiles:1});assert.deepEqual(await readFile(join(target,row.storage_key)),bytes);
   await assert.rejects(()=>restorePrivateFiles(target,files,[row]));assert.deepEqual(await readFile(join(target,row.storage_key)),bytes);
-  const erased=join(root,'erased-target');await mkdir(erased);assert.deepEqual(await restorePrivateFiles(erased,files,[]),{restoredFiles:0});await assert.rejects(()=>readFile(join(erased,row.storage_key)));
+  const erased=join(root,'erased-target');await mkdir(erased);assert.deepEqual(await restorePrivateFiles(erased,files,[]),{restoredFiles:0,verifiedFiles:0});await assert.rejects(()=>readFile(join(erased,row.storage_key)));
   assert.throws(()=>validatePrivateFiles([{...files[0],data:Buffer.from('tampered').toString('base64')}],[row]));
   assert.throws(()=>validatePrivateFiles([...files,...files],[row,row]));
   for(const bad of ['../outside','uploads/other/private.txt','uploads/owner/../outside','uploads/owner/private:stream'])await assert.rejects(()=>capturePrivateFiles(source,[{...row,storage_key:bad}]));

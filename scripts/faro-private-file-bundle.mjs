@@ -40,5 +40,6 @@ export async function restorePrivateFiles(dataDir,files,retainedRows){
   const bytes=Buffer.from(file.data,'base64');if(bytes.length!==item.size_bytes||hash(bytes)!==item.sha256){bytes.fill(0);throw new Error('Private file integrity refused.');}
   const path=join(dataDir,item.storage_key);let handle;try{handle=await open(path,'wx',0o600);await handle.writeFile(bytes);await handle.sync();await handle.close();handle=undefined;restored++;}catch(error){if(handle){await handle.close().catch(()=>{});await unlink(path).catch(()=>{});}throw error;}finally{bytes.fill(0);}
  }
- if(restored!==retained.size)throw new Error('Retained private file missing.');return {restoredFiles:restored};
+ if(restored!==retained.size)throw new Error('Retained private file missing.');
+ const verified=await capturePrivateFiles(dataDir,retainedRows);validatePrivateFiles(verified,retainedRows);return {restoredFiles:restored,verifiedFiles:verified.length};
 }

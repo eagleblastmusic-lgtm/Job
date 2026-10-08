@@ -1085,3 +1085,13 @@ Capture validates the final file entry with lstat before opening, rejecting symb
 [Current operator runbook](RUNBOOK.md) now documents prepared-schema runtime keys, private storage readiness, minimized disposal diagnostics, offline DB/file backup, independent current authority and absent-target restore. No resources created, no production migration/deploy/routing, no gate approval inferred. SQLite remains default.
 
 Remaining genuine dependencies: actual Render inventory/config inspection (connector service list null), explicit approval for paid resources/production deployment, protected real secrets and backup/current-authority custody, mounted storage/cutover/rollback and measured production RPO/RTO; licensed and validated taxonomy/provider AI/tax/transport/external notification integrations; consciously approved safe advanced file/code/SQL assessment execution architecture; independent security/privacy/manual accessibility/user research and KRAZ/GDPR/DPIA/retention/moderation/minor population decisions with owners. User instructed continuation without external evidence; this does not create evidence or authorize paid deploy. Technical acceptance recorded above does not close these dependencies. Whole plan/release PARTIAL.
+
+
+## Hosting scope correction (2026-10-08)
+
+The user did not request hosting on Render. Confirmation of Bartosz workspace authorized read-only inspection, not provider selection, provisioning or deployment. Render review draft was an assistant assumption; it is an optional unused artifact, not a project dependency or a prerequisite for technical completion. No resources/deploy were performed. Root pre-existing render.yaml is historical configuration, not release authorization. Further work remains hosting-independent; actual infrastructure acceptance eventually needs a user-selected environment. Never cite paid Render plans as the reason technical work must stop.
+
+
+## CP11-CI — Post-restore physical verification (2026-10-08)
+
+[Scope](CP11_CI_POST_RESTORE_PHYSICAL_VERIFICATION.md). Re-read/hash actual destination before success and actual filesystem-write failure/owned-target cleanup native proof. Standalone3/lint/syntax/diff PASS; native pending. d2071a7 FARO37771876387/CI37771876392 SUCCESS. Work is hosting-independent; no Render hosting requested or authorized. Whole plan/release PARTIAL.
