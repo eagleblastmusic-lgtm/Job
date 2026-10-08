@@ -75,7 +75,7 @@ export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partia
     const result=await database.transaction(async()=>{const current=await authority();if(current.user.role!=='ADMIN')throw new HttpError(403,'Wymagany administrator.','FORBIDDEN');const rows=await database.readBatch([{text:'SELECT COUNT(*) users FROM users',values:[]},{text:'SELECT COUNT(*) completed FROM analytics_events WHERE event_name=$1',values:['FARO_MUTUAL_STAGE_COMPLETED']}]);return {users:rows[0]?.[0]?.users,databaseEngine:'postgresql',worker:worker.status(),completedPairs:rows[1]?.[0]?.completed,generatedAt:now()};},{readOnly:true});ok(result);return;
    }
    throw new HttpError(404,'Nie znaleziono endpointu.','NOT_FOUND');
-  }catch(error){const failure=error instanceof HttpError?error:new HttpError(500,'Nie udało się obsłużyć żądania.');if(!res.headersSent)sendJson(res,failure.status,{error:{code:failure.code,message:failure.message}});else res.end();}
+  }catch(error){const conflict=typeof error==='object'&&error!==null&&'code' in error&&['40001','40P01'].includes(String(error.code));const failure=error instanceof HttpError?error:conflict?new HttpError(409,'Dane zmieniły się równolegle. Odśwież dane przed ponowieniem operacji.','VERSION_CONFLICT'):new HttpError(500,'Nie udało się obsłużyć żądania.');if(!res.headersSent)sendJson(res,failure.status,{error:{code:failure.code,message:failure.message}});else res.end();}
  });
  worker.start();
  return {server,db:database,config,worker,close:async()=>{worker.stop();await worker.idle();if(server.listening)await new Promise<void>((done,reject)=>server.close(error=>error?reject(error):done()));}};

@@ -30,6 +30,20 @@ export async function proveNativeHttp(database,config){
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
   await json('/api/auth/register','','POST',{name:'Foreign',email:'foreign@example.pl',password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true},403,{origin:'https://foreign.invalid'});
   await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+  const conflictBaseline=await json('/api/faro/profile',candidate.cookie),conflictAudit=(await database.query('SELECT COUNT(*) n FROM audit_logs')).rows[0].n;
+  // Real driver failures verify HTTP classification AND transactional rollback.
+  for(const code of ['40001','40P01']){
+   await database.query('CREATE SEQUENCE http_profile_conflict_attempts');
+   await database.query(`CREATE FUNCTION http_profile_conflict() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM nextval('http_profile_conflict_attempts'); RAISE EXCEPTION 'synthetic private database detail' USING ERRCODE = '${code}'; END $$`);
+   await database.query('CREATE TRIGGER http_profile_conflict BEFORE UPDATE ON faro_profiles FOR EACH ROW EXECUTE FUNCTION http_profile_conflict()');
+   try{
+    const failed=await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Natalia',expectedVersion:conflictBaseline.version,availability:{kind:'IMMEDIATE'}},409);
+    assert.equal(failed.error.code,'VERSION_CONFLICT');assert.equal(JSON.stringify(failed).includes('synthetic private database detail'),false);
+    assert.deepEqual(await json('/api/faro/profile',candidate.cookie),conflictBaseline);
+    assert.equal((await database.query('SELECT COUNT(*) n FROM audit_logs')).rows[0].n,conflictAudit);
+    const attempts=(await database.query('SELECT last_value,is_called FROM http_profile_conflict_attempts')).rows[0];assert.equal(attempts.last_value,'1');assert.equal(attempts.is_called,true);
+   }finally{await database.query('DROP TRIGGER http_profile_conflict ON faro_profiles');await database.query('DROP FUNCTION http_profile_conflict()');await database.query('DROP SEQUENCE http_profile_conflict_attempts');}
+  }
   const preview=await json('/api/faro/profile/preview-confirmation',candidate.cookie);
   const org=await json('/api/faro/organizations',owner.cookie,'POST',{name:'Native HTTP organization'},201);
   await json(`/api/faro/organizations/${org.id}/verify`,moderator.cookie,'POST',{note:'Synthetic independent verification'},403);
