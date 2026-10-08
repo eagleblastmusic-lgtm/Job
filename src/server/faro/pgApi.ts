@@ -11,7 +11,7 @@ import { routeFaroApi,type FaroRouteServices } from './api.js';
 import { tickNativeWorker } from './trustTickModel.js';
 import type { FaroWorker } from './worker.js';
 import { readProfile,profileProjection,profilePreview } from './profileReadModel.js';
-import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,recordProfileActivity,decideProfileProposal } from './profileWriteModel.js';
+import { saveProfile,saveProfileConstraints,addProfileClaim,revokeProfileClaim,saveProfileLearning,removeProfileLearning,recordProfileActivity,decideProfileProposal } from './profileWriteModel.js';
 import { readOrganizations,readMembership } from './organizationReadModel.js';
 import { createOrganization,verifyOrganization,inviteOrganizationMember,acceptOrganizationInvite,revokeOrganizationMember } from './organizationWriteModel.js';
 import { readOfferList,readOfferDetail } from './offerReadModel.js';
@@ -75,6 +75,7 @@ previewConfirmation:(u)=>read(async()=>profilePreview(u,await readProfile(databa
 addClaim:(u,b)=>addProfileClaim(owned,u,b,asOf),
 revoke:(u,id)=>revokeProfileClaim(owned,u,id,asOf),
 learn:(u,b)=>saveProfileLearning(owned,u,b,asOf),
+removeLearning:(u,b)=>removeProfileLearning(owned,u,b,asOf),
 activity:(u,b)=>recordProfileActivity(owned,u,b,asOf),
 decideProposal:(u,id,b)=>decideProfileProposal(owned,u,id,b,asOf),
 organizations:(u)=>read(()=>readOrganizations(database,u)),

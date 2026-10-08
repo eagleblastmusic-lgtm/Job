@@ -44,6 +44,25 @@ export async function proveNativeHttp(database,config){
     const attempts=(await database.query('SELECT last_value,is_called FROM http_profile_conflict_attempts')).rows[0];assert.equal(attempts.last_value,'1');assert.equal(attempts.is_called,true);
    }finally{await database.query('DROP TRIGGER http_profile_conflict ON faro_profiles');await database.query('DROP FUNCTION http_profile_conflict()');await database.query('DROP SEQUENCE http_profile_conflict_attempts');}
   }
+  const learning={skillId:'faro:legacy:4',mode:'SELF_DEVELOPING',practice:{quantity:3,unit:'PROJECTS'}};
+  const removal={skillId:learning.skillId,mode:learning.mode,expectedPractice:learning.practice,confirmed:true};
+  await json('/api/faro/learning',candidate.cookie,'POST',learning,201);
+  await json('/api/faro/learning',candidate.cookie,'POST',{...learning,mode:'WANTS_TO_LEARN'},201);
+  await json('/api/faro/learning',owner.cookie,'POST',{...learning,practice:{quantity:7,unit:'PROJECTS'}},201);
+  await json('/api/faro/learning',candidate.cookie,'DELETE',{...removal,confirmed:false},400);
+  await json('/api/faro/learning',owner.cookie,'DELETE',{...removal,userId:candidate.id},409);
+  await json('/api/faro/learning',candidate.cookie,'POST',{...learning,practice:{quantity:5,unit:'PROJECTS'}},201);
+  await json('/api/faro/learning',candidate.cookie,'DELETE',removal,409);
+  const freshRemoval={...removal,expectedPractice:{quantity:5,unit:'PROJECTS'},userId:owner.id};
+  const learningAudit=(await database.query("SELECT COUNT(*) n FROM audit_logs WHERE action='LEARNING_REMOVED'")).rows[0].n;
+  await database.query("ALTER TABLE audit_logs ADD CONSTRAINT http_learning_audit_guard CHECK(action<>'LEARNING_REMOVED') NOT VALID");
+  try{await json('/api/faro/learning',candidate.cookie,'DELETE',freshRemoval,500);assert.equal((await json('/api/faro/profile',candidate.cookie)).learning.length,2);}finally{await database.query('ALTER TABLE audit_logs DROP CONSTRAINT http_learning_audit_guard');}
+  const removed=await json('/api/faro/learning',candidate.cookie,'DELETE',freshRemoval);
+  assert.deepEqual(removed.learning.map(row=>row.mode),['WANTS_TO_LEARN']);
+  assert.deepEqual(await json('/api/faro/learning',candidate.cookie,'DELETE',freshRemoval),removed);
+  assert.equal(Number((await database.query("SELECT COUNT(*) n FROM audit_logs WHERE action='LEARNING_REMOVED'")).rows[0].n),Number(learningAudit)+1);
+  assert.equal((await json('/api/faro/profile',owner.cookie)).learning.length,1);
+  assert.deepEqual((await json('/api/export',candidate.cookie)).faro.faro_learning.map(row=>row.mode),['WANTS_TO_LEARN']);
   const preview=await json('/api/faro/profile/preview-confirmation',candidate.cookie);
   const org=await json('/api/faro/organizations',owner.cookie,'POST',{name:'Native HTTP organization'},201);
   await json(`/api/faro/organizations/${org.id}/verify`,moderator.cookie,'POST',{note:'Synthetic independent verification'},403);

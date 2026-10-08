@@ -33,6 +33,14 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.locator('[data-form=profile] [name=phone]').fill('+48500100200');
     await page.getByRole('button', { name: 'Zapisz profil', exact: true }).click();
     await expect(page.locator('#f-status')).toHaveText('Zapisano.');
+    const learning=page.locator('[data-form=learning]').filter({has:page.locator('[name=mode][value=WANTS_TO_LEARN]')});
+    await learning.locator('[name=skillId]').selectOption('faro:legacy:4');
+    await learning.locator('[name=quantity]').fill('3');await learning.locator('[name=unit]').selectOption('PROJECTS');
+    await learning.getByRole('button',{name:'Zapisz kierunek',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true})).toHaveCount(0);
+    expect((await f.request<{learning:unknown[]}>('/api/faro/profile',candidate.cookie)).learning).toHaveLength(0);
     await page.getByText('Dodaj kompetencję', { exact: true }).click();
     await page.getByText('Przykłady zadań dla poziomów: Obsługa klienta',{exact:true}).click();
     await expect(page.getByText('Samodzielnie wyjaśniam typową sprawę klienta według procedury i potwierdzam uzgodniony kolejny krok.',{exact:true})).toBeVisible();

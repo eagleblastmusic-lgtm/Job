@@ -1,6 +1,6 @@
 import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries,organizationInvitePlan,organizationInviteReadQuery,organizationInviteFromRows,organizationExistingMemberQuery,organizationInviteAcceptPlan,organizationRevokeQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
-import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
+import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileLearningEntryQuery,profileLearningRemovalQueries,profileActivityQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows,profileProjection,profilePreview } from './profileReadModel.js';
 import { FaroStore } from './base.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
@@ -48,6 +48,13 @@ export class ProfileService extends FaroStore {
     if(!this.db.prepare(query.text).get({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!}))throw new HttpError(404,'Nie znaleziono deklaracji.');
   }
   learn(userId:string,body:Record<string,unknown>) {this.runQueries([profileLearningQuery(userId,body)]);return this.profile(userId);}
+  removeLearning(userId:string,body:Record<string,unknown>) {
+    const query=profileLearningEntryQuery(userId,body);
+    return this.transaction(()=>{
+      const row=this.db.prepare(query.text).get({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!});
+      this.runQueries(profileLearningRemovalQueries(userId,body,row,this.now()));return this.profile(userId);
+    });
+  }
   activity(userId:string,body:Record<string,unknown>) {const queries=profileActivityQueries(userId,body,this.now());this.transaction(()=>this.runQueries(queries));return this.profile(userId);}
   decideProposal(userId:string,id:string,body:Record<string,unknown>) {
     this.transaction(()=>{

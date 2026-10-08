@@ -60,7 +60,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
 
 type AsyncMethods<T> = { [K in keyof T]: T[K] extends (...args:infer A)=>infer R ? (...args:A)=>R|Promise<R> : never };
 export interface FaroRouteServices {
- profiles:AsyncMethods<Pick<ProfileService,'profile'|'save'|'saveConstraints'|'projection'|'previewConfirmation'|'addClaim'|'revoke'|'learn'|'activity'|'decideProposal'|'organization'|'verify'|'invite'|'acceptInvite'|'revokeMember'>>&{organizations(userId:string):Record<string,unknown>[]|Promise<Record<string,unknown>[]>};
+ profiles:AsyncMethods<Pick<ProfileService,'profile'|'save'|'saveConstraints'|'projection'|'previewConfirmation'|'addClaim'|'revoke'|'learn'|'removeLearning'|'activity'|'decideProposal'|'organization'|'verify'|'invite'|'acceptInvite'|'revokeMember'>>&{organizations(userId:string):Record<string,unknown>[]|Promise<Record<string,unknown>[]>};
  offers:AsyncMethods<Pick<OfferService,'list'|'create'|'detail'|'edit'|'lifecycle'>>;
  recruitment:AsyncMethods<Pick<RecruitmentService,'interest'|'watchSettings'|'watch'|'watches'|'list'|'view'|'change'|'phonePreview'|'grant'|'phone'|'retryDeadLetter'>>;
  assessments:AsyncMethods<Pick<AssessmentService,'create'|'keyCorrectionPreview'|'correctCohortKey'|'read'|'edit'|'approve'|'attempts'|'assign'|'overview'|'start'|'save'|'finalize'|'invalidateResult'|'amendResult'|'reportIncident'|'resolveIncident'|'retry'>>&{list(userId:string,offerId:string):Record<string,unknown>[]|Promise<Record<string,unknown>[]>};
@@ -94,6 +94,7 @@ export async function routeFaroApi(req:IncomingMessage,res:ServerResponse,path:s
     const claim = path.match(/^\/api\/faro\/claims\/([^/]+)$/);
     if (claim && method === 'DELETE') { await profiles.revoke(user.id, claim[1]!); return ok({ ok: true }); }
     if (path === '/api/faro/learning' && method === 'POST') return ok(await profiles.learn(user.id, body), 201);
+    if (path === '/api/faro/learning' && method === 'DELETE') return ok(await profiles.removeLearning(user.id, body));
     if (path === '/api/faro/activities' && method === 'POST') return ok(await profiles.activity(user.id, body), 201);
     const proposal = path.match(/^\/api\/faro\/proposals\/([^/]+)$/);
     if (proposal && method === 'POST') return ok(await profiles.decideProposal(user.id, proposal[1]!, body));

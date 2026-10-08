@@ -1141,3 +1141,12 @@ CM final103a4e4 actual acceptance2026-10-08: FARO37791470294/CI37791470540 SUCCE
 
 
 CN/CO final9c42699 acceptance2026-10-08: FARO37793582627 and CI37793582723 SUCCESS, every required job. PostgreSQL18 Node22/24 verifies common-listener writes/origin rejection, read-only rollback/stale-source refusal and fresh-connection/listener restart with retained session/data. Actual recovered HTTP verifies recovered private storage readiness, stale session/erased login refusal, production-required MFA setup/confirmation and retained-only own export, with503 RELEASE_GATES_OPEN preserved. Native26 desktop/mobile browser cases/version, default38 browsers, contracts179 Node and container/recovery acceptance PASS. Prior CN9aacc1d FARO37792729928/CI37792729850 SUCCESS. Initial CO4fd1a3b premature export correctly failed MFA guard; corrected fixture completes the factor without weakening production policy. No public Render PostgreSQL migration, production cutover or measured production RPO/RTO claimed; free staging remains SQLite. Whole plan/release PARTIAL.
+
+
+## CP11-CP/CQ — Conflict acceptance and learning withdrawal (2026-10-08)
+
+CP1f50fdb FARO37796476554/CI37796476655 SUCCESS, every required job. Native PostgreSQL18 Node22/24 verifies safe409 conflict response, rollback and no automatic mutation replay.
+
+[CQ scope](CP11_CQ_LEARNING_REMOVAL.md): owned confirmed learning withdrawal with expected practice, atomic minimized audit, idempotent retry, profile/preview/export consistency and desktop/mobile buttons on both backends. Verification in progress; no full DONE inferred.
+
+Render discovery now confirms the connector is installed and enabled. This session exposes no Render service/database API tools; no OAuth request was made, so no missing OAuth scope is established. Bartosz workspace remains authorized for inspection and free staging; paid database and production deployment remain unauthorized. Free staging currently runs SQLite. This supersedes earlier installation-state statements. Protected PostgreSQL connection/configuration and actual infrastructure acceptance remain open, along with external owners/evidence and wider licensed/provider/executor scope. Whole plan/release PARTIAL.

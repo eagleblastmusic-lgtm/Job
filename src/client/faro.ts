@@ -235,6 +235,7 @@ root.addEventListener('click', event => {
       if(action==='watch-mute'||action==='watch-enable')await api(`/offers/${id}/watch`,'PUT',{alerts:action==='watch-enable'});
       if (action === 'watch' || action === 'unwatch') await api(`/offers/${id}/watch`,action === 'watch' ? 'POST':'DELETE',{});
       if (action === 'revoke-claim') await api(`/claims/${id}`,'DELETE',{});
+      if (action === 'remove-learning') await api('/learning','DELETE',{...JSON.parse(id) as Record<string,unknown>,confirmed:true});
       if (action === 'revoke-member') await api(`/organizations/${orgId}/members/${id}`,'DELETE',{});
       if (action === 'export') {
         const data=await api('/api/export'); if(mine!==epoch)return;

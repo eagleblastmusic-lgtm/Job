@@ -94,6 +94,20 @@ export function profileLearningQuery(userId:string,body:Record<string,unknown>) 
   const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
   return {text:'INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice',values:[userId,skillId,choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const),JSON.stringify(profilePractice(body.practice))]};
 }
+export function profileLearningEntryQuery(userId:string,body:Record<string,unknown>) {
+  const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
+  const mode=choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const);
+  if(body.confirmed!==true)throw new HttpError(400,'Potwierdź usunięcie kierunku nauki.','CONFIRMATION_REQUIRED');
+  profilePractice(body.expectedPractice);
+  return {text:'SELECT practice FROM faro_learning WHERE user_id=$1 AND skill_id=$2 AND mode=$3',values:[userId,skillId,mode]};
+}
+export function profileLearningRemovalQueries(userId:string,body:Record<string,unknown>,row:Record<string,unknown>|undefined,asOf:string) {
+  const query=profileLearningEntryQuery(userId,body),expected=profilePractice(body.expectedPractice);
+  if(!row)return [];
+  const current=profilePractice(JSON.parse(row.practice as string));
+  if(current.quantity!==expected.quantity||current.unit!==expected.unit)throw new HttpError(409,'Kierunek nauki zmienił się. Odśwież profil.','VERSION_CONFLICT');
+  return [{text:'DELETE FROM faro_learning WHERE user_id=$1 AND skill_id=$2 AND mode=$3',values:query.values},profileAuditQuery(userId,'LEARNING_REMOVED',query.values[1]!,asOf)];
+}
 export function profileActivityQueries(userId:string,body:Record<string,unknown>,asOf:string) {
   const description=text(body.description,3000),source=choice(body.source,SOURCES),id=randomUUID();
   return [
@@ -119,6 +133,14 @@ export async function revokeProfileClaim(database:ProfileWriteDatabase,userId:st
 export async function saveProfileLearning(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
   const query=profileLearningQuery(userId,body);
   return database.transaction(async()=>{await database.query(query.text,query.values);return readProfile(database,userId,asOf);});
+}
+export async function removeProfileLearning(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
+  const query=profileLearningEntryQuery(userId,body);
+  return database.transaction(async()=>{
+    const rows=await database.readBatch([query]);
+    for(const command of profileLearningRemovalQueries(userId,body,rows[0]?.[0],asOf))await database.query(command.text,command.values);
+    return readProfile(database,userId,asOf);
+  });
 }
 export async function recordProfileActivity(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
   const queries=profileActivityQueries(userId,body,asOf);
