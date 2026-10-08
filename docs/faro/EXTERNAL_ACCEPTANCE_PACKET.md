@@ -53,3 +53,6 @@ No messages sent to reviewers/providers/participants. User authorized integratio
 
 
 Technical evidence update2026-10-07: optional prepared-schema PostgreSQL HTTP runtime and reused candidate/employer/private-export/deletion desktop/mobile browser contracts passed exact712d838 FARO37668365491/CI37668365334 on PostgreSQL18 Node22/24. SQLite remains default pending cutover. This supersedes the earlier statement that the native HTTP adapter is unimplemented; production migration/deployment/current-authority recovery and all external acceptance decisions remain open. Durable native/SQLite file disposal0036 is under verification.
+
+
+Latest operations acceptance2026-10-08:0a8750e FARO37771331348 and CI37771331200 SUCCESS (all jobs), PostgreSQL18 Node22/24 including26 browser cases/version. CE disposal directory confinement, CG linked-entry backup refusal and corrected CF Canonical smoke are accepted. Runbook current operations is updated. Every external decision/owner remains MISSING/UNASSIGNED; no paid resource, deploy or release approval obtained.

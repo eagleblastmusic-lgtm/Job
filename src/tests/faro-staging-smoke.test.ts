@@ -14,6 +14,7 @@ test('canonical smoke defaults to public reads and confirmed synthetic mode eras
   await assert.rejects(()=>promisify(execFile)(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account'],options));assert.equal(count(),before);
   const result=await promisify(execFile)(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account','--operator-confirmed','--expect-faro-open'],options);
   assert.match(result.stdout,/ACCOUNT_CLEANUP_PASS/);assert.equal(count(),before);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM sessions').get()!.n,0);
+  await assert.rejects(()=>promisify(execFile)(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account','--operator-confirmed'],options),error=>{const failure=error as Error & {stderr:string;stdout:string};assert.match(failure.stderr,/FARO_SMOKE_FAILURE step=PROFILE/);assert.match(failure.stdout,/ACCOUNT_CLEANUP_PASS/);return true;});assert.equal(count(),before);
  }finally{await f.close();}
 });
 

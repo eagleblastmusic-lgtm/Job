@@ -8,7 +8,7 @@ Restore only to a new explicit rehearsal target first. The legacy restore utilit
 
 Notifications use durable outbox dedupe/retry/dead-letter state. Development runs one in-process worker every 60 seconds; `FARO_WORKER_ENABLED=false` disables it and `FARO_WORKER_INTERVAL_MS` changes the interval (minimum 1000 ms). Tests default to disabled. Production always disables it while release gates are open, even with an enable override. Closing the app stops the timer before database closure. No external email/SMS is sent.
 
-Authenticated ADMIN can invoke POST `/api/faro/worker/tick` and inspect GET `/api/faro/worker/status`: running state, last success, opaque error code and aggregate outbox states only. Failure preserves durable work for the next cycle; bounded per-message retries end in DEAD_LETTER. There is no automatic dead-letter replay or deletion endpoint. Restart picks up pending durable obligations on the first scheduled cycle. Do not run multiple SQLite app instances; leased multi-instance scheduling remains part of the production persistence gate. Stale intake is paused without destroying candidate process history, and closing uses the last published deadline rather than draft values.
+Authenticated ADMIN can invoke POST `/api/faro/worker/tick` and inspect GET `/api/faro/worker/status`: running state, last success, opaque error code and aggregate outbox/file-disposal states. Failure preserves durable work for the next cycle; bounded per-message retries end in DEAD_LETTER. There is no automatic dead-letter replay or deletion endpoint. Restart picks up pending durable obligations on the first scheduled cycle. Do not run multiple SQLite app instances; native PostgreSQL leased scheduling is proven in isolated CI; actual production scheduling/storage remains part of the production persistence gate. Stale intake is paused without destroying candidate process history, and closing uses the last published deadline rather than draft values.
 
 For a failed checkpoint, revert its code commit or close Canonical activation; keep additive tables. Do not drop domain history as a rollback shortcut. Production data retention and legal holds require approved policy before launch.
 
@@ -51,3 +51,31 @@ ROLLBACK: disable correction UI/API together, retain header/history/latest resul
 NEXT: current remote acceptance, then consent-gated minimal Canonical product analytics/meaningful progression and remaining legal-safe gaps.
 
 CP11-I operator rehearsal: npm run verify:postgres:source checks a synthetic SQLite source only. npm run verify:postgres:rehearsal requires FARO_PG_REHEARSAL_URL pointing to an isolated disposable PostgreSQL database and exercises actual70-table import/counts/hashes/constraints/consent/rollback. Fixture uses synthetic data only; secrets/records are not CLI output. It creates a unique faro_rehearsal_* schema and drops only its own successful creation. It never changes a source database, existing destination schema or production runtime. Actual PostgreSQL18 acceptance on Node22/24 at7c05f87 in FARO37389939763 PASS. Runtime adapter, real operator cutover/backup/authority and external gates remain pending; SQLite reference SQL is not deployment proof.
+
+
+## Current native PostgreSQL offline operations (2026-10-08)
+
+SQLite remains the default. Opt-in native runtime requires FARO_DATABASE_ENGINE=postgresql, protected FARO_PG_URL and reviewed FARO_PG_SCHEMA containing all37 migrations. Startup checks prepared schema; it does not provision or migrate production. Provision independent64hex FARO_MFA_ENCRYPTION_KEY and FARO_RATE_LIMIT_KEY through controlled secrets, never shell command literals or Git. Missing rate-limit key refuses native auth/commands. All instances require the same rate key; rotation resets bucket windows and needs coordinated policy. Production recruitment gates and scheduler remain closed.
+
+Health requires application database and real private-storage write/sync/unlink readiness. A200 does not prove Render disk mount durability, independent backup storage or release. ADMIN worker status includes fileDisposals pending/ready/retrying/leased/failed/oldestRequestedAt aggregates alongside outbox; no file identifiers or payloads. Assign an actual polling/alert/support owner before production. Protected node-user filesystem access must be checked on the actual approved mounted service.
+
+Build reviewed version before operator CLI use. Stop all writers/workers for a snapshot including files; confirm current authority independently. Supply connection and encryption secrets through protected process environment, not pasted command arguments. Example commands use placeholders for access-controlled destinations:
+
+```text
+node scripts/backup-faro-postgres.mjs --output <new-encrypted-artifact> --operator-confirmed
+node scripts/backup-faro-postgres.mjs --output <new-encrypted-file-artifact> --operator-confirmed --with-private-files --private-files-dir <private-source-root> --offline-confirmed
+node scripts/backup-faro-postgres.mjs --authority-only --output <new-encrypted-current-authority> --operator-confirmed
+```
+
+Backup CLI reads FARO_BACKUP_ENCRYPTION_KEY; for authority capture use its separately controlled authority key as that process's encryption input. Keep latest authority artifact independently from stale backups. Timestamp and confirmation flags do not establish freshness. File bundle limit1000 files/16MiB each/64MiB total; missing/changed/mismatched/redirected files refuse success. DB-only mode still refuses uploaded-file metadata. Artifacts exclusively created, authenticated and synced; preserve matching historical reviewed tools for older schema artifacts.
+
+Restore authenticates backup with FARO_BACKUP_ENCRYPTION_KEY and latest authority with independent FARO_AUTHORITY_ENCRYPTION_KEY. The database URL must point to an approved offline destination. Use a new faro_rehearsal_* schema and, for bundled files, an absent explicit files directory:
+
+```text
+node scripts/restore-faro-postgres.mjs --source <encrypted-artifact> --authority-source <encrypted-current-authority> --target-schema faro_rehearsal_operator_review --offline-confirmed --authority-current-confirmed
+node scripts/restore-faro-postgres.mjs --source <encrypted-file-artifact> --authority-source <encrypted-current-authority> --target-schema faro_rehearsal_operator_review_files --files-target <new-absent-private-root> --offline-confirmed --authority-current-confirmed
+```
+
+Do not activate targets on any error or cleanup quarantine warning. Successful restore validates full schema/rows/hash/FKs, reapplies current credentials/roles/restrictions/erasure, revokes sessions/grants/invites and pauses published offers. It writes only uploaded files identical in the latest authority; erased/obsolete files do not return. Actual physical recovery proof passed CD6d9fb99 FARO37770052739/CI37770052754 PostgreSQL18 Node22/24. Isolated recovery success does not establish production RPO/RTO or authorize routing. Review target access/keys/files, perform approved cutover, and refuse rollback to stale SQLite after native writes. Retain source and artifacts until approved retention/disposal.
+
+Render proposed configuration remains a separate review draft, never applied. User explicitly requires approval before paid resources or production deploy. The connector returned null for service inventory; dashboard inventory confirmation is still required before applying. Advanced assessment executors, external licensed providers and independent legal/security/manual accessibility/user research acceptances remain outside this technical proof.
