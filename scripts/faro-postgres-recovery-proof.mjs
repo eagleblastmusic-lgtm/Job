@@ -1,3 +1,10 @@
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {readProtectedBackup} from './faro-backup-envelope.mjs';
+import { sealBackup,openBackup } from './faro-backup-envelope.mjs';
 import { captureNativeSnapshot } from './faro-postgres-backup.mjs';
 import assert from 'node:assert/strict';
 import { randomBytes,createHash } from 'node:crypto';
@@ -11,7 +18,11 @@ import { hashSessionToken,hashPassword } from '../dist/server/auth.js';
 export async function proveNativeRecovery(snapshot,candidate,employer,org,offer){
  const schemas=[`faro_rehearsal_${randomBytes(8).toString('hex')}`,`faro_rehearsal_${randomBytes(8).toString('hex')}`],authority=clientFromEnvironment(),target=clientFromEnvironment(),asOf=new Date().toISOString();let created=0;
  try{
-  await authority.connect();await target.connect();await importSnapshot(authority,snapshot,schemas[0]);created=1;const backup=await captureNativeSnapshot(authority,snapshot,schemas[0],()=>{});await importSnapshot(target,backup,schemas[1]);created=2;
+  await authority.connect();await target.connect();await importSnapshot(authority,snapshot,schemas[0]);created=1;const backup=await captureNativeSnapshot(authority,snapshot,schemas[0],()=>{});const key='99'.repeat(32),sealed=sealBackup(backup,key);assert.equal(sealed.includes(Buffer.from(candidate.id)),false);assert.throws(()=>openBackup(sealed,'98'.repeat(32)),/authentication/);const recoveredBackup=openBackup(sealed,key);assert.deepEqual(recoveredBackup,backup);await importSnapshot(target,recoveredBackup,schemas[1]);created=2;
+  const artifactRoot=await mkdtemp(join(tmpdir(),'faro-native-artifact-'));
+  try{const path=join(artifactRoot,'snapshot.backup'),result=await promisify(execFile)(process.execPath,['scripts/backup-faro-postgres.mjs','--output',path,'--operator-confirmed'],{env:{...process.env,FARO_PG_URL:process.env.FARO_PG_REHEARSAL_URL,FARO_PG_SCHEMA:schemas[0],FARO_BACKUP_ENCRYPTION_KEY:key}});assert.equal(JSON.parse(result.stdout).operation,'FARO_POSTGRES_ENCRYPTED_BACKUP');assert.deepEqual((await readProtectedBackup(path,key)).snapshot,backup);}
+  finally{await rm(artifactRoot,{recursive:true,force:true});}
+
   await authority.query(`SET search_path TO ${identifier(schemas[0])}`);await target.query(`SET search_path TO ${identifier(schemas[1])}`);
   const initial=await readRecoveryLedger(authority,()=>{});assert.ok(initial.mfa.some(row=>row.user_id===candidate.id));
   await assert.rejects(()=>readRecoveryLedger(authority,()=>{throw new Error('OPERATOR_REFUSED');}),/OPERATOR_REFUSED/);

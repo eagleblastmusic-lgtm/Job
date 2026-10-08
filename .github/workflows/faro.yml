@@ -101,6 +101,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Authenticated private backup artifact regression
+        run: node --test scripts/faro-backup-envelope.test.mjs
       - name: Import synthetic offline snapshot into real PostgreSQL and verify it
         run: npm run verify:postgres:rehearsal
         env:
