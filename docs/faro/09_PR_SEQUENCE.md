@@ -596,3 +596,10 @@ Remaining genuine dependencies: actual Render inventory/config inspection (conne
 ## CP11-CJ — Private HTTP error logs (2026-10-08)
 
 [Scope](CP11_CJ_PRIVATE_HTTP_ERROR_LOGS.md). Replace raw unexpected SQLite exceptions with fixed opaque code/request correlation; real erasure-failure regression verifies log minimization plus rollback. Full Node177/build/lint/typecheck/diff PASS; remote acceptance pending. Hosting-independent work; whole plan/release PARTIAL.
+
+
+## CP11-CI/CJ actual acceptance and scope (2026-10-08)
+
+9e0905b FARO37777439659 and CI37777439657 SUCCESS, every job. PostgreSQL18 Node22/24 includes26 native browser cases/version, post-write physical readback/hash verification and real destination-write refusal with owned schema/directory cleanup, source preservation and current-authority no-resurrection. Full Node177/build/lint/typecheck PASS; remote browser/container/restore/migration checks accepted. Prior a54972f FARO37777143315/CI37777143136 SUCCESS. Latest documentation update does not change runtime or invalidate these proofs.
+
+No hosting on Render was requested. Workspace confirmation only authorized inspection; its earlier manifest is optional unused reference. No hosting selected, paid resources created or production deploy performed. Continued local/CI engineering does not require purchasing Render services. Actual deployment acceptance eventually needs an explicitly chosen target and operator-controlled secrets/custody; that dependency is distinct from coding/testing. Full graph/provider/advanced-executor scope and real legal/security/manual/user validation remain unfinished, never inferred from technical PASS. Whole plan/release PARTIAL.

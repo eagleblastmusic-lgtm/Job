@@ -61,3 +61,10 @@ Latest operations acceptance2026-10-08:0a8750e FARO37771331348 and CI37771331200
 ## Hosting scope correction (2026-10-08)
 
 The user did not request hosting on Render. Confirmation of Bartosz workspace authorized read-only inspection, not provider selection, provisioning or deployment. Render review draft was an assistant assumption; it is an optional unused artifact, not a project dependency or a prerequisite for technical completion. No resources/deploy were performed. Root pre-existing render.yaml is historical configuration, not release authorization. Further work remains hosting-independent; actual infrastructure acceptance eventually needs a user-selected environment. Never cite paid Render plans as the reason technical work must stop.
+
+
+## CP11-CI/CJ actual acceptance and scope (2026-10-08)
+
+9e0905b FARO37777439659 and CI37777439657 SUCCESS, every job. PostgreSQL18 Node22/24 includes26 native browser cases/version, post-write physical readback/hash verification and real destination-write refusal with owned schema/directory cleanup, source preservation and current-authority no-resurrection. Full Node177/build/lint/typecheck PASS; remote browser/container/restore/migration checks accepted. Prior a54972f FARO37777143315/CI37777143136 SUCCESS. Latest documentation update does not change runtime or invalidate these proofs.
+
+No hosting on Render was requested. Workspace confirmation only authorized inspection; its earlier manifest is optional unused reference. No hosting selected, paid resources created or production deploy performed. Continued local/CI engineering does not require purchasing Render services. Actual deployment acceptance eventually needs an explicitly chosen target and operator-controlled secrets/custody; that dependency is distinct from coding/testing. Full graph/provider/advanced-executor scope and real legal/security/manual/user validation remain unfinished, never inferred from technical PASS. Whole plan/release PARTIAL.

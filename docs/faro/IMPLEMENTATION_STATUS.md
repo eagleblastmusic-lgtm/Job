@@ -1,6 +1,6 @@
 # IMPLEMENTATION STATUS
 
-Current execution 2026-10-08: local canonical checkout and remote integration are main. SQLite remains default. Native PostgreSQL18 Node22/24 all-job acceptance at0a8750e FARO37771331348/CI37771331200 SUCCESS includes26 native browser executions per version, durable request limits/disposal/diagnostics, storage readiness, encrypted physical-file and current-authority recovery, offline MFA rotation, cutover/rollback and Canonical smoke. Local Node177 and38 browser/both restore checks passed; additional cleanup-on-smoke-failure targeted2 PASS. Render review blueprint remains unapplied. Actual infrastructure approval/secrets/custody/production RPO/RTO/provider and independent external acceptance remain required; whole plan/release PARTIAL. Historical entries below retain checkpoint evidence.
+Current execution 2026-10-08: local canonical checkout and GitHub integration are main. SQLite remains default. Latest runtime9e0905b FARO37777439659/CI37777439657 SUCCESS (all jobs): PostgreSQL18 Node22/24 and26 native browser executions/version, encrypted verified physical-file/current-authority recovery with real write-failure cleanup, durable limits/disposal/diagnostics, readiness, MFA rotation, cutover/rollback, Canonical smoke and minimized HTTP error logs. Full local Node177 and remote required checks PASS. Hosting is not selected; Render workspace inspection did not authorize hosting or provisioning. Optional unused Render draft is not a technical dependency. Actual deployment/secrets/custody/RPO/RTO, broad graph/provider/advanced executor scope and external independent acceptance remain required; whole plan/release PARTIAL. Historical sections preserve checkpoint evidence.
 
 Source 2026-09-16.1; audited main ae4af4e. Initial plan 1.0 preserved in 8b2524a; current plan 1.2. Implementation is in progress on codex/faro-canonical. Backend deliveries and workspace b7d93b8 are partial checkpoints, not a completed Canonical product.
 
@@ -1145,3 +1145,10 @@ The user did not request hosting on Render. Confirmation of Bartosz workspace au
 ## CP11-CJ — Private HTTP error logs (2026-10-08)
 
 [Scope](CP11_CJ_PRIVATE_HTTP_ERROR_LOGS.md). Replace raw unexpected SQLite exceptions with fixed opaque code/request correlation; real erasure-failure regression verifies log minimization plus rollback. Full Node177/build/lint/typecheck/diff PASS; remote acceptance pending. Hosting-independent work; whole plan/release PARTIAL.
+
+
+## CP11-CI/CJ actual acceptance and scope (2026-10-08)
+
+9e0905b FARO37777439659 and CI37777439657 SUCCESS, every job. PostgreSQL18 Node22/24 includes26 native browser cases/version, post-write physical readback/hash verification and real destination-write refusal with owned schema/directory cleanup, source preservation and current-authority no-resurrection. Full Node177/build/lint/typecheck PASS; remote browser/container/restore/migration checks accepted. Prior a54972f FARO37777143315/CI37777143136 SUCCESS. Latest documentation update does not change runtime or invalidate these proofs.
+
+No hosting on Render was requested. Workspace confirmation only authorized inspection; its earlier manifest is optional unused reference. No hosting selected, paid resources created or production deploy performed. Continued local/CI engineering does not require purchasing Render services. Actual deployment acceptance eventually needs an explicitly chosen target and operator-controlled secrets/custody; that dependency is distinct from coding/testing. Full graph/provider/advanced-executor scope and real legal/security/manual/user validation remain unfinished, never inferred from technical PASS. Whole plan/release PARTIAL.
