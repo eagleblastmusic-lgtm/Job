@@ -1117,3 +1117,6 @@ No hosting on Render was requested. Workspace confirmation only authorized inspe
 ## CP11-CL — Bounded backup artifact reads (2026-10-08)
 
 [Scope](CP11_CL_BOUNDED_BACKUP_ARTIFACT_READS.md). Reject oversized/redirected/changing artifacts before unbounded allocation; bounded reader/decoder/writer256MiB. Standalone4/lint/diff PASS; native actual CLI acceptance pending. Free Render approved but no connector/auth available; independent technical work continued. Whole plan/release PARTIAL.
+
+
+CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCCESS, all jobs including PostgreSQL18 Node22/24 actual encrypted CLI backup/authority/physical restore and26 native browser executions/version. CK e331291 FARO37780567739/CI37780567753 SUCCESS. Free staging document passes official schema; no Render deployment performed or platform availability claimed. Current blocker for authorized free deployment is confirmed missing Render installation/authentication, not cost approval; integration restoration is the required user action. No paid resources, database, disk or production release authorized. Independent external decisions/secrets/custody and broader provider/graph/executor validation remain open; entire plan PARTIAL.
