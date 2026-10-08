@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {execFile} from 'node:child_process';
+import {execFile,spawn} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createServer} from 'node:http';
 import type {AddressInfo} from 'node:net';
@@ -31,6 +31,32 @@ test('synthetic staging smoke verifies the closed production boundary and remove
 });
 
 const execute=promisify(execFile);
+for(const failure of ['none','consent','session','confirmation'])test(`restart smoke checks retained state and cleans up after ${failure}`,async()=>{
+ const f=await faroFixture({nodeEnv:'production',appOrigin:'http://127.0.0.1'});f.app.config.appOrigin=f.base;
+ const child=spawn(process.execPath,['scripts/staging-smoke.mjs','--synthetic-account','--operator-confirmed','--restart-proof'],{env:{...process.env,STAGING_URL:f.base,STAGING_ALLOW_HTTP:'1'},windowsHide:true,stdio:['pipe','pipe','pipe']});
+ let stdout='',stderr='';child.stdout.on('data',data=>{stdout+=String(data);});child.stderr.on('data',data=>{stderr+=String(data);});
+ const completed=new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve);});
+ try{
+  await new Promise<void>((resolve,reject)=>{
+   const timer=setTimeout(()=>reject(new Error('Smoke readiness marker timeout')),10000);
+   child.stdout.on('data',()=>{if(stdout.includes('FARO_SMOKE_RESTART_READY')){clearTimeout(timer);resolve();}});
+   child.once('exit',()=>{clearTimeout(timer);reject(new Error('Smoke exited before marker: '+stderr));});
+  });
+  assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM users').get()!.n,1);
+  if(failure==='consent')f.app.db.db.exec("UPDATE consents SET granted=0 WHERE consent_type='ANALYTICS'");
+  if(failure==='session')f.app.db.db.exec('DELETE FROM sessions');
+  if(failure==='confirmation')child.stdin.end();else child.stdin.write('RESTARTED\n');
+  assert.equal(await completed,failure==='none'?0:1);
+  if(failure==='none')assert.match(stdout,/RESTART_PERSISTENCE_PASS/);
+  else{assert.doesNotMatch(stdout,/RESTART_PERSISTENCE_PASS/);assert.match(stderr,new RegExp('step='+({consent:'RESTART_CONSENTS',session:'RESTART_SESSION',confirmation:'RESTART_WAIT'}[failure as 'consent'|'session'|'confirmation'])));}
+  assert.match(stdout,/ACCOUNT_CLEANUP_PASS/);
+  assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM users').get()!.n,0);
+  assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM sessions').get()!.n,0);
+  assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM consents').get()!.n,0);
+  assert.doesNotMatch(stdout+stderr,/job_session=|faro-smoke-[a-f0-9]|SyntheticSmoke[a-f0-9]/);
+ }finally{if(child.exitCode===null){child.kill();await completed;}await f.close();}
+});
+
 for(const legalStatus of [200,503])test(`staging smoke waits for readiness but does not retry later responses (${legalStatus})`,async()=>{
  let healthReads=0,legalReads=0,writes=0;
  const server=createServer((request,response)=>{

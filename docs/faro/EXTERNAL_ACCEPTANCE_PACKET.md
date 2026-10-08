@@ -96,3 +96,8 @@ CV actual acceptance2026-10-08:99e6bc9 FARO37827730169 and CI37827730617 SUCCESS
 ## CP11-CW — Actual hosted free PostgreSQL acceptance (2026-10-08)
 
 [Hosted acceptance](CP11_CW_HOSTED_POSTGRES_STAGING_ACCEPTANCE.md). Applied prepared Blueprint from main6577cfb in Bartosz workspace to existing free web/database only; sync exe-db3upn2j9qps73fhmn60, deploy dep-db3upqeb7d7c739nefig Live in1m22s. Actual empty schema preparation, HTTPS public/synthetic smoke and account cleanup PASS. Actual restart logs EXISTING_SCHEMA_RETAINED, post-restart synthetic smoke/cleanup PASS. Reused and re-read successful CV FARO37827730169/CI37827730617; runtime unchanged since accepted99e6bc9. Supersedes missing-browser/connector deployment blocker and SQLite-hosted status. No paid resources or production operations; free database expiry/private-file durability and external owner/provider/executor/release gates remain open. Whole plan/release PARTIAL.
+
+
+## CP11-CX — Hosted retained account/session/consent restart (2026-10-08)
+
+[Scope and actual proof](CP11_CX_HOSTED_RESTART_PERSISTENCE.md). Existing smoke now supports confirmed bounded restart proof with in-memory credentials and reauthenticated cleanup. Actual Render process thhhx retained prepared schema at21:32:46 and listener at21:32:47; same account/original session/changed consent/fresh login/export/closed gate PASS, account cleanup PASS. Targeted8/full Node185/build/lint/typecheck/syntax/diff PASS; new remote CI pending. No application/migration/UI change; existing native/browser/recovery evidence reused. No paid resources/production operations; whole plan/release PARTIAL.
