@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,stat} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,stat,link} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
@@ -25,6 +25,8 @@ test('encrypted private file bundle verifies bytes and restores only current aut
   for(const bad of ['../outside','uploads/other/private.txt','uploads/owner/../outside','uploads/owner/private:stream'])await assert.rejects(()=>capturePrivateFiles(source,[{...row,storage_key:bad}]));
   await assert.rejects(()=>capturePrivateFiles(source,[{...row,size_bytes:row.size_bytes+1}]));await assert.rejects(()=>capturePrivateFiles(source,[{...row,sha256:'0'.repeat(64)}]));
   await assert.rejects(()=>capturePrivateFiles(source,[{...row,size_bytes:17*1024*1024}]));
+  const hardlink=join(root,'linked-private.txt');await link(join(source,row.storage_key),hardlink);await assert.rejects(()=>capturePrivateFiles(source,[row]));await rm(hardlink);
+  if(process.platform!=='win32'){const actual=join(root,'actual-private.txt');await writeFile(actual,bytes);await rm(join(source,row.storage_key));await symlink(actual,join(source,row.storage_key));await assert.rejects(()=>capturePrivateFiles(source,[row]));assert.deepEqual(await readFile(actual),bytes);}
   const outside=join(root,'outside');await mkdir(outside);await rm(join(source,'uploads','owner'),{recursive:true});await symlink(outside,join(source,'uploads','owner'),process.platform==='win32'?'junction':'dir');await assert.rejects(()=>capturePrivateFiles(source,[row]));
  }finally{await rm(root,{recursive:true,force:true});}
 });

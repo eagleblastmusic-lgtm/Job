@@ -1151,3 +1151,8 @@ CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exerc
 ## CP11-CF — Canonical staging smoke (2026-10-08)
 
 [Scope](CP11_CF_CANONICAL_STAGING_SMOKE.md). Public reads by default; explicit synthetic mode checks actual Canonical and erases test account. Full Node177/build/lint/typecheck/syntax/diff PASS, native smoke pending. CD6d9fb99 FARO37770052739/CI37770052754 SUCCESS including physical recovery. Whole plan/release PARTIAL; production/platform/custody/external gates open.
+
+
+## CP11-CG — Private backup entry confinement (2026-10-08)
+
+Capture validates the final file entry with lstat before opening, rejecting symbolic links and multiple hard links even where O_NOFOLLOW is unavailable. Existing descriptor/hash/bounded-read/current-authority checks remain. Standalone crypto/private-file3 and lint/diff PASS; real hardlink refusal regression passes locally, final-file symlink refusal additionally executes on Linux CI. No application/migration/UI change; previous full177/38 evidence remains current. CE731b44c FARO37770387356 SUCCESS including actual PostgreSQL disposal sentinel preservation. CF native smoke acceptance pending; whole plan/release PARTIAL, external/platform/custody gates remain open.

@@ -15,7 +15,8 @@ export async function capturePrivateFiles(dataDir,rows){
  let total=0;const result=[],keys=new Set(),ids=new Set();
  for(const row of rows){const item=descriptor(row);if(keys.has(item.storage_key)||ids.has(item.id))throw new Error('Duplicate private file.');keys.add(item.storage_key);ids.add(item.id);total+=item.size_bytes;if(total>maxTotal)throw new Error('Private file bundle limit.');
   await directory(join(root,'uploads'));await directory(join(root,'uploads',item.user_id));
-  const file=await open(join(root,item.storage_key),constants.O_RDONLY|(constants.O_NOFOLLOW??0));let bytes;
+  const path=join(root,item.storage_key),entry=await lstat(path);if(!entry.isFile()||entry.isSymbolicLink()||entry.nlink!==1)throw new Error('Private file entry refused.');
+  const file=await open(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));let bytes;
   try{const before=await file.stat();if(!before.isFile()||before.nlink!==1||before.size!==item.size_bytes)throw new Error('Private file changed.');bytes=Buffer.alloc(item.size_bytes+1);let read=0;while(read<bytes.length){const part=await file.read(bytes,read,bytes.length-read,read);if(!part.bytesRead)break;read+=part.bytesRead;}if(read!==item.size_bytes)throw new Error('Private file changed.');bytes=bytes.subarray(0,read);const after=await file.stat();if(after.size!==before.size||after.mtimeMs!==before.mtimeMs||bytes.length!==item.size_bytes||hash(bytes)!==item.sha256)throw new Error('Private file integrity refused.');result.push({...item,data:bytes.toString('base64')});}finally{bytes?.fill(0);await file.close();}
  }
  return result;
