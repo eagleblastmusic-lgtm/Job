@@ -48,6 +48,14 @@
         {
           "key": "FARO_WORKER_ENABLED",
           "value": "false"
+        },
+        {
+          "key": "FARO_MFA_ENCRYPTION_KEY_BASE64",
+          "generateValue": true
+        },
+        {
+          "key": "FARO_RATE_LIMIT_KEY_BASE64",
+          "generateValue": true
         }
       ]
     }

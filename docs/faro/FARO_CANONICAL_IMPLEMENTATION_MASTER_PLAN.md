@@ -1170,3 +1170,8 @@ CS finalf375f8a acceptance2026-10-08: FARO37820553760 and CI37820553769 SUCCESS,
 ## CP11-CT — Offline PostgreSQL staging preparation (2026-10-08)
 
 [Command and evidence](CP11_CT_OFFLINE_POSTGRES_PREPARATION.md). New operator CLI prepares only a new isolated schema from an explicitly offline regular SQLite source; existing targets, missing confirmation and private-file metadata are refused. Full comparison and source re-read protect readiness claims; runtime activation remains separate. Actual local PostgreSQL18.6/Node24.19.0 native exercise and28 browsers PASS, owned cluster STOPPED/CLEANUP_PASS. Required remote acceptance pending. No paid resource or production migration; whole plan/release PARTIAL.
+
+
+## CP11-CU — Provider-generated keys (2026-10-08)
+
+[Configuration and evidence](CP11_CU_PROVIDER_GENERATED_KEYS.md). Strict independent 256-bit Base64 inputs preserve existing hex cryptographic contracts and mandatory production MFA. Free staging Blueprint generates secrets provider-side; no live configuration change yet. Build/full181 Node/config-MFA11/lint/typecheck/diff and official Blueprint schema PASS. CT fcc4744 FARO37823699172/CI37823699233 SUCCESS, every required job. Hosted staging remains SQLite; whole plan/release PARTIAL.

@@ -17,6 +17,19 @@ function boolEnv(name: string, fallback: boolean): boolean {
   throw new Error(`Nieprawidłowa wartość ${name}.`);
 }
 
+// Decode provider-generated keys without changing the established hex key contract.
+function protectedKey(name:string,override:string|null|undefined):string|null {
+  const hex=override??process.env[name]??null,encoded=process.env[`${name}_BASE64`];
+  if(encoded!==undefined&&(override===undefined||override===null)) {
+    if(hex!==null)throw new Error(`${name}: skonfiguruj tylko jeden format klucza.`);
+    const bytes=Buffer.from(encoded,'base64');
+    if(bytes.length!==32||bytes.toString('base64')!==encoded)throw new Error(`${name}_BASE64 wymaga 32 bajtów w kanonicznym Base64.`);
+    return bytes.toString('hex');
+  }
+  if(hex!==null&&!/^[a-fA-F0-9]{64}$/.test(hex))throw new Error(`${name} wymaga 32 bajtów zapisanych szesnastkowo.`);
+  return hex;
+}
+
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
@@ -46,10 +59,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   validateMalwareScanEnvironment();
   const nodeEnvRaw = overrides.nodeEnv ?? process.env.NODE_ENV ?? 'development';
   const nodeEnv: AppConfig['nodeEnv'] = nodeEnvRaw === 'production' || nodeEnvRaw === 'test' ? nodeEnvRaw : 'development';
-  const faroRateLimitKey=overrides.faroRateLimitKey??process.env.FARO_RATE_LIMIT_KEY??null;
-  if(faroRateLimitKey!==null&&!/^[a-fA-F0-9]{64}$/.test(faroRateLimitKey))throw new Error('FARO_RATE_LIMIT_KEY wymaga 32 bajtów zapisanych szesnastkowo.');
-  const faroMfaEncryptionKey=overrides.faroMfaEncryptionKey??process.env.FARO_MFA_ENCRYPTION_KEY??null;
-  if(faroMfaEncryptionKey!==null&&!/^[a-fA-F0-9]{64}$/.test(faroMfaEncryptionKey))throw new Error('FARO_MFA_ENCRYPTION_KEY wymaga 32 bajtów zapisanych szesnastkowo.');
+  const faroRateLimitKey=protectedKey('FARO_RATE_LIMIT_KEY',overrides.faroRateLimitKey);
+  const faroMfaEncryptionKey=protectedKey('FARO_MFA_ENCRYPTION_KEY',overrides.faroMfaEncryptionKey);
   const dataDir = overrides.dataDir ?? resolve(process.env.DATA_DIR ?? './data');
   const explicitOrigin = overrides.appOrigin ?? process.env.APP_ORIGIN?.trim();
   const platformOrigin = process.env.RENDER_EXTERNAL_URL?.trim() || null;

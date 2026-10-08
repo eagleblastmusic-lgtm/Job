@@ -7,6 +7,30 @@ function restoreEnv(name: string, value: string | undefined): void {
   else process.env[name] = value;
 }
 
+test('provider Base64 keys preserve independent 256-bit keys and production MFA policy',()=>{
+  const names=['FARO_MFA_ENCRYPTION_KEY','FARO_MFA_ENCRYPTION_KEY_BASE64','FARO_RATE_LIMIT_KEY','FARO_RATE_LIMIT_KEY_BASE64'];
+  const previous=names.map(name=>process.env[name]);
+  try {
+    for(const name of names)delete process.env[name];
+    process.env.FARO_MFA_ENCRYPTION_KEY_BASE64=Buffer.alloc(32,17).toString('base64');
+    process.env.FARO_RATE_LIMIT_KEY_BASE64=Buffer.alloc(32,34).toString('base64');
+    const config=loadConfig({nodeEnv:'production',faroRequirePrivilegedMfa:false});
+    assert.equal(config.faroMfaEncryptionKey,'11'.repeat(32));
+    assert.equal(config.faroRateLimitKey,'22'.repeat(32));
+    assert.equal(config.faroRequirePrivilegedMfa,true);
+    assert.equal(loadConfig({faroMfaEncryptionKey:'33'.repeat(32)}).faroMfaEncryptionKey,'33'.repeat(32));
+    for(const name of ['FARO_MFA_ENCRYPTION_KEY','FARO_RATE_LIMIT_KEY']) {
+      for(const invalid of ['',Buffer.alloc(31).toString('base64'),Buffer.alloc(33).toString('base64'),'!'+Buffer.alloc(32).toString('base64'),Buffer.alloc(32).toString('base64').replace(/A=$/,'B='),Buffer.alloc(32).toString('base64').trimEnd()+'\n']) {
+        const good=process.env[`${name}_BASE64`];process.env[`${name}_BASE64`]=invalid;
+        assert.throws(()=>loadConfig(),error=>error instanceof Error&&error.message.includes(`${name}_BASE64`)&&!error.message.includes(invalid||'not a secret'));
+        restoreEnv(`${name}_BASE64`,good);
+      }
+      process.env[name]='44'.repeat(32);
+      assert.throws(()=>loadConfig(),/tylko jeden format/);delete process.env[name];
+    }
+  }finally{names.forEach((name,index)=>restoreEnv(name,previous[index]));}
+});
+
 test('Render external URL becomes app origin when APP_ORIGIN is not set', () => {
   const previousAppOrigin = process.env.APP_ORIGIN;
   const previousRenderUrl = process.env.RENDER_EXTERNAL_URL;
