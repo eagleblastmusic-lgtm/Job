@@ -1,0 +1,7 @@
+# CP11-CO — Recovered PostgreSQL HTTP runtime
+
+DELTA_REQUIRED: encrypted private-file recovery already verifies current-authority erasures, retained bytes/hashes, excluded obsolete files and real failed-write cleanup. Extend that same disposable native proof by booting the real HTTP entrypoint with a fresh PostgreSQL connection scoped to the restored schema and actual recovered storage directory.
+
+Require database/storage readiness, refusal of both pre-backup sessions, refusal to log in as the erased candidate, fresh retained-account login and own export containing only the retained file, plus503 RELEASE_GATES_OPEN for production Faro. Existing no-overwrite/source-preservation tests remain. This fixture uses known synthetic accounts/passwords and explicitly disables privileged MFA only inside its isolated authentication probe; it is not operator MFA acceptance or production configuration. Worker remains off; listeners, connections, schemas and private temporary files are cleaned.
+
+Local syntax/lint/diff PASS; real PostgreSQL18 Node22/24 and broader required acceptance pending. No deployed runtime change, no real records/credentials and no Render resource/config changes. Free Render remains disposable SQLite. Production cutover/storage/key/current-authority custody and measured real RPO/RTO remain open, as do licensed provider/graph/executor and independent external acceptances; whole plan/release PARTIAL.

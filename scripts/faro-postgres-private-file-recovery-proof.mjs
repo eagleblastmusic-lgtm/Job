@@ -10,6 +10,7 @@ import {clientFromEnvironment,identifier,importSnapshot} from './faro-postgres-r
 import {readProtectedBackup,writeProtectedBackup} from './faro-backup-envelope.mjs';
 import {eraseAccount} from '../dist/server/faro/privacyErasureModel.js';
 import {hashSessionToken} from '../dist/server/auth.js';
+import {createConnectedPgFaroApp} from '../dist/server/pgFaroApp.js';
 
 /** Actual encrypted offline CLI backup and restore of retained vs erased/stale private files. */
 export async function proveNativePrivateFileRecovery(snapshot,candidate,employer){
@@ -42,6 +43,23 @@ export async function proveNativePrivateFileRecovery(snapshot,candidate,employer
   assert.deepEqual(await readFile(join(filesTarget,`uploads/${employer.id}/retained-file.txt`)),retained);
   for(const [id,userId] of entries.slice(1))await assert.rejects(()=>stat(join(filesTarget,`uploads/${userId}/${id}.txt`)),error=>error.code==='ENOENT');
   assert.equal((await db.readBatch([{text:`SELECT id FROM ${identifier(target)}.uploaded_files`,values:[]}]))[0].length,1);assert.equal((await db.readBatch([{text:`SELECT id FROM ${identifier(target)}.users WHERE id=$1`,values:[candidate.id]}]))[0].length,0);
+  // Boot the actual HTTP runtime against recovered database AND recovered storage.
+  const runtimeDb=clientFromEnvironment();let runtime;
+  try{
+   await runtimeDb.connect();await runtimeDb.query(`SET search_path TO ${identifier(target)}`);
+   runtime=createConnectedPgFaroApp(runtimeDb,{nodeEnv:'production',dataDir:filesTarget,faroWorkerEnabled:false,faroRequirePrivilegedMfa:false,faroRateLimitKey:'61'.repeat(32)});
+   await new Promise(done=>runtime.server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${runtime.server.address().port}`;runtime.config.appOrigin=base;
+   const request=async(path,cookie='',method='GET',body,status=200)=>{const response=await fetch(base+path,{method,redirect:'error',signal:AbortSignal.timeout(10000),headers:{cookie,origin:base,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});assert.equal(response.status,status,'recovered runtime HTTP contract');assert.equal(response.headers.get('cache-control'),'no-store');return {value:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]??''};};
+   const healthy=(await request('/api/health')).value;assert.equal(healthy.database,'ok');assert.equal(healthy.storage,'ok');
+   await request('/api/me',candidate.cookie,'GET',undefined,401);await request('/api/me',employer.cookie,'GET',undefined,401);
+   const users= snapshot.tables.find(table=>table.name==='users').rows,erasedUser=users.find(row=>row.id===candidate.id),retainedUser=users.find(row=>row.id===employer.id);
+   await request('/api/auth/login','','POST',{email:erasedUser.email,password:'Bezpieczne123'},401);
+   const login=await request('/api/auth/login','','POST',{email:retainedUser.email,password:'Bezpieczne123'});assert.ok(login.cookie.startsWith('job_session='));
+   assert.equal((await request('/api/me',login.cookie)).value.user.id,employer.id);
+   const exported=(await request('/api/export',login.cookie)).value;assert.equal(exported.user.id,employer.id);assert.deepEqual(exported.uploaded_files.map(row=>row.id),['retained-file']);
+   assert.equal((await request('/api/faro/profile',login.cookie,'GET',undefined,503)).value.error.code,'RELEASE_GATES_OPEN');
+   console.log('FARO_POSTGRES_RECOVERED_HTTP_PASS recovered storage readiness, erased login/session refusal, fresh retained login/export, closed production gate; synthetic only.');
+  }finally{if(runtime){const closing=runtime.close();runtime.server.closeAllConnections();await closing;}await runtimeDb.end();}
   await assert.rejects(()=>run(restoreArgs(target,filesTarget)),error=>error.code===1);assert.deepEqual(await readFile(join(filesTarget,`uploads/${employer.id}/retained-file.txt`)),retained);assert.deepEqual(await readFile(join(dataDir,`uploads/${candidate.id}/erased-file.txt`)),erased);
  }finally{
   if(targetCreated)await db.query(`DROP SCHEMA ${identifier(target)} CASCADE`);if(sourceCreated)await db.query(`DROP SCHEMA ${identifier(source)} CASCADE`);await db.end();await rm(root,{recursive:true,force:true});
