@@ -241,6 +241,8 @@ try {
     await client.query("UPDATE faro_profiles SET preferences=$1 WHERE user_id=$2",[JSON.stringify({active:true,noNights:true}),candidate.id]);
     const unchangedPhone=await saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:2,phone:'+48500100200',availability:{kind:'IMMEDIATE'}},asOf);
     assert.equal(unchangedPhone.version,3);assert.deepEqual(unchangedPhone.preferences,{active:true,noNights:true});assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
+    for(const phone of [false,0,[],{},'-------','(     )','+--- --','1-- --2','123456','+48phone'])await assert.rejects(()=>saveProfile(client,candidate.id,{firstName:'Anna',expectedVersion:3,phone,availability:{kind:'IMMEDIATE'}},asOf),error=>error.status===400);
+    assert.deepEqual(await readProfile(client,candidate.id,asOf),unchangedPhone);assert.equal((await client.query("SELECT 1 FROM audit_logs WHERE user_id=$1 AND action='PHONE_CHANGED_GRANTS_REVOKED'",[candidate.id])).rowCount,1);
     // A real database failure after grant revocation must roll back revocation and audit together.
     await client.query('UPDATE faro_contact_grants SET revoked_at=NULL WHERE process_id=$1',[process.id]);
     await client.query("ALTER TABLE faro_profiles ADD CONSTRAINT pg_profile_write_guard CHECK(first_name<>'Blocked')");

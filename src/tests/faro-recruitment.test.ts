@@ -9,6 +9,7 @@ import { explainOffer, explainConditions, DEFAULT_CONSTRAINTS, sortOffers } from
 import { parseOffer } from '../server/faro/offerService.js';
 import { TrustService } from '../server/faro/trustService.js';
 import { EconomicsService } from '../server/faro/economicsService.js';
+import {parseProfileSave} from '../server/faro/profileWriteModel.js';
 
 async function setup() {
   const f = await faroFixture(), employer = await f.user('Firma'), candidate = await f.user('Jan'), outsider = await f.user('Obcy');
@@ -421,6 +422,11 @@ test('phone consent binds exact number and process; profile changes atomically r
     r.grant(f.candidate.id,second.id,true,{phoneConfirmed:true,confirmationToken:r.phonePreview(f.candidate.id,second.id).confirmationToken});
     profiles.save(f.candidate.id,{firstName:'Jan',expectedVersion:1,phone:old.phone,availability:{kind:'IMMEDIATE'}});
     assert.equal(r.phone(f.employer.id,p.id).phone,old.phone); // Other edits preserve consent to the same number.
+    const beforeInvalid=profiles.profile(f.candidate.id),grantBefore=r.view(f.candidate.id,p.id).contactGrant;
+    for(const phone of ['+48 (500) 100-200','500 100 200','1234567'])assert.equal(parseProfileSave({firstName:'Jan',phone,availability:{kind:'IMMEDIATE'}},new Date().toISOString()).phone,phone);
+    for(const phone of [null,undefined,''])assert.equal(parseProfileSave({firstName:'Jan',phone,availability:{kind:'IMMEDIATE'}},new Date().toISOString()).phone,null);
+    for(const phone of [false,0,[],{},'-------','(     )','+--- --','1-- --2','123456','+48phone'])await f.request('/api/faro/profile',f.candidate.cookie,'PUT',{firstName:'Jan',expectedVersion:2,phone,availability:{kind:'IMMEDIATE'}},400);
+    assert.deepEqual(profiles.profile(f.candidate.id),beforeInvalid);assert.deepEqual(r.view(f.candidate.id,p.id).contactGrant,grantBefore);assert.equal(r.phone(f.employer.id,p.id).phone,old.phone);
     profiles.save(f.candidate.id,{firstName:'Jan',expectedVersion:2,phone:'+48600200300',availability:{kind:'IMMEDIATE'}});
     for(const id of [p.id,second.id])await f.request(`/api/faro/processes/${id}/phone`,f.employer.cookie,'GET',undefined,403);
     await f.request(grantUrl,f.candidate.cookie,'POST',{phoneConfirmed:true,confirmationToken:old.confirmationToken},409);

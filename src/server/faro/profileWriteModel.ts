@@ -13,8 +13,8 @@ export function profileAvailability(input:unknown,asOf:string):Availability {
 export function parseProfileSave(body:Record<string,unknown>,asOf:string) {
   const name=text(body.firstName,60);
   if(!/^[\p{L}][\p{L}\p{M}'’-]*$/u.test(name))throw new HttpError(400,'Wpisz tylko imię, bez nazwiska.','FIRST_NAME_ONLY');
-  const availability=profileAvailability(body.availability,asOf),phone=body.phone?text(body.phone,20):null;
-  if(phone&&!/^\+?[0-9 ()-]{7,20}$/.test(phone))throw new HttpError(400,'Nieprawidłowy telefon.');
+  const availability=profileAvailability(body.availability,asOf),phone=body.phone===undefined||body.phone===null||body.phone===''?null:text(body.phone,20);
+  if(phone&&(!/^\+?[0-9 ()-]{7,20}$/.test(phone)||phone.replace(/\D/g,'').length<7))throw new HttpError(400,'Nieprawidłowy telefon.');
   return {name,availability,phone};
 }
 export function profileSaveQueries(userId:string,body:Record<string,unknown>,current:{version:number;phone:string|null},parsed:ReturnType<typeof parseProfileSave>,asOf:string) {

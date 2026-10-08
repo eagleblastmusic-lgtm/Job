@@ -1227,3 +1227,8 @@ CP03-G exact final acceptance2026-10-09: a308e44 FARO37855259036 and CI378552589
 
 
 CY exact final acceptance2026-10-09:054196a FARO37856922577 and CI37856922591 SUCCESS, every required job. PostgreSQL18 Node22/24 rejects invalid economics dates without overwriting prior state; native/default desktop/mobile browsers, full contracts and container/recovery checks accepted. Local full188 Node/targeted24/build/lint/typecheck/syntax/diff PASS, zero skips. Historical timestamps unchanged; no migration/client/hosted configuration or production operation. Staging remains accepted f08e62f; full plan/release PARTIAL and external dependencies unchanged.
+
+
+## CP02-I — Phone input boundary
+
+[Scope](CP02_I_PHONE_INPUT_BOUNDARY.md). Shared profile parser rejects formatting-only and falsy non-string phones instead of clearing contact. Valid formatting/explicit clearing retained; exact-number consent semantics unchanged. Actual API invalid writes preserve profile and grants; native exercise includes same refusals. Local25/augmented contact1/build/lint PASS; final required CI pending. No client/schema/migration/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.
