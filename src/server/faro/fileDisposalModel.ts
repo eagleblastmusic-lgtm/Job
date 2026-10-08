@@ -22,3 +22,11 @@ export async function disposeFiles(database:DisposalDatabase,dataDir:string,asOf
  }
  return {disposed,pending:claims.length-disposed};
 }
+
+/** Aggregate operator visibility survives account erasure and worker restart; no private keys leave storage. */
+export function fileDisposalStatusQuery(asOf:string){return {text:`SELECT COUNT(*) pending,
+ COALESCE(SUM(CASE WHEN next_attempt_at<=$1 AND (lease_until IS NULL OR lease_until<=$1) THEN 1 ELSE 0 END),0) ready,
+ COALESCE(SUM(CASE WHEN attempts>0 THEN 1 ELSE 0 END),0) retrying,
+ COALESCE(SUM(CASE WHEN lease_until>$1 THEN 1 ELSE 0 END),0) leased,
+ COALESCE(SUM(CASE WHEN error_code IS NOT NULL THEN 1 ELSE 0 END),0) failed,
+ MIN(requested_at) AS "oldestRequestedAt" FROM faro_file_disposals`,values:[asOf]};}

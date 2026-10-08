@@ -1,5 +1,5 @@
 import { enforceNativeRate } from './requestLimitModel.js';
-import { disposeFiles } from './fileDisposalModel.js';
+import { disposeFiles,fileDisposalStatusQuery } from './fileDisposalModel.js';
 import type { IncomingMessage,ServerResponse } from 'node:http';
 import type { AppConfig } from '../config.js';
 import type { PgJobDatabase } from '../postgresDb.js';
@@ -151,7 +151,7 @@ revokeSessions:(_u,b)=>revokeAllSessions(database,tokenHash,b,new Date().toISOSt
  runWorker:()=>worker.run(async()=>{await tickNativeWorker(database,new Date().toISOString(),adminAuthority);await disposeFiles(database,config.dataDir,new Date().toISOString(),adminAuthority);}),
  notifications:async()=>{for(const claim of await claimOutbox(database,new Date().toISOString(),authorize))await deliverClaimedOutbox(database,claim.id,claim.claimToken,new Date().toISOString(),authorize);},
  notificationRows:(u)=>read(async()=>(await database.readBatch([{text:"SELECT id,message,entity_type,entity_id,read_at,created_at FROM notifications WHERE user_id=$1 AND dedupe_key LIKE 'faro:%' ORDER BY created_at DESC LIMIT 100",values:[u]}]))[0]??[]),
- workerRows:()=>read(async()=>{await adminAuthority();const rows=await database.readBatch([{text:'SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status',values:[]},{text:"SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>$1",values:[new Date().toISOString()]}]);return {outbox:rows[0]??[],leases:rows[1]?.[0]};})
+ workerRows:()=>read(async()=>{await adminAuthority();const rows=await database.readBatch([{text:'SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status',values:[]},{text:"SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>$1",values:[new Date().toISOString()]},fileDisposalStatusQuery(new Date().toISOString())]);return {outbox:rows[0]??[],leases:rows[1]?.[0],fileDisposals:rows[2]?.[0]};})
  };
  return routeFaroApi(req,res,path,config,user,body,services,worker);
  };

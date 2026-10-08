@@ -552,3 +552,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 
 
 CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exercises/38 desktop-mobile browser cases. Final native-health change is compiled by the last full-check build; final typecheck/lint/script syntax/diff PASS. Actual PostgreSQL HTTP storage/schema regression pending remote acceptance.
+
+
+## CP11-CC — Durable disposal operator diagnostics (2026-10-08)
+
+[Scope](CP11_CC_DISPOSAL_OPERATOR_DIAGNOSTICS.md). Shared admin-only minimized persistent file-disposal backlog/lease/error aggregates, no private identifiers. Targeted11/full Node174/build/lint/typecheck/syntax/diff PASS. Added native failure/retry/HTTP status proof pending. CAca1dac3 FARO37767565096/CI37767565030 SUCCESS; CB e78bc95 native acceptance pending. Whole plan/release PARTIAL; continue.

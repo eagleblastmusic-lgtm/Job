@@ -45,7 +45,7 @@ export async function proveNativeHttp(database,config){
   await json('/api/faro/attempts',candidate.cookie);await json(`/api/faro/processes/${process.id}/interviews`,candidate.cookie);
   await json('/api/faro/notifications',owner.cookie);
   await json('/api/faro/worker/tick',moderator.cookie,'POST',{});
-  await json('/api/faro/worker/status',moderator.cookie);
+  const workerStatus=await json('/api/faro/worker/status',moderator.cookie);assert.deepEqual(workerStatus.fileDisposals,{pending:0,ready:0,retrying:0,leased:0,failed:0,oldestRequestedAt:null});await json('/api/faro/worker/status',candidate.cookie,'GET',undefined,403);
   const token=hashSessionToken(candidate.cookie.split('=')[1]);await database.query('DELETE FROM sessions WHERE token_hash=$1',[token]);await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Unauthorized',expectedVersion:1,availability:{kind:'IMMEDIATE'}},401);
   const login=await request('/api/auth/login','','POST',{email:'http-candidate@example.pl',password:'Bezpieczne123'});candidate.cookie=login.cookie;
   const uploadKey=`uploads/${candidate.id}/synthetic-private.txt`;await mkdir(join(config.dataDir,'uploads',candidate.id),{recursive:true});await writeFile(join(config.dataDir,uploadKey),'synthetic retained private file');await database.query("INSERT INTO uploaded_files(id,user_id,kind,original_name,mime_type,storage_key,size_bytes,sha256,created_at) VALUES($1,$2,'CV','synthetic.txt','text/plain',$3,31,'synthetic',$4)",['http-upload-'+candidate.id,candidate.id,uploadKey,new Date().toISOString()]);

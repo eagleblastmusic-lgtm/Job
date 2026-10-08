@@ -1,3 +1,4 @@
+import { fileDisposalStatusQuery } from './fileDisposalModel.js';
 import { clearSessionCookie } from '../app.js';
 import { revokeSessionsQueries } from './identityAccessModel.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -33,7 +34,7 @@ export function createFaroApi(db: JobDatabase, store: AppStore, config: AppConfi
     runWorker:()=>worker.run(),
     notifications:()=>{recruitment.deliverOutbox();},
     notificationRows:(userId:string)=>db.db.prepare('SELECT id,message,entity_type,entity_id,read_at,created_at FROM notifications WHERE user_id=? AND dedupe_key LIKE ? ORDER BY created_at DESC LIMIT 100').all(userId,'faro:%'),
-    workerRows:()=>({outbox:db.db.prepare('SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status').all(),leases:db.db.prepare("SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>?").get(new Date().toISOString())})
+    workerRows:()=>{const query=fileDisposalStatusQuery(new Date().toISOString());return {fileDisposals:db.db.prepare(query.text).get({$1:query.values[0]!}),outbox:db.db.prepare('SELECT status,COUNT(*) count FROM faro_outbox GROUP BY status').all(),leases:db.db.prepare("SELECT COUNT(*) active FROM faro_outbox WHERE status='PENDING' AND lease_until>?").get(new Date().toISOString())};}
   };
   return async (req: IncomingMessage, res: ServerResponse, path: string) => {
     if (!path.startsWith('/api/faro/')) return false;
@@ -72,7 +73,7 @@ export interface FaroRouteServices {
  runWorker():boolean|Promise<boolean>;
  notifications():unknown|Promise<unknown>;
  notificationRows(userId:string):unknown|Promise<unknown>;
- workerRows():{outbox:unknown;leases:unknown}|Promise<{outbox:unknown;leases:unknown}>;
+ workerRows():{outbox:unknown;leases:unknown;fileDisposals:unknown}|Promise<{outbox:unknown;leases:unknown;fileDisposals:unknown}>;
 }
 /** One canonical route contract shared by SQLite and PostgreSQL adapters. */
 export async function routeFaroApi(req:IncomingMessage,res:ServerResponse,path:string,config:AppConfig,user:ReturnType<typeof requireExtendedUser>,body:Record<string,unknown>,services:FaroRouteServices,worker:FaroWorker){
