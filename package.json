@@ -28,7 +28,8 @@
     "test:faro": "npm run build && node --test dist/tests/faro-*.test.js dist/tests/auth-security.test.js dist/tests/admin-security.test.js dist/tests/security.test.js dist/tests/http-proxy-security.test.js dist/tests/consents.test.js dist/tests/config.test.js dist/tests/health.test.js",
     "test:browser:faro": "npm run test:browser",
     "verify:postgres:source": "npm run build && node scripts/faro-postgres-exercise.mjs --source-only",
-    "verify:postgres:rehearsal": "npm run build && node scripts/faro-postgres-exercise.mjs"
+    "verify:postgres:rehearsal": "npm run build && node scripts/faro-postgres-exercise.mjs",
+    "verify:postgres:local": "npm run build && node scripts/faro-postgres-local.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

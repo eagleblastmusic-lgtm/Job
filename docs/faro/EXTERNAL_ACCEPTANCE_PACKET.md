@@ -81,3 +81,8 @@ Latest technical acceptance2026-10-08:396a5e9 FARO37798340585/CI37798340448 SUCC
 ## CP11-CR — Restored Render connector and staging refresh (2026-10-08)
 
 [Actual evidence](CP11_CR_RENDER_CONNECTOR_STAGING_REFRESH.md). Authenticated MCP inventory confirms the existing free staging and zero PostgreSQL instances; Dashboard confirms SQLite/worker disabled. Supersedes missing-tool statements. Accepted main1f00366 FARO37799063032/CI37799063088 deployed free service as dep-db3tb60473hc73bstvl0 Live; actual synthetic HTTPS smoke/account cleanup PASS, no app error entries. No paid resource, database or production activation. Native schema preparation still needs protected write-capable PostgreSQL connection/CLI: connector SQL is read-only. Whole plan/release PARTIAL; external decisions/evidence unchanged.
+
+
+## CP11-CS — Local PostgreSQL18 (2026-10-08)
+
+[Actual local evidence and command](CP11_CS_LOCAL_POSTGRES18.md). User chose local isolation first. New disposable loopback/SCRAM runner accepted PostgreSQL18.6/Node24.19.0:72 tables/37 migrations, full native HTTP/auth/MFA/privacy/worker/recovery/cutover proof and28 desktop/mobile browser cases PASS. Server stopped and own temp cluster cleaned. No Windows service, paid resource or production migration. Local migration acceptance does not require Render credentials; prior request for those credentials as a test prerequisite is superseded. Render has no PostgreSQL instance; hosted connection/custody and external acceptances remain open. Whole plan/release PARTIAL.
