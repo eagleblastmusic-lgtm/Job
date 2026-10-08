@@ -1167,3 +1167,6 @@ No hosting on Render was requested. Workspace confirmation only authorized inspe
 
 
 CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCCESS, all jobs including PostgreSQL18 Node22/24 actual encrypted CLI backup/authority/physical restore and26 native browser executions/version. CK e331291 FARO37780567739/CI37780567753 SUCCESS. Free staging document passes official schema; no Render deployment performed or platform availability claimed. Current blocker for authorized free deployment is confirmed missing Render installation/authentication, not cost approval; integration restoration is the required user action. No paid resources, database, disk or production release authorized. Independent external decisions/secrets/custody and broader provider/graph/executor validation remain open; entire plan PARTIAL.
+
+
+CM final103a4e4 actual acceptance2026-10-08: FARO37791470294/CI37791470540 SUCCESS, every job including PostgreSQL18 Node22/24 native browser acceptance and container/recovery. Local full Node179 PASS, zero skips; four smoke regressions retained. Free staging remains isolated and production Faro gated; whole plan/release PARTIAL.

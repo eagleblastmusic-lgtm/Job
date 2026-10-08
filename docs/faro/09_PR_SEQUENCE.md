@@ -626,3 +626,6 @@ CK/CL actual acceptance2026-10-08:3597302 FARO37780729584 and CI37780729634 SUCC
 ## CP11-CM — Bounded staging cold-start acceptance (2026-10-08)
 
 [Scope](CP11_CM_STAGING_COLD_START.md). Initial public health waits within90 seconds,60-second per-request cap, retries only transport/502/503/504. Account writes and later endpoint reads are not replayed. All4 smoke regressions/build/lint/typecheck/diff and actual Render public HTTPS smoke PASS. Existing account cleanup and production-gate tests retained after correcting an initial test-file replacement. Remote acceptance pending. Whole plan/release PARTIAL.
+
+
+CM final103a4e4 actual acceptance2026-10-08: FARO37791470294/CI37791470540 SUCCESS, every job including PostgreSQL18 Node22/24 native browser acceptance and container/recovery. Local full Node179 PASS, zero skips; four smoke regressions retained. Free staging remains isolated and production Faro gated; whole plan/release PARTIAL.

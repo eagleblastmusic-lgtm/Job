@@ -1,5 +1,7 @@
 # FARO — external acceptance packet (2026-10-06)
 
+Current hosting evidence2026-10-08 supersedes historical hosting statements below: user approved free Render staging; confirmed Bartosz workspace was inspected before provisioning. https://faro-free-staging.onrender.com is Live, Docker/Free/Frankfurt, main397e215, service srv-db3pb9rncjis73banf90. Actual public and synthetic HTTPS smoke plus own-account cleanup PASS; production Faro remains503 RELEASE_GATES_OPEN. Auto-deploy off and Blueprint Auto Sync No; no paid resource, database, disk or billing change. Evidence is in CP11_CK_FREE_RENDER_STAGING.md. This disposable SQLite staging does not prove production persistence or PostgreSQL cutover. Every external decision/owner below remains MISSING/UNASSIGNED.
+
 Prepared from the existing Canonical plan and actual implementation evidence. User reported no external acceptance evidence. Every external decision below is MISSING; reviewers/owners are UNASSIGNED. This packet organizes review, does not provide a legal opinion, substitute independent assessment, invent participants or enable production. Runtime recruitment remains503 RELEASE_GATES_OPEN and production scheduler stays disabled. Existing approved login is preserved.
 
 ## Concrete scope for review
