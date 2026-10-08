@@ -14,3 +14,5 @@ npm.cmd run verify:postgres:local
 ```
 
 Render connection is unnecessary for these tests. Render MCP inventory found no staging PostgreSQL, so no instructions for a nonexistent database secret are asserted. Actual hosted PostgreSQL integration later needs protected write access and reviewed prepared schema; read-only connector SQL cannot perform migrations. No paid database or production deployment authorized. Native/local test PASS is not production persistence/custody/RPO/RTO or external legal/security/manual/user acceptance. Whole plan/release PARTIAL.
+
+Remote FARO acceptance2026-10-08:f375f8a FARO37820553760 SUCCESS, every job including real PostgreSQL18 Node22/24 HTTP/recovery and native browser contracts, default browsers/contracts and container. General CI37820553769 SUCCESS. Actual logs confirm28 native browser cases/version,38 default browser cases and retained contracts/recovery/container PASS. Full technical acceptance is confirmed; no production/external release acceptance inferred.
