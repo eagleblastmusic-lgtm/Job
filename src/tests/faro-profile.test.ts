@@ -50,8 +50,20 @@ test('activity is private, proposals require confirmation, projection is allowli
     for (const forbidden of ['Tajna Firma','Kowalska','kierownik','500100200','SECRET','surname','photo','watchlist']) assert.ok(!serialized.includes(forbidden), forbidden);
     const own = new ProfileService(f.app.db).profile(candidate.id);
     assert.equal(own.claims[0]!.version, 1); assert.equal(own.claims[0]!.practice.quantity, 3);
-    await f.request(`/api/faro/claims/${own.claims[0]!.id}`, candidate.cookie, 'DELETE');
+    const claimId=own.claims[0]!.id,withdrawUrl=`/api/faro/claims/${claimId}`;
+    await f.request(withdrawUrl,other.cookie,'DELETE',{},404);
+    f.app.db.db.exec("CREATE TRIGGER reject_withdrawal_audit BEFORE INSERT ON audit_logs WHEN NEW.action='SKILL_WITHDRAWN' BEGIN SELECT RAISE(ABORT,'synthetic audit failure'); END");
+    await f.request(withdrawUrl,candidate.cookie,'DELETE',{},500);
+    assert.deepEqual(new ProfileService(f.app.db).profile(candidate.id),own);
+    assert.deepEqual(await f.request('/api/faro/profile/preview',candidate.cookie),preview);
+    f.app.db.db.exec('DROP TRIGGER reject_withdrawal_audit');
+    await f.request(withdrawUrl, candidate.cookie, 'DELETE');
     assert.equal(new ProfileService(f.app.db).projection(candidate.id).skillClaims.length, 0);
+    await f.request(withdrawUrl,candidate.cookie,'DELETE',{},404);
+    const history=f.app.db.db.prepare('SELECT version,confirmed_at,revoked_at FROM faro_claims WHERE id=?').get(claimId);
+    assert.equal(history!.version,1);assert.equal(history!.confirmed_at,own.claims[0]!.confirmedAt);assert.ok(history!.revoked_at);
+    const audit=f.app.db.db.prepare("SELECT entity_id,metadata FROM audit_logs WHERE user_id=? AND action='SKILL_WITHDRAWN'").all(candidate.id);
+    assert.deepEqual(audit.map(a=>({...a})),[{entity_id:claimId,metadata:'{}'}]);
   } finally { await f.close(); }
 });
 

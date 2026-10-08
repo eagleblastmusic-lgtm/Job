@@ -90,6 +90,7 @@ export function profileClaimQueries(userId:string,body:Record<string,unknown>,as
 export function profileRevokeQuery(userId:string,id:string,asOf:string) {
   return {text:'UPDATE faro_claims SET revoked_at=$1 WHERE id=$2 AND user_id=$3 AND revoked_at IS NULL RETURNING id',values:[asOf,id,userId]};
 }
+export function profileRevokeAuditQuery(userId:string,id:string,asOf:string) {return profileAuditQuery(userId,'SKILL_WITHDRAWN',id,asOf);}
 export function profileLearningQuery(userId:string,body:Record<string,unknown>) {
   const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
   return {text:'INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice',values:[userId,skillId,choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const),JSON.stringify(profilePractice(body.practice))]};
@@ -141,7 +142,7 @@ export async function addProfileClaim(database:ProfileWriteDatabase,userId:strin
   return database.transaction(async()=>{for(const query of queries)await database.query(query.text,query.values);return readProfile(database,userId,asOf);});
 }
 export async function revokeProfileClaim(database:ProfileWriteDatabase,userId:string,id:string,asOf:string) {
-  return database.transaction(async()=>{const query=profileRevokeQuery(userId,id,asOf);const rows=await database.readBatch([query]);if(!rows[0]?.length)throw new HttpError(404,'Nie znaleziono deklaracji.');});
+  return database.transaction(async()=>{const query=profileRevokeQuery(userId,id,asOf);const rows=await database.readBatch([query]);if(!rows[0]?.length)throw new HttpError(404,'Nie znaleziono deklaracji.');const audit=profileRevokeAuditQuery(userId,id,asOf);await database.query(audit.text,audit.values);});
 }
 export async function saveProfileLearning(database:ProfileWriteDatabase,userId:string,body:Record<string,unknown>,asOf:string) {
   const query=profileLearningQuery(userId,body);

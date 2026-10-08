@@ -261,7 +261,13 @@ try {
     const declared=await addProfileClaim(client,candidate.id,declaration,asOf);assert.equal(declared.claims.length,1);assert.equal(declared.claims[0].version,2);assert.equal(declared.claims[0].verification,'DECLARED');assert.equal((await client.query('SELECT revoked_at FROM faro_claims WHERE id=$1',[originalProfile.claims[0].id])).rows[0].revoked_at,asOf);
     await assert.rejects(()=>addProfileClaim(client,candidate.id,{...declaration,confirmed:false},asOf),error=>error.code==='CONFIRMATION_REQUIRED');assert.deepEqual((await readProfile(client,candidate.id,asOf)).claims,declared.claims);
     await assert.rejects(()=>revokeProfileClaim(client,employer.id,declared.claims[0].id,asOf),error=>error.status===404);
+    await client.query("ALTER TABLE audit_logs ADD CONSTRAINT pg_withdraw_audit_guard CHECK(action<>'SKILL_WITHDRAWN') NOT VALID");
+    await assert.rejects(()=>revokeProfileClaim(client,candidate.id,declared.claims[0].id,asOf),error=>error.code==='23514');
+    assert.deepEqual(await readProfile(client,candidate.id,asOf),declared);
+    await client.query('ALTER TABLE audit_logs DROP CONSTRAINT pg_withdraw_audit_guard');
     await revokeProfileClaim(client,candidate.id,declared.claims[0].id,asOf);await assert.rejects(()=>revokeProfileClaim(client,candidate.id,declared.claims[0].id,asOf),error=>error.status===404);
+    const withdrawalAudit=(await client.query("SELECT entity_id,metadata FROM audit_logs WHERE user_id=$1 AND action='SKILL_WITHDRAWN' AND entity_id=$2",[candidate.id,declared.claims[0].id])).rows;
+    assert.deepEqual(withdrawalAudit,[{entity_id:declared.claims[0].id,metadata:'{}'}]);
     const redeclared=await addProfileClaim(client,candidate.id,declaration,asOf);assert.equal(redeclared.claims[0].version,3);
     const learning=await saveProfileLearning(client,candidate.id,{skillId:declaration.skillId,mode:'SELF_DEVELOPING',practice:{quantity:null,unit:'MONTHS'}},asOf);assert.equal(learning.learning.length,2);
     const updatedLearning=await saveProfileLearning(client,candidate.id,{skillId:declaration.skillId,mode:'SELF_DEVELOPING',practice:{quantity:2,unit:'MONTHS'}},asOf);assert.equal(updatedLearning.learning.length,2);assert.equal(updatedLearning.learning.find(item=>item.mode==='SELF_DEVELOPING').practice.quantity,2);

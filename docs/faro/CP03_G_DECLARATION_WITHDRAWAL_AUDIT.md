@@ -1,0 +1,7 @@
+# CP03-G — Atomic declaration withdrawal audit
+
+DELTA_REQUIRED: explicit declaration creation records an audit, but withdrawal previously changed revoked_at without recording the corresponding event. Extend the existing owner-scoped withdrawal on SQLite and PostgreSQL with SKILL_WITHDRAWN, entity ID and empty metadata. No private activity, employer/title, skill label or practice is copied to audit. Revocation and audit commit or roll back together.
+
+Keep existing DELETE /api/faro/claims/:id and UI contract. Foreign, nonexistent and already withdrawn IDs return404 without new events. Historical claim version and confirmedAt remain; revoked_at removes the claim from current profile/matching/projection, while submitted recruitment snapshots remain immutable. No schema, client, migration or automatic competence expiry change.
+
+Actual HTTP regression injects an audit failure and verifies the complete profile/projection remain unchanged, then verifies successful withdrawal, retained history and one minimized event after a rejected replay. Existing native PostgreSQL exercise injects the same failure through a real CHECK constraint and requires rollback, foreign denial and one audit after success. Local build, profile5/5, lint/typecheck/script syntax/diff PASS. Exact required broader CI/native acceptance pending at commit time. Reuse accepted CP03-F browser/recovery evidence for unchanged inputs until required CI completes. No hosted configuration, new/paid resource or production operation; full plan/release PARTIAL and external dependencies remain open.

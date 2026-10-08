@@ -1244,3 +1244,8 @@ CP03-E exact final acceptance: 9ccbfd2 FARO37850875499 and CI37850875593 SUCCESS
 
 
 CP03-F exact acceptance2026-10-09: f08e62f FARO37853704003 and CI37853704140 SUCCESS, every required job, including PostgreSQL18 Node22/24 native deletion/audit rollback and desktop/mobile browser journeys. Full local Node187/targeted8 and targeted browsers2 PASS, zero skips. Accepted commit deployed to existing Free staging in Bartosz's workspace as dep-db41kihsrm7s73aj0aqg, Live in58.1s at00:34:44 Europe/Warsaw. Startup retained existing schema (process l8jhb); actual synthetic HTTPS smoke and account cleanup PASS, production gate remains closed. No new resource, plan/key/connection/schema change or production operation. Screenshot retained locally outside Git. Whole plan/release PARTIAL; external provider/license/independent validation and production custody dependencies remain open.
+
+
+## CP03-G — Atomic declaration withdrawal audit
+
+[Scope](CP03_G_DECLARATION_WITHDRAWAL_AUDIT.md). Existing owner-scoped withdrawal now commits revoked_at and minimal SKILL_WITHDRAWN audit together on SQLite/PostgreSQL. Actual API audit-failure rollback, preserved profile/projection/history and single audit after rejected replay PASS; build/profile5/lint/typecheck/syntax/diff PASS. Required native/broader CI pending. No schema/client/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.

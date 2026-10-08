@@ -1,6 +1,6 @@
 import { organizationCreatePlan,organizationVerificationReadQueries,organizationVerifyQueries,organizationInvitePlan,organizationInviteReadQuery,organizationInviteFromRows,organizationExistingMemberQuery,organizationInviteAcceptPlan,organizationRevokeQueries } from './organizationWriteModel.js';
 import { organizationsReadQuery } from './organizationReadModel.js';
-import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileLearningQuery,profileLearningEntryQuery,profileLearningRemovalQueries,profileActivityQueries,profileActivityRemovalQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
+import { parseProfileSave,profileSaveQueries,profileAvailability,parseProfileConstraints,profileConstraintsQuery,profilePractice,profileClaimQueries,profileRevokeQuery,profileRevokeAuditQuery,profileLearningQuery,profileLearningEntryQuery,profileLearningRemovalQueries,profileActivityQueries,profileActivityRemovalQueries,profileProposalQuery,profileProposalDecisionQueries } from './profileWriteModel.js';
 import { profileReadQueries,profileFromRows,profileProjection,profilePreview } from './profileReadModel.js';
 import { FaroStore } from './base.js';
 import { DEFAULT_CONSTRAINTS,type CandidateConstraints } from '../../domain/faro/offers.js';
@@ -44,8 +44,11 @@ export class ProfileService extends FaroStore {
   claim(userId:string,body:Record<string,unknown>) {this.runQueries(profileClaimQueries(userId,body,this.now()));}
   addClaim(userId:string,body:Record<string,unknown>) {this.transaction(()=>this.claim(userId,body));return this.profile(userId);}
   revoke(userId:string,id:string) {
-    const query=profileRevokeQuery(userId,id,this.now());
-    if(!this.db.prepare(query.text).get({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!}))throw new HttpError(404,'Nie znaleziono deklaracji.');
+    const asOf=this.now(),query=profileRevokeQuery(userId,id,asOf);
+    this.transaction(()=>{
+      if(!this.db.prepare(query.text).get({$1:query.values[0]!,$2:query.values[1]!,$3:query.values[2]!}))throw new HttpError(404,'Nie znaleziono deklaracji.');
+      this.runQueries([profileRevokeAuditQuery(userId,id,asOf)]);
+    });
   }
   learn(userId:string,body:Record<string,unknown>) {this.runQueries([profileLearningQuery(userId,body)]);return this.profile(userId);}
   removeLearning(userId:string,body:Record<string,unknown>) {
