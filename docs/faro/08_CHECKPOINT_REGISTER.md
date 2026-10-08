@@ -1146,3 +1146,8 @@ CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exerc
 ## CP11-CE — Disposal directory confinement (2026-10-08)
 
 [Scope](CP11_CE_DISPOSAL_DIRECTORY_CONFINEMENT.md). Reject redirected unlink parents, retain queue retry and preserve missing-file idempotency. Full Node175/build/lint/typecheck PASS; native sentinel proof pending. Whole plan/release PARTIAL; production/operator/external gates remain open.
+
+
+## CP11-CF — Canonical staging smoke (2026-10-08)
+
+[Scope](CP11_CF_CANONICAL_STAGING_SMOKE.md). Public reads by default; explicit synthetic mode checks actual Canonical and erases test account. Full Node177/build/lint/typecheck/syntax/diff PASS, native smoke pending. CD6d9fb99 FARO37770052739/CI37770052754 SUCCESS including physical recovery. Whole plan/release PARTIAL; production/platform/custody/external gates open.

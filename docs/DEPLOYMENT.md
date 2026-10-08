@@ -70,18 +70,15 @@ After the service is created from the Blueprint, run the disposable automated sm
 STAGING_URL=https://job-mvp-staging.onrender.com npm run smoke:staging
 ```
 
-The smoke command checks health/legal surfaces, creates a unique synthetic account with analytics disabled, exercises profile → Career Truth → job parser → Decision Engine → application → outcome → export, and finally logs out the synthetic session. It intentionally does not bypass the password re-authentication required by the real account-deletion flow. Synthetic records may remain until the disposable Render filesystem is recycled.
+Default smoke mode only reads public health/legal surfaces and requires database/storage readiness. It does not create an account or claim release acceptance. An operator-approved isolated synthetic run uses:
 
-For each staging acceptance run:
+```bash
+STAGING_URL=https://approved-staging.example npm run smoke:staging -- --synthetic-account --operator-confirmed
+```
 
-1. confirm the deployed commit is the intended `main` revision,
-2. confirm `/api/health` returns HTTP 200 and reports `database: "ok"`,
-3. confirm the smoke command ends with `STAGING_SMOKE_OK` and `STAGING_SMOKE_SESSION_CLEANUP_OK`,
-4. exercise one browser flow from registration through Decision Card on mobile and desktop widths,
-5. inspect recent service logs for uncaught errors,
-6. confirm synthetic CV/raw job text is not emitted to product analytics or general logs,
-7. confirm rate limiting distinguishes synthetic requests with different platform-forwarded client addresses rather than collapsing all clients onto the proxy socket address,
-8. treat synthetic records remaining after the run as expendable and never use persistence across Render lifecycle events as an acceptance requirement.
+The synthetic mode checks free-first registration, optional analytics disabled, own export and retired API410; it expects the production FARO gate503 RELEASE_GATES_OPEN. It deletes the synthetic account using its actual password and verifies session invalidation. Cleanup failure fails the command and requires operator review. Never run synthetic writes on an unapproved target. For isolated non-production fixtures only, --expect-faro-open checks the available Canonical profile instead of the closed production gate.
+
+Record the intended deployed commit, public health/database/storage status, minimal smoke PASS/cleanup result, actual Canonical desktop/mobile browser flows, minimized operator errors and platform-forwarded rate-limit behavior. Network smoke is additional evidence; it does not certify persistent storage, production release, backup key custody, RPO/RTO or manual accessibility.
 
 The repository CI already exercises lint, strict TypeScript, migration validation, API/unit tests, semantic backup/restore to another filesystem root, Chromium E2E on desktop/mobile, production container build and container smoke test. Render staging is an additional real-host/network gate, not a replacement for CI.
 
