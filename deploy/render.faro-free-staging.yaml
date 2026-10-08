@@ -1,0 +1,55 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "faro-free-staging",
+      "runtime": "docker",
+      "repo": "https://github.com/eagleblastmusic-lgtm/Job",
+      "branch": "main",
+      "region": "frankfurt",
+      "plan": "free",
+      "autoDeployTrigger": "off",
+      "healthCheckPath": "/api/health",
+      "dockerfilePath": "./Dockerfile",
+      "numInstances": 1,
+      "envVars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "PORT",
+          "value": "10000"
+        },
+        {
+          "key": "DATA_DIR",
+          "value": "/app/data"
+        },
+        {
+          "key": "DATABASE_PATH",
+          "value": "/app/data/job.sqlite"
+        },
+        {
+          "key": "TRUST_PROXY",
+          "value": "true"
+        },
+        {
+          "key": "SESSION_DAYS",
+          "value": "1"
+        },
+        {
+          "key": "MAX_UPLOAD_BYTES",
+          "value": "5242880"
+        },
+        {
+          "key": "FARO_DATABASE_ENGINE",
+          "value": "sqlite"
+        },
+        {
+          "key": "FARO_WORKER_ENABLED",
+          "value": "false"
+        }
+      ]
+    }
+  ]
+}
