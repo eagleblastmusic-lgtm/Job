@@ -1234,3 +1234,6 @@ CY exact final acceptance2026-10-09:054196a FARO37856922577 and CI37856922591 SU
 ## CP02-I — Phone input boundary
 
 [Scope](CP02_I_PHONE_INPUT_BOUNDARY.md). Shared profile parser rejects formatting-only and falsy non-string phones instead of clearing contact. Valid formatting/explicit clearing retained; exact-number consent semantics unchanged. Actual API invalid writes preserve profile and grants; native exercise includes same refusals. Local25/augmented contact1/build/lint PASS; final required CI pending. No client/schema/migration/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.
+
+
+CP02-I exact final acceptance2026-10-09:e127089 FARO37857818844 and CI37857818846 SUCCESS, every required job. PostgreSQL18 Node22/24 rejects invalid phone edits with profile/audit state retained; native/default desktop/mobile browsers, full contracts and container/recovery checks accepted. Local profile/recruitment25 and final contact1/build/lint/typecheck/syntax/diff PASS. No schema/client/hosted configuration or production change. Staging remains accepted f08e62f; whole plan/release PARTIAL and independent external dependencies unchanged.
