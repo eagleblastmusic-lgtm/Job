@@ -3,7 +3,7 @@ import type { RecoveryLedger } from './recoveryService.js';
 import { eraseDerivativesOwned } from './privacyErasureModel.js';
 interface RecoveryDatabase {readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;query(text:string,values:readonly unknown[]):Promise<unknown>;transaction<T>(work:()=>T|Promise<T>):Promise<T>;}
 /** Offline reconciliation is confined to a new recovery/rehearsal schema, never the live runtime. */
-export async function reconcileRecovery(database:RecoveryDatabase,ledger:RecoveryLedger,asOf:string,authorizeOperator:()=>void|Promise<void>){
+export async function reconcileRecovery(database:RecoveryDatabase,ledger:RecoveryLedger,asOf:string,authorizeOperator:()=>void|Promise<void>,privateFilesVerified=false){
  return database.transaction(async()=>{
   await authorizeOperator();
   const read=async(text:string,values:readonly unknown[]=[])=>((await database.readBatch([{text,values}]))[0]??[]);
@@ -11,7 +11,15 @@ export async function reconcileRecovery(database:RecoveryDatabase,ledger:Recover
   const write=(text:string,values:readonly unknown[]=[])=>database.query(text,values);
   const schema=(await get('SELECT current_schema() schema'))?.schema;
   if(typeof schema!=='string'||!/^faro_(recovery|rehearsal)_[a-z0-9_]{1,40}$/.test(schema))throw new Error('Isolated offline recovery schema required.');
-  if((await read('SELECT 1 FROM uploaded_files LIMIT 1')).length)throw new Error('Retained upload recovery requires a reviewed physical-file procedure.');
+  const uploaded=await read('SELECT id,user_id,storage_key,size_bytes,sha256 FROM uploaded_files');
+  if(uploaded.length){
+   if(!privateFilesVerified)throw new Error('Retained upload recovery requires a reviewed physical-file procedure.');
+   if(!Array.isArray(ledger.uploads))throw new Error('Missing current private file authority.');
+   if(ledger.uploads.some(file=>typeof file.id!=='string'||typeof file.user_id!=='string'||typeof file.storage_key!=='string'||file.storage_key.split('/')[1]!==file.user_id||!/^[a-f0-9]{64}$/.test(file.sha256)||!Number.isSafeInteger(file.size_bytes)||file.size_bytes<0))throw new Error('Invalid current private file authority.');
+   const currentFiles=new Map(ledger.uploads.map(file=>[file.id,file]));
+   if(currentFiles.size!==ledger.uploads.length)throw new Error('Ambiguous current private file authority.');
+   for(const file of uploaded){const current=currentFiles.get(file.id as string);if(!current||current.user_id!==file.user_id||current.storage_key!==file.storage_key||current.size_bytes!==file.size_bytes||current.sha256!==file.sha256)await write('DELETE FROM uploaded_files WHERE id=$1',[file.id]);}
+  }
   if(!Number.isFinite(Date.parse(asOf)))throw new Error('Invalid recovery time.');
   const hashes=new Set<string>(),erasedAt=new Map<string,string>();
   for(const item of ledger.erasures){if(!/^[a-f0-9]{64}$/.test(item.subject_hash)||item.policy_version!=='local-erasure-v1'||!Number.isFinite(Date.parse(item.erased_at))||hashes.has(item.subject_hash))throw new Error('Invalid current erasure ledger.');hashes.add(item.subject_hash);erasedAt.set(item.subject_hash,item.erased_at);}

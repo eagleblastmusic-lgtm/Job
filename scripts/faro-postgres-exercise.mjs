@@ -1,3 +1,4 @@
+import {proveNativePrivateFileRecovery} from './faro-postgres-private-file-recovery-proof.mjs';
 import { proveNativeRequestLimits } from './faro-postgres-request-limit-proof.mjs';
 import { proveNativeMfaRotation } from './faro-postgres-mfa-rotation-proof.mjs';
 import { proveNativeCutover } from './faro-postgres-cutover-proof.mjs';
@@ -668,6 +669,7 @@ try {
     await nativeProof('MFA_ROTATION',()=>proveNativeMfaRotation(snapshot,candidate));
     await nativeProof('CUTOVER',()=>proveNativeCutover(snapshot,f,candidate,process));
     await nativeProof('RECOVERY',()=>proveNativeRecovery(snapshot,candidate,employer,org,offer));
+    await nativeProof('PRIVATE_FILE_RECOVERY',()=>proveNativePrivateFileRecovery(snapshot,candidate,employer));
     await nativeProof('FILE_DISPOSAL',()=>proveNativeFileDisposal(client,f.app.config.dataDir,schema));
     await nativeProof('REQUEST_LIMITS',()=>proveNativeRequestLimits(snapshot));
     await nativeProof('HTTP',()=>proveNativeHttp(client,f.app.config));

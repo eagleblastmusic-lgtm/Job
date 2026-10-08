@@ -1,6 +1,7 @@
 import type { RecoveryLedger } from './recoveryService.js';
 /** Sensitive operational authority only. Never mount as a public export or diagnostic. */
 export const recoveryLedgerQueries=[
+ {key:'uploads',text:'SELECT id,user_id,storage_key,size_bytes,sha256 FROM uploaded_files'},
  {key:'erasures',text:'SELECT subject_hash,erased_at,policy_version FROM faro_erasure_log'},
  {key:'owners',text:"SELECT organization_id,user_id FROM faro_members WHERE role='OWNER' AND active=1"},
  {key:'members',text:'SELECT organization_id,user_id,role FROM faro_members WHERE active=1'},

@@ -9,6 +9,7 @@ export interface RecoveryLedger {
   assignments:Array<{offer_id:string;user_id:string}>;
   /** Sensitive authority snapshot: never log or serialize this input to diagnostics. */
   accounts:Array<{id:string;role:'USER'|'ADMIN';password_hash:string;email:string;name:string}>;
+  uploads?:Array<{id:string;user_id:string;storage_key:string;size_bytes:number;sha256:string}>;
   mfa?:Array<{user_id:string;active_cipher:string;last_counter:number;activated_at:string}>;
   mfaRecovery?:Array<{user_id:string;code_hash:string;used_at:string|null}>;
   mfaLimits?:Array<{user_id:string;failures:number;window_start:string}>;

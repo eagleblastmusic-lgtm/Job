@@ -1101,3 +1101,8 @@ CB full local check PASS173 Node/37 migrations/lint/typecheck/both restore exerc
 ## CP11-CC — Durable disposal operator diagnostics (2026-10-08)
 
 [Scope](CP11_CC_DISPOSAL_OPERATOR_DIAGNOSTICS.md). Shared admin-only minimized persistent file-disposal backlog/lease/error aggregates, no private identifiers. Targeted11/full Node174/build/lint/typecheck/syntax/diff PASS. Added native failure/retry/HTTP status proof pending. CAca1dac3 FARO37767565096/CI37767565030 SUCCESS; CB e78bc95 native acceptance pending. Whole plan/release PARTIAL; continue.
+
+
+## CP11-CD — Encrypted offline private-file recovery (2026-10-08)
+
+[Scope](CP11_CD_PRIVATE_FILE_RECOVERY.md). Extend existing backup/isolated recovery with encrypted verified private files and independent current upload authority, no erased/stale resurrection. Full local174/37 migrations/both restores/38 browsers and standalone3 PASS. Actual PostgreSQL CLI proof pending. CCedb1018 FARO37768731595 SUCCESS; CBe78bc95 FARO37768363699 SUCCESS. Production/custody/RPO/RTO/external gates open; whole plan/release PARTIAL; continue.
