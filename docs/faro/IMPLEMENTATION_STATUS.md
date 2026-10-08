@@ -1078,3 +1078,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BY — Isolated PostgreSQL recovery CLI
 
 [Scope](CP11_BY_ISOLATED_POSTGRES_RECOVERY_CLI.md). Authenticated explicit backup/current-ledger artifacts, reviewed schema/import/reconciliation and new-target-only fail-closed cleanup. Local required-input refusal/lint/syntax/diff PASS; native CLI pending. BX native artifact proofs passed, full run37764367217 pending. BV57f6f49 FARO37763865493/CI37763865523 SUCCESS. Production/custody/physical restore/RPO/RTO and external gates open; whole plan/release PARTIAL; continue.
+
+
+## CP11-BZ — Durable PostgreSQL request limits
+
+[Scope](CP11_BZ_DURABLE_POSTGRES_REQUEST_LIMITS.md). Shared hashed expiring transactional rate charges preserve auth/command policies across connections/restart; explicit protected key required. Full local PASS172/37 migrations/both restores/38 browsers; final targeted rollback/build/static/source72 tables37 migrations PASS. Actual PostgreSQL parallel/restart/rollback proof pending. BY2b1a5b9 FARO37764742956/CI37764743000 SUCCESS. All open historical FARO PR heads already ancestors of main; independent review still open. Whole plan/release PARTIAL; continue.

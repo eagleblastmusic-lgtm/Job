@@ -21,7 +21,7 @@ export async function extract(source){
     if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok'||db.prepare('PRAGMA foreign_key_check').all().length)throw new Error('Source integrity failed.');
     const schema=db.prepare(schemaQuery).all();if(fingerprint(schema)!==fingerprint(expected))throw new Error('Source schema does not match current migrations.');
     const versions=db.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    if(versions.length!==36||versions.at(-1).version!=='0036_faro_file_disposal')throw new Error('Rehearsal supports the reviewed 0036 schema only.');
+    if(versions.length!==37||versions.at(-1).version!=='0037_faro_request_limits')throw new Error('Rehearsal supports the reviewed 0037 schema only.');
     if(JSON.stringify(versions)!==JSON.stringify(baseline.db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()))throw new Error('Source migration ledger mismatch.');
     const triggers=schema.filter(row=>row.type==='trigger');if(triggers.length!==1||triggers[0].name!=='trg_analytics_requires_consent')throw new Error('Unsupported trigger scope.');
     const tables=schema.filter(row=>row.type==='table').map(table=>{

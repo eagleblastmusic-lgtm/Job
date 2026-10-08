@@ -7,7 +7,7 @@ import { hashSessionToken } from '../dist/server/auth.js';
 
 /** Actual HTTP against the same disposable PostgreSQL schema, no SQLite facade. */
 export async function proveNativeHttp(database,config){
- const app=createConnectedPgFaroApp(database,{...config,faroWorkerEnabled:false});
+ const app=createConnectedPgFaroApp(database,{...config,faroWorkerEnabled:false,faroRateLimitKey:'61'.repeat(32)});
  await new Promise(done=>app.server.listen(0,'127.0.0.1',done));
  const base=`http://127.0.0.1:${app.server.address().port}`;
  async function request(path,cookie='',method='GET',body,status=200,headers={}){const response=await fetch(base+path,{method,headers:{cookie,'content-type':'application/json',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});const value=await response.json();if(response.status!==status)console.error(`FARO_HTTP_STATUS_FAILURE method=${method} route=${path.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/g,':id')} expected=${status} actual=${response.status} code=${value.error?.code??'NONE'}`);assert.equal(response.status,status,'HTTP status contract');assert.equal(response.headers.get('cache-control'),'no-store');return {value,cookie:response.headers.get('set-cookie')?.split(';')[0]};}

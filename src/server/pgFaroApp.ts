@@ -1,3 +1,4 @@
+import { enforceNativeRate } from './faro/requestLimitModel.js';
 import { enqueueFileDisposalsOwned,disposeFiles } from './faro/fileDisposalModel.js';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +7,7 @@ import { resolve } from 'node:path';
 import type { ClientConfig } from 'pg';
 import { PgJobDatabase } from './postgresDb.js';
 import { loadConfig,type AppConfig } from './config.js';
-import { securityHeaders,clientIp,enforceRate,cookieForSession,clearSessionCookie,LEGAL_VERSION } from './app.js';
+import { securityHeaders,clientIp,cookieForSession,clearSessionCookie,LEGAL_VERSION } from './app.js';
 import { enforceExtendedOrigin } from './extendedAuth.js';
 import { HttpError,sendJson,readJson,serveStatic,sendText } from './http.js';
 import { hashSessionToken,parseCookies } from './auth.js';
@@ -30,7 +31,7 @@ export async function createPgFaroApp(options:{connection:ClientConfig;schema:st
 }
 /** Injected connection is already scoped to the validated schema; caller owns its lifecycle. */
 export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partial<AppConfig>={}){
- const config=loadConfig(overrides),rates=new Map<string,{count:number;resetAt:number}>();
+ const config=loadConfig(overrides);
  const worker=new FaroWorker(async()=>{await tickNativeWorker(database,new Date().toISOString(),()=>{});await disposeFiles(database,config.dataDir,new Date().toISOString(),()=>{});},config.faroWorkerEnabled,config.faroWorkerIntervalMs);
  const handleFaro=createPgFaroApi(database,config,worker),publicDir=resolve(process.cwd(),'dist/public');
  const server=createServer(async(req,res)=>{
@@ -45,7 +46,7 @@ export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partia
    if(path==='/api/health'&&method==='GET'){try{await database.query('SELECT 1');ok({ok:true,service:'job',version:'0.1.0',database:'ok',now:now()});}catch{ok({ok:false,service:'job',version:'0.1.0',database:'unavailable',now:now()},503);}return;}
    if(path==='/api/legal'&&method==='GET'){ok({legalVersion:LEGAL_VERSION,termsUrl:'/terms.html',privacyUrl:'/privacy.html'});return;}
    if(/^\/api\/auth\/(register|login)$/.test(path)&&method==='POST'){
-    const registering=path.endsWith('/register');enforceRate(rates,`${registering?'register':'login'}:${clientIp(req,config)}`,registering?15:20,15*60000);
+    const registering=path.endsWith('/register');await enforceNativeRate(database,config.faroRateLimitKey,`${registering?'register':'login'}:${clientIp(req,config)}`,registering?15:20,15*60000);
     const body=await readJson(req),result=registering?await registerAccount(database,body,config,LEGAL_VERSION,now()):await loginAccount(database,body,config.sessionDays,now());
     res.setHeader('set-cookie',cookieForSession(result.token.raw,config));const {user}=result;ok({user:{id:user.id,email:user.email,name:user.name,role:user.role}},registering?201:200);return;
    }
@@ -64,7 +65,7 @@ export function createConnectedPgFaroApp(database:PgJobDatabase,overrides:Partia
     const result=await database.transaction(async()=>{const {user:u}=await authority(),asOf=now();await database.query("INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES($1,$2,'DATA_EXPORTED','user',$2,'{}',$3)",[randomUUID(),u.id,asOf]);const safe={id:u.id,email:u.email,name:u.name,locale:u.locale,timezone:u.timezone,role:u.role,createdAt:u.createdAt,updatedAt:u.updatedAt},queries=Object.entries(accountDataColumns).map(([table,columns])=>({text:table==='job_requirements'?`SELECT ${columns.map(c=>'r.'+c).join(',')} FROM job_requirements r JOIN jobs j ON j.id=r.job_id WHERE j.user_id=$1`:table==='outcomes'?`SELECT ${columns.map(c=>'o.'+c).join(',')} FROM outcomes o JOIN applications a ON a.id=o.application_id WHERE a.user_id=$1`:`SELECT ${columns.join(',')} FROM ${table} WHERE user_id=$1`,values:[u.id]})),rows=await database.readBatch(queries),faro=ownExportFromRows(await database.readBatch(ownExportQueries(u.id)),asOf);return {user:safe,...Object.fromEntries(Object.keys(accountDataColumns).map((table,index)=>[table,rows[index]??[]])),faro};});ok(result);return;
    }
    if(path==='/api/account'&&method==='DELETE'){
-    enforceRate(rates,`account-delete:${user.id}`,5,15*60000);const body=await readJson(req);
+    await enforceNativeRate(database,config.faroRateLimitKey,`account-delete:${user.id}`,5,15*60000);const body=await readJson(req);
     const erased=await eraseAccount(database,tokenHash,body,now(),config.faroRequirePrivilegedMfa,configured,id=>enqueueFileDisposalsOwned(database,id,config.dataDir,now()));
     // Durable queue exists before account removal; a failed unlink stays pending for restart.
     try{await disposeFiles(database,config.dataDir,now(),()=>{});}catch{/* Account erasure committed; durable disposal retries after worker restart. */}res.setHeader('set-cookie',clearSessionCookie(config));ok(erased);return;

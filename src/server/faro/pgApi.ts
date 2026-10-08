@@ -1,3 +1,4 @@
+import { enforceNativeRate } from './requestLimitModel.js';
 import { disposeFiles } from './fileDisposalModel.js';
 import type { IncomingMessage,ServerResponse } from 'node:http';
 import type { AppConfig } from '../config.js';
@@ -50,7 +51,6 @@ import { mutateMfa } from './mfaWriteModel.js';
 
 /** Authenticated operation boundaries always recheck session/MFA in the model transaction. */
 export function createPgFaroApi(database:PgJobDatabase,config:AppConfig,worker:FaroWorker){
- const rates=new Map<string,{count:number;expires:number}>();
  return async(req:IncomingMessage,res:ServerResponse,path:string)=>{
   if(!path.startsWith('/api/faro/'))return false;
   enforceExtendedOrigin(req,config);
@@ -58,7 +58,7 @@ export function createPgFaroApi(database:PgJobDatabase,config:AppConfig,worker:F
   const mfaPath=path.match(/^\/api\/faro\/security\/mfa(?:\/(setup|confirm|verify|recover))?$/),configured=Boolean(config.faroMfaEncryptionKey);
   const identity=await readIdentity(database,tokenHash,asOf,config.faroRequirePrivilegedMfa,configured,!mfaPath),user=identity.user;
   if(config.nodeEnv==='production'&&!mfaPath)throw new HttpError(503,'Faro oczekuje na zamknięcie bramek uruchomienia usługi.','RELEASE_GATES_OPEN');
-  if(method!=='GET'){const now=Date.now();for(const [key,value] of rates)if(value.expires<=now)rates.delete(key);const rate=rates.get(user.id)??{count:0,expires:now+60000};rate.count++;rates.set(user.id,rate);if(rate.count>90)throw new HttpError(429,'Zbyt wiele zmian. Spróbuj za chwilę.','RATE_LIMITED');}
+  if(method!=='GET')await enforceNativeRate(database,config.faroRateLimitKey,`faro-change:${user.id}`,90,60000);
   const body=method==='GET'?{}:await readJson(req);
   const authorize=async()=>{const current=await requireIdentityOwned(database,tokenHash,new Date().toISOString(),config.faroRequirePrivilegedMfa,configured);if(current.user.id!==user.id)throw new HttpError(401,'Zaloguj się, aby kontynuować.','UNAUTHENTICATED');};
   const owned={query:database.query.bind(database),readBatch:database.readBatch.bind(database),transaction:<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean})=>database.transaction(async()=>{await authorize();return work();},options)};

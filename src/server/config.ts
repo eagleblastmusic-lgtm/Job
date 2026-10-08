@@ -38,6 +38,7 @@ export interface AppConfig {
   faroWorkerEnabled: boolean;
   faroWorkerIntervalMs: number;
   faroMfaEncryptionKey:string|null;
+  faroRateLimitKey:string|null;
   faroRequirePrivilegedMfa:boolean;
 }
 
@@ -45,6 +46,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   validateMalwareScanEnvironment();
   const nodeEnvRaw = overrides.nodeEnv ?? process.env.NODE_ENV ?? 'development';
   const nodeEnv: AppConfig['nodeEnv'] = nodeEnvRaw === 'production' || nodeEnvRaw === 'test' ? nodeEnvRaw : 'development';
+  const faroRateLimitKey=overrides.faroRateLimitKey??process.env.FARO_RATE_LIMIT_KEY??null;
+  if(faroRateLimitKey!==null&&!/^[a-fA-F0-9]{64}$/.test(faroRateLimitKey))throw new Error('FARO_RATE_LIMIT_KEY wymaga 32 bajtów zapisanych szesnastkowo.');
   const faroMfaEncryptionKey=overrides.faroMfaEncryptionKey??process.env.FARO_MFA_ENCRYPTION_KEY??null;
   if(faroMfaEncryptionKey!==null&&!/^[a-fA-F0-9]{64}$/.test(faroMfaEncryptionKey))throw new Error('FARO_MFA_ENCRYPTION_KEY wymaga 32 bajtów zapisanych szesnastkowo.');
   const dataDir = overrides.dataDir ?? resolve(process.env.DATA_DIR ?? './data');
@@ -53,6 +56,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     nodeEnv,
     faroMfaEncryptionKey,
+    faroRateLimitKey,
     faroRequirePrivilegedMfa:nodeEnv==='production'||(overrides.faroRequirePrivilegedMfa??boolEnv('FARO_REQUIRE_PRIVILEGED_MFA',false)),
     port: overrides.port ?? intEnv('PORT', 3000),
     databasePath: overrides.databasePath ?? resolve(process.env.DATABASE_PATH ?? `${dataDir}/job.sqlite`),

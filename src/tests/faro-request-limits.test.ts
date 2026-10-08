@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {JobDatabase} from '../server/db.js';
+import {enforceNativeRate,requestLimitPlan} from '../server/faro/requestLimitModel.js';
+test('durable request limits survive restart, cap denial counts, expire and omit raw identifiers',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'faro-rate-')),path=join(root,'db.sqlite'),key='61'.repeat(32);let db=new JobDatabase(path);
+ const adapter={query:async(text:string,values:readonly unknown[])=>{const statement=db.db.prepare(text),params=Object.fromEntries(values.map((value,index)=>[`$${index+1}`,value as string|number]));return {rows:text.includes('RETURNING')?[statement.get(params)!]:(statement.run(params),[])};},transaction:async<T>(work:()=>T|Promise<T>)=>{db.db.exec('BEGIN IMMEDIATE');try{const result=await work();db.db.exec('COMMIT');return result;}catch(error){db.db.exec('ROLLBACK');throw error;}}};
+ try{await assert.rejects(()=>enforceNativeRate(adapter,null,'login:127.0.0.1',2,1000,1000),(error:unknown)=>(error as {code:string}).code==='RATE_LIMIT_UNAVAILABLE');await enforceNativeRate(adapter,key,'login:127.0.0.1',2,1000,1000);db.close();db=new JobDatabase(path);await enforceNativeRate(adapter,key,'login:127.0.0.1',2,1000,1001);for(let i=0;i<3;i++)await assert.rejects(()=>enforceNativeRate(adapter,key,'login:127.0.0.1',2,1000,1002),(error:unknown)=>(error as {status:number}).status===429);const row=db.db.prepare('SELECT * FROM faro_request_limits').get()!;assert.equal(row.request_count,3);assert.equal(row.expires_at,2000);assert.doesNotMatch(JSON.stringify(row),/127\.0\.0\.1|login/);await enforceNativeRate(adapter,key,'login:127.0.0.1',2,1000,2000);assert.equal(db.db.prepare('SELECT request_count FROM faro_request_limits').get()!.request_count,1);assert.notEqual(requestLimitPlan(key,'login:127.0.0.1',2,1000,2000).hash,requestLimitPlan(key,'register:127.0.0.1',2,1000,2000).hash);const guarded=requestLimitPlan(key,'guarded',2,1000,3000).hash;db.db.exec(`CREATE TRIGGER reject_rate BEFORE INSERT ON faro_request_limits WHEN NEW.bucket_hash='${guarded}' BEGIN SELECT RAISE(ABORT,'synthetic'); END`);await assert.rejects(()=>enforceNativeRate(adapter,key,'guarded',2,1000,3000),(error:unknown)=>(error as {code:string}).code==='RATE_LIMIT_UNAVAILABLE');assert.equal(db.db.prepare('SELECT request_count FROM faro_request_limits').get()!.request_count,1);assert.equal(db.db.prepare('SELECT expires_at FROM faro_request_limits').get()!.expires_at,3000);db.db.exec('DROP TRIGGER reject_rate');}
+ finally{db.close();await rm(root,{recursive:true,force:true});}
+});

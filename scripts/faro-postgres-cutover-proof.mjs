@@ -9,7 +9,7 @@ export async function proveNativeCutover(snapshot,fixture,candidate,process){
  const schema=`faro_rehearsal_${randomBytes(8).toString('hex')}`,db=clientFromEnvironment();let created=false,app,front,target=fixture.base;
  try{
   await db.connect();await importSnapshot(db,snapshot,schema);created=true;await db.query(`SET search_path TO ${identifier(schema)}`);
-  app=createConnectedPgFaroApp(db,{...fixture.app.config,faroWorkerEnabled:false});await new Promise(done=>app.server.listen(0,'127.0.0.1',done));const native=`http://127.0.0.1:${app.server.address().port}`;
+  app=createConnectedPgFaroApp(db,{...fixture.app.config,faroWorkerEnabled:false,faroRateLimitKey:'61'.repeat(32)});await new Promise(done=>app.server.listen(0,'127.0.0.1',done));const native=`http://127.0.0.1:${app.server.address().port}`;
   front=createServer(async(req,res)=>{try{const response=await fetch(target+(req.url??'/'),{headers:{cookie:req.headers.cookie??''}});res.writeHead(response.status,{'content-type':'application/json'});res.end(Buffer.from(await response.arrayBuffer()));}catch{res.writeHead(503);res.end('{}');}});await new Promise(done=>front.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${front.address().port}`;
   async function read(path){const response=await fetch(base+path,{headers:{cookie:candidate.cookie}});assert.equal(response.status,200,'cutover HTTP read');return response.json();}
   const paths=['/api/me','/api/faro/profile',`/api/faro/processes/${process.id}`],baseline=[];for(const path of paths)baseline.push(await read(path));
