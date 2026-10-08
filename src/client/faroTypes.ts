@@ -1,5 +1,5 @@
 export interface User { id: string; name: string; email: string; role: string; }
-export interface Skill { id: string; label: string;levelGuidance?:{version:string;status:'AUTHOR_DRAFT';BASICS:string;INDEPENDENT:string;FLUENT:string}; }
+export interface Skill { id: string; label: string;aliases?:readonly string[];canonicalURI?:string|null;taxonomyVersion?:string;licenseRef?:string;levelGuidance?:{version:string;status:'AUTHOR_DRAFT';BASICS:string;INDEPENDENT:string;FLUENT:string}; }
 export interface Practice { quantity: number | null; unit: string; }
 export interface Claim { id: string; skillId: string; level: string; source: string; verification: string; practice: Practice; }
 export interface Learning { skillId: string; mode: string; practice: Practice; }

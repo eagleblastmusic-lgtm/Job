@@ -48,7 +48,14 @@ export const area = (name: string, title: string, value = '', extra = 'required'
 export const check = (name: string, title: string, required = true) => `<label class="f-check f-wide"><input type="checkbox" name="${esc(name)}" ${required ? 'required' : ''}>${esc(title)}</label>`;
 export const button = (action: string, title: string, id = '', primary = false) => `<button type="button" class="${primary ? 'f-primary' : ''}" data-action="${esc(action)}" data-id="${esc(id)}">${esc(title)}</button>`;
 export const form = (action: string, content: string, submit: string, id = '') => `<form data-form="${esc(action)}" data-id="${esc(id)}"><fieldset class="f-fields">${content}<div class="f-wide"><button class="f-primary" type="submit">${esc(submit)}</button></div><p class="f-form-message f-wide" role="status"></p></fieldset></form>`;
-export const skillSelect = (skills: Skill[], name = 'skillId', selected = '') => `<label>Kompetencja<select name="${esc(name)}">${skills.map(s => `<option value="${esc(s.id)}" ${s.id === selected ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}</select></label>`;
+export function skillOptions(skills:Skill[],query='',selected='') {
+  const normalize=(value:string)=>value.toLocaleLowerCase('pl').normalize('NFD').replace(/\p{M}/gu,'').replace(/ł/g,'l');
+  const needle=normalize(query.trim()),matches=needle?skills.filter(s=>[s.label,...(s.aliases??[])].some(label=>normalize(label).includes(needle))):skills;
+  const shown=matches.slice(0,50),current=matches.find(s=>s.id===selected);
+  if(current&&!shown.some(s=>s.id===selected))shown[shown.length-1]=current;
+  return {count:matches.length,html:(needle?'<option value="">Wybierz kompetencję z wyników</option>':'')+shown.map(s=>`<option value="${esc(s.id)}" ${s.id===selected?'selected':''}>${esc(s.label)}${s.canonicalURI?' — ESCO':''}</option>`).join('')};
+}
+export const skillSelect = (skills: Skill[], name = 'skillId', selected = '') => `<div data-skill-picker><label>Szukaj kompetencji<input type="search" data-skill-search maxlength="100" autocomplete="off"></label><label>Kompetencja<select name="${esc(name)}" required>${skillOptions(skills,'',selected).html}</select></label><p class="f-muted" data-skill-status role="status">Wpisz nazwę, aby przeszukać cały katalog. Pokazujemy do 50 wyników.</p><p class="f-muted">Etykiety ESCO: Komisja Europejska, Skills Pillar v1.2.1, <a href="https://esco.ec.europa.eu/en/copyright-notice-esco-skills-competences" target="_blank" rel="noopener noreferrer">CC BY 4.0 i źródła</a>. Wybranie pojęcia nie jest weryfikacją kompetencji.</p></div>`;
 export const practiceFields = () => input('quantity', 'Ile praktyki? (opcjonalnie)', '', 'number', 'min="0" max="10000"') + select('unit', 'Jednostka praktyki', ['MONTHS','PROJECTS','TASKS']);
 export const claimFields = () => select('level', 'Poziom', ['BASICS','INDEPENDENT','FLUENT']) + select('source', 'Źródło', ['WORK','SELF_LEARNING','HOBBY','SCHOOL','VOLUNTEERING']) + practiceFields() + check('confirmed', 'Potwierdzam, że opis odpowiada temu, co potrafię.');
 export function projection(p: Projection) {

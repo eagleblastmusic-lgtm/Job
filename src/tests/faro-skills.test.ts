@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync=promisify(execFile);
-import { SKILL_CATALOG } from '../domain/faro/skillCatalog.js';
-import { faroFixture } from './faro-fixture.js';
+import { SKILL_CATALOG,LOCAL_SKILL_CATALOG,ESCO_LICENSE_REF } from '../domain/faro/skillCatalog.js';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import {ESCO_SKILLS} from '../domain/faro/escoCatalogData.js';
+import { faroFixture,offerInput } from './faro-fixture.js';
+import {explainOffer} from '../domain/faro/offers.js';
+import type {Claim} from '../domain/faro/skills.js';
+import type {OfferData} from '../domain/faro/offers.js';
 import {suggestSkills,LOCAL_SUGGESTION_VERSION} from '../domain/faro/skills.js';
 
 test('local suggestions match complete aliases, preserve meaningful punctuation and never turn untrusted prose into a claim',async()=>{
@@ -49,6 +55,33 @@ test('persisted Faro skill IDs retain meaning when historical ontology is reorde
   const {stdout}=await execFileAsync(process.execPath,['--input-type=module','-e',script]);
   const r=JSON.parse(stdout) as {first:string;sql:string;activity:string;added:boolean;suggestions:string[];frozen:boolean;count:number;uri:null};
   assert.equal(r.first,'Excel');assert.equal(r.sql,'SQL');assert.equal(r.activity,'Obsługa klienta');assert.equal(r.added,false);
-  assert.equal(r.frozen,true);assert.equal(r.count,23);assert.equal(r.uri,null);
+  assert.equal(r.frozen,true);assert.equal(r.count,13962);assert.equal(r.uri,null);
   assert.ok(r.suggestions.includes('faro:activity:customer-service'));assert.ok(r.suggestions.includes('faro:activity:cash-register'));
+});
+
+test('pinned Polish ESCO member-skills preserve URI/provenance and require explicit independent declarations',async()=>{
+  const esco=SKILL_CATALOG.filter(s=>s.canonicalURI);
+  assert.equal(LOCAL_SKILL_CATALOG.length,23);assert.equal(esco.length,13939);assert.equal(new Set(SKILL_CATALOG.map(s=>s.id)).size,13962);
+  assert.ok(esco.every(s=>s.taxonomyVersion==='ESCO-v1.2.1'&&s.licenseRef===ESCO_LICENSE_REF&&s.canonicalURI===`http://data.europa.eu/esco/skill/${s.id.slice(5)}`&&s.levelGuidance===undefined));
+  const manifest=JSON.parse(await readFile(new URL('../../docs/faro/ESCO_SKILLS_MANIFEST.json',import.meta.url),'utf8')) as {count:number;dataSha256:string};
+  assert.equal(manifest.count,13939);assert.equal(createHash('sha256').update(JSON.stringify(ESCO_SKILLS)).digest('hex'),manifest.dataSha256);
+  const concept=esco.find(s=>s.id==='esco:29c954f2-ed17-4900-bba5-4cfd294f3680')!;assert.equal(concept.label,'posługiwać się językiem tureckim w mowie');
+  assert.deepEqual(suggestSkills(concept.label),[]); // New source is not an automatic fact/suggestion producer.
+  const f=await faroFixture();try{
+    const user=await f.user('EscoDeclaration');
+    await f.request('/api/faro/profile',user.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const declaration={skillId:concept.id,level:'BASICS',source:'SELF_LEARNING',practice:{quantity:3,unit:'TASKS'},confirmed:true,verification:'REVIEWED_EVIDENCE'};
+    await f.request('/api/faro/claims',user.cookie,'POST',{...declaration,confirmed:false},400);
+    const result=await f.request<{claims:Claim[]}>('/api/faro/claims',user.cookie,'POST',declaration,201);
+    assert.equal(result.claims[0]!.verification,'DECLARED');assert.equal(result.claims[0]!.skillId,concept.id);
+    const organization=await f.request<{id:string}>('/api/faro/organizations',user.cookie,'POST',{name:'ESCO test organization'},201);
+    const draft=await f.request<{data:OfferData}>(`/api/faro/organizations/${organization.id}/offers`,user.cookie,'POST',{...offerInput(user.id),requirements:[{id:'esco-required',skillId:concept.id,kind:'MUST_HAVE',level:'BASICS',rationale:'Rozmowa w języku tureckim'}]},201);
+    const offer=draft.data;
+    assert.equal(explainOffer(offer,[],[])[0]!.state,'NOT_DEMONSTRATED');
+    assert.equal(explainOffer(offer,result.claims,[])[0]!.state,'SATISFIED');
+    assert.equal(explainOffer({...offer,requirements:[{...offer.requirements[0]!,skillId:'faro:legacy:9'}]},result.claims,[])[0]!.state,'NOT_DEMONSTRATED');
+    const projection=await f.request<{skillClaims:Array<{skill:{id:string;label:string}}>} >('/api/faro/profile/preview',user.cookie);
+    assert.deepEqual(projection.skillClaims[0]!.skill,{id:concept.id,label:concept.label});
+    await f.request('/api/faro/claims',user.cookie,'POST',{...declaration,skillId:concept.canonicalURI},400);
+  }finally{await f.close();}
 });

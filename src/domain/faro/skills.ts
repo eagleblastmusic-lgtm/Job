@@ -1,5 +1,5 @@
 import { normalizeText } from '../ontology.js';
-import { SKILL_CATALOG } from './skillCatalog.js';
+import { SKILL_CATALOG,LOCAL_SKILL_CATALOG } from './skillCatalog.js';
 export { SKILL_CATALOG } from './skillCatalog.js';
 
 export const LEVELS = ['BASICS', 'INDEPENDENT', 'FLUENT'] as const;
@@ -13,7 +13,8 @@ export interface Claim {
 }
 export interface Learning { skillId: string; mode: 'SELF_DEVELOPING' | 'WANTS_TO_LEARN'; practice: Practice; }
 export interface Availability { kind: 'UNKNOWN' | 'IMMEDIATE' | 'AFTER_PERIOD' | 'ON_DATE'; value: string | null; updatedAt: string; }
-export function skillById(id: string) { return SKILL_CATALOG.find(skill => skill.id === id); }
+const skillsById=new Map(SKILL_CATALOG.map(skill=>[skill.id,skill]));
+export function skillById(id: string) { return skillsById.get(id); }
 export const LOCAL_SUGGESTION_VERSION = 'local-question-rules-v2';
 function containsAlias(text:string,alias:string) {
   const needle=normalizeText(alias);
@@ -27,7 +28,7 @@ function containsAlias(text:string,alias:string) {
 }
 export function suggestSkills(description: string) {
   const text = normalizeText(description);
-  return SKILL_CATALOG.filter(skill => skill.aliases.some(alias => containsAlias(text,alias)))
+  return LOCAL_SKILL_CATALOG.filter(skill => skill.aliases.some(alias => containsAlias(text,alias)))
     .map(skill => ({ skillId: skill.id, rationale: `Czy wykonywano czynność: ${skill.label}? Opis nie jest dowodem kompetencji.`, modelVersion: LOCAL_SUGGESTION_VERSION }));
 }
 

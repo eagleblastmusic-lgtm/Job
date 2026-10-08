@@ -1,4 +1,5 @@
 /** Stable authored nodes. Never reassign an existing ID or infer ESCO equivalence. */
+import {ESCO_SKILLS} from './escoCatalogData.js';
 export interface SkillConcept {
   readonly id:string;readonly label:string;readonly aliases:readonly string[];
   readonly taxonomyVersion:string;readonly canonicalURI:string|null;readonly licenseRef:string;
@@ -37,4 +38,6 @@ const activityGuidance:Record<string,{BASICS:string;INDEPENDENT:string;FLUENT:st
   'faro:activity:shift-work':{BASICS:'Z pomocą odczytuję grafik i przygotowuję przekazanie podstawowych informacji następnej zmianie.',INDEPENDENT:'Samodzielnie organizuję zadania swojej zmiany i przekazuję stan pracy oraz otwarte sprawy.',FLUENT:'Przy zmianie priorytetów ustalam bezpieczną kolejność zadań i koordynuję przekazanie spraw w granicach swojej roli.'},
   'faro:activity:conflict-resolution':{BASICS:'Z pomocą opisuję sporne fakty, słucham stron i kieruję sprawę do właściwej osoby.',INDEPENDENT:'Samodzielnie oddzielam fakty od ocen, wyjaśniam dostępne rozwiązania i zapisuję uzgodnienia typowej sprawy.',FLUENT:'W złożonej sprawie wskazuję nierozstrzygnięte kwestie, dobieram bezpieczny sposób dalszego wyjaśnienia i eskaluję poza zakresem swojej roli.'}
 };
-export const SKILL_CATALOG:readonly SkillConcept[]=Object.freeze(seed.map(c=>Object.freeze({...c,aliases:Object.freeze([...c.aliases]),...(activityGuidance[c.id]?{levelGuidance:Object.freeze({version:'faro-authored-activity-guidance-v1',status:'AUTHOR_DRAFT' as const,...activityGuidance[c.id]!})}:{})})));
+export const LOCAL_SKILL_CATALOG:readonly SkillConcept[]=Object.freeze(seed.map(c=>Object.freeze({...c,aliases:Object.freeze([...c.aliases]),...(activityGuidance[c.id]?{levelGuidance:Object.freeze({version:'faro-authored-activity-guidance-v1',status:'AUTHOR_DRAFT' as const,...activityGuidance[c.id]!})}:{})})));
+export const ESCO_LICENSE_REF='esco-skills-v1.2.1-cc-by-4.0';
+export const SKILL_CATALOG:readonly SkillConcept[]=Object.freeze([...LOCAL_SKILL_CATALOG,...ESCO_SKILLS.map(([uuid,label,aliases]):SkillConcept=>Object.freeze({id:`esco:${uuid}`,label,aliases:Object.freeze([label,...aliases]),taxonomyVersion:'ESCO-v1.2.1',canonicalURI:`http://data.europa.eu/esco/skill/${uuid}`,licenseRef:ESCO_LICENSE_REF,kind:'SKILL',family:'esco-member-skills'}))]);

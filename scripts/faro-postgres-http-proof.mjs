@@ -30,6 +30,17 @@ export async function proveNativeHttp(database,config){
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
   await json('/api/auth/register','','POST',{name:'Foreign',email:'foreign@example.pl',password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true},403,{origin:'https://foreign.invalid'});
   await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+  const escoId='esco:29c954f2-ed17-4900-bba5-4cfd294f3680';
+  const catalog=await json('/api/faro/catalog',candidate.cookie);
+  assert.equal(catalog.skills.length,13962);
+  const esco=catalog.skills.find(skill=>skill.id===escoId);
+  assert.equal(esco.canonicalURI,'http://data.europa.eu/esco/skill/29c954f2-ed17-4900-bba5-4cfd294f3680');
+  assert.equal(esco.taxonomyVersion,'ESCO-v1.2.1');assert.equal(esco.licenseRef,'esco-skills-v1.2.1-cc-by-4.0');
+  const escoLearning={skillId:escoId,mode:'WANTS_TO_LEARN',practice:{quantity:1,unit:'TASKS'}};
+  await json('/api/faro/learning',candidate.cookie,'POST',escoLearning,201);
+  assert.equal((await json('/api/faro/profile',candidate.cookie)).learning[0].skillId,escoId);
+  await json('/api/faro/learning',candidate.cookie,'DELETE',{...escoLearning,expectedPractice:escoLearning.practice,confirmed:true});
+  assert.equal((await json('/api/faro/profile',candidate.cookie)).learning.length,0);
   const conflictBaseline=await json('/api/faro/profile',candidate.cookie),conflictAudit=(await database.query('SELECT COUNT(*) n FROM audit_logs')).rows[0].n;
   // Real driver failures verify HTTP classification AND transactional rollback.
   for(const code of ['40001','40P01']){

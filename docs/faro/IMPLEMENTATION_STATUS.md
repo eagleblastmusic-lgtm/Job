@@ -1237,3 +1237,7 @@ CY exact final acceptance2026-10-09:054196a FARO37856922577 and CI37856922591 SU
 
 
 CP02-I exact final acceptance2026-10-09:e127089 FARO37857818844 and CI37857818846 SUCCESS, every required job. PostgreSQL18 Node22/24 rejects invalid phone edits with profile/audit state retained; native/default desktop/mobile browsers, full contracts and container/recovery checks accepted. Local profile/recruitment25 and final contact1/build/lint/typecheck/syntax/diff PASS. No schema/client/hosted configuration or production change. Staging remains accepted f08e62f; whole plan/release PARTIAL and independent external dependencies unchanged.
+
+## CP03-H — ESCO Skills foundation (2026-10-09)
+
+[Scope and source boundaries](CP03_H_ESCO_SKILLS_FOUNDATION.md). Complete pinned Polish ESCO v1.2.1 member-skills import, canonical URIs, labels/aliases, attribution/hash manifest and bounded searchable selectors are under verification. Existing authored IDs/local suggestions remain stable; new concepts require explicit declarations and exact requirement matching. Actual API/native/browser regressions added. Final source count, local and required broader acceptance pending; whole plan remains PARTIAL and independent external decisions remain open.

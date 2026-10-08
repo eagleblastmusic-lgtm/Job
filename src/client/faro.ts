@@ -1,6 +1,6 @@
 import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview, AssessmentDefinition, Reliability } from './faroTypes.js';
-import { esc, label, salary, scenarioSalary, money, date, chip, empty, input, select, area, check, form, button, projection } from './faroUi.js';
-import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView, assessmentEditor, assessmentTask, assessmentReview, reliabilityView } from './faroViews.js';
+import { esc, label, salary, scenarioSalary, money, date, chip, empty, input, select, area, check, form, button, projection,skillOptions } from './faroUi.js';
+import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView, assessmentEditor, assessmentTask, requirementFields, assessmentReview, reliabilityView } from './faroViews.js';
 
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)!;
 const root = $('#appView');
@@ -21,6 +21,12 @@ const number = (f: FormData, name: string) => Number(value(f, name));
 const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit') });
 const claim = (f: FormData) => ({ skillId: value(f, 'skillId'), level: value(f, 'level'), source: value(f, 'source'), practice: practice(f), confirmed: f.has('confirmed') });
 const toDate = (text: string) => { const d = new Date(text); if (!Number.isFinite(d.getTime())) throw new Error('Podaj prawidłowy termin.'); return d.toISOString(); };
+root.addEventListener('input',event=>{
+  const search=event.target;if(!(search instanceof HTMLInputElement)||!search.hasAttribute('data-skill-search'))return;
+  const picker=search.closest('[data-skill-picker]')!,select=picker.querySelector('select')!,status=picker.querySelector('[data-skill-status]')!;
+  const results=skillOptions(skills,search.value,select.value);select.innerHTML=results.html;
+  status.textContent=results.count?`Wyników: ${results.count}. Pokazujemy do 50. Wybierz właściwe pojęcie.`:'Brak wyników. Spróbuj innej nazwy.';
+});
 
 async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal): Promise<T> {
   let r: Response;
@@ -87,7 +93,7 @@ async function render() {
       $('#f-content').innerHTML=`<h1>Bezpieczeństwo dostępu</h1><section class="f-card"><h2>Drugi składnik</h2><p>${state.enabled?'MFA jest włączone.':'MFA nie jest jeszcze włączone.'} ${state.required?'Dostęp wymaga drugiego składnika.':''} ${state.verified?'Ta sesja ma aktualne potwierdzenie na maksymalnie 5 minut.':''}</p>${!state.configured?'<p role="status">Serwer wymaga chronionego klucza konfiguracji MFA. Skontaktuj się z operatorem.</p>':''}${state.enabled?form('mfa-verify',input('code','Kod z aplikacji uwierzytelniającej','','text','required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"'),'Potwierdź drugi składnik'):''}${state.configured&&(!state.enabled||state.verified)?form('mfa-setup',input('password','Aktualne hasło','','password','required autocomplete="current-password"'),'Rozpocznij konfigurację MFA'):''}${mfaSetup?`<p>Dodaj sekret do aplikacji uwierzytelniającej: <code class="f-mfa-secret">${esc(mfaSetup.secret)}</code>. SHA1, 6 cyfr, 30 sekund. Ważny do ${esc(date(mfaSetup.expiresAt))}. Nie udostępniaj sekretu. Włączenie unieważni pozostałe sesje; nowe kody odzyskiwania zastąpią poprzednie.</p>${form('mfa-confirm',input('code','Kod potwierdzający konfigurację','','text','required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"'),'Włącz MFA')}`:''}${mfaRecoveryCodes?`<section><h2>Zapisz kody odzyskiwania</h2><p>Każdy kod działa raz i wymaga hasła. Pokazujemy je tylko po włączeniu; po opuszczeniu strony nie będą dostępne. Włączenie MFA unieważniło pozostałe sesje.</p><pre class="f-mfa-codes">${esc(mfaRecoveryCodes.join('\n'))}</pre></section>`:''}${state.enabled?`<p>Pozostałe kody odzyskiwania: ${state.recoveryRemaining}.</p>${form('mfa-recover',input('password','Aktualne hasło odzyskiwania','','password','required autocomplete="current-password"')+input('code','Jednorazowy kod odzyskiwania','','text','required autocomplete="off" maxlength="32"'),'Użyj kodu odzyskiwania')}<p>Kod odzyskiwania unieważni pozostałe sesje. Po odzyskaniu skonfiguruj nowy sekret.</p>`:''}<a href="#offers">Wróć do przestrzeni</a></section>`;finish(mine);return;
     }
     mfaSetup=null;mfaRecoveryCodes=null;
-    const [catalog, orgs] = await Promise.all([api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
+    const [catalog, orgs] = await Promise.all([skills.length?Promise.resolve({skills}):api<{skills:Skill[]}>('/catalog'), api<{organizations:Organization[]}>('/organizations')]);
     if (mine !== epoch) return;
     skills = catalog.skills; organizations = orgs.organizations;
     if (!organizations.some(o => o.id === orgId)) orgId = organizations[0]?.id ?? '';
@@ -219,6 +225,14 @@ root.addEventListener('click', event => {
   const action = el.dataset.action!, id = el.dataset.id!, mine = epoch; el.disabled = true;
   void (async () => {
     try {
+      if(action==='add-requirement') {
+        const offer=el.closest('form')!,selected=offer.querySelector<HTMLSelectElement>('[name=requirementSkill]')!.value;
+        const skill=skills.find(s=>s.id===selected);if(!skill)throw new Error('Wybierz kompetencję z katalogu.');
+        const existing=Array.from(offer.querySelectorAll<HTMLElement>('[data-requirement-skill]')).find(field=>field.dataset.requirementSkill===selected);
+        if(existing){existing.scrollIntoView({block:'nearest'});existing.querySelector('select')?.focus();return;}
+        const fields=offer.querySelector('.f-requirements')!;fields.insertAdjacentHTML('beforeend',requirementFields(skill));
+        fields.lastElementChild?.scrollIntoView({block:'nearest'});fields.lastElementChild?.querySelector('select')?.focus();return;
+      }
       if(action==='assessment-add-task') {
         const tasks=$('#f-assessment-tasks'),items=Array.from(tasks.querySelectorAll<HTMLElement>('[data-assessment-task]'));
         if(items.length>=50)throw new Error('Assessment może zawierać do 50 zadań.');
@@ -299,7 +313,7 @@ root.addEventListener('submit', event => {
       else if (action === 'delete-account') { await api('/api/account','DELETE',{confirmation:value(f,'confirmation'),password:value(f,'password')}); loggedOut(); location.hash=''; $('#authMessage').textContent='Konto i dane zostały usunięte.'; return; }
       else if (action === 'offer') {
         const prior=currentOffer, contract=value(f,'contract');
-        const data: OfferData = { role:value(f,'role'), responsibilities:value(f,'responsibilities').split('\n').filter(Boolean), location:value(f,'location'), workModel:value(f,'workModel'), remoteDays:number(f,'remoteDays'), salary:[{ contract, basis:({UOP:'GROSS_EMPLOYMENT',CIVIL:'GROSS_CIVIL',B2B:'B2B_NET_INVOICE_EXCL_VAT'} as Record<string,string>)[contract]!, min:Math.round(number(f,'salaryMin')*100),max:Math.round(number(f,'salaryMax')*100),currency:'PLN',period:value(f,'period'),variable:value(f,'variable'),hoursPerPeriod:number(f,'hoursPerPeriod'),ftePercent:number(f,'ftePercent')},...(prior?.data.salary.slice(1)??[])], requirements:skills.filter(s=>value(f,`kind:${s.id}`)!=='Pomijam').map(s=>({id:prior?.data.requirements.find(r=>r.skillId===s.id)?.id ?? crypto.randomUUID(),skillId:s.id,kind:value(f,`kind:${s.id}`),level:value(f,`level:${s.id}`),rationale:value(f,`why:${s.id}`)})), hours:value(f,'hours'),shifts:value(f,'shifts'),nights:value(f,'nights')==='Nie określono'?null:value(f,'nights')==='Tak',weekends:value(f,'weekends')==='Nie określono'?null:value(f,'weekends')==='Tak',learningSupport:value(f,'learningSupport'),responseHours:number(f,'responseHours'),decisionHours:number(f,'decisionHours'),stages:value(f,'stages').split('\n').filter(Boolean),assessmentMinutes:number(f,'assessmentMinutes'),interviewCount:number(f,'interviewCount'),closesAt:toDate(value(f,'closesAt')),recruiterId:value(f,'recruiterId') };
+        const data: OfferData = { role:value(f,'role'), responsibilities:value(f,'responsibilities').split('\n').filter(Boolean), location:value(f,'location'), workModel:value(f,'workModel'), remoteDays:number(f,'remoteDays'), salary:[{ contract, basis:({UOP:'GROSS_EMPLOYMENT',CIVIL:'GROSS_CIVIL',B2B:'B2B_NET_INVOICE_EXCL_VAT'} as Record<string,string>)[contract]!, min:Math.round(number(f,'salaryMin')*100),max:Math.round(number(f,'salaryMax')*100),currency:'PLN',period:value(f,'period'),variable:value(f,'variable'),hoursPerPeriod:number(f,'hoursPerPeriod'),ftePercent:number(f,'ftePercent')},...(prior?.data.salary.slice(1)??[])], requirements:skills.filter(s=>f.has(`kind:${s.id}`)&&value(f,`kind:${s.id}`)!=='Pomijam').map(s=>({id:prior?.data.requirements.find(r=>r.skillId===s.id)?.id ?? crypto.randomUUID(),skillId:s.id,kind:value(f,`kind:${s.id}`),level:value(f,`level:${s.id}`),rationale:value(f,`why:${s.id}`)})), hours:value(f,'hours'),shifts:value(f,'shifts'),nights:value(f,'nights')==='Nie określono'?null:value(f,'nights')==='Tak',weekends:value(f,'weekends')==='Nie określono'?null:value(f,'weekends')==='Tak',learningSupport:value(f,'learningSupport'),responseHours:number(f,'responseHours'),decisionHours:number(f,'decisionHours'),stages:value(f,'stages').split('\n').filter(Boolean),assessmentMinutes:number(f,'assessmentMinutes'),interviewCount:number(f,'interviewCount'),closesAt:toDate(value(f,'closesAt')),recruiterId:value(f,'recruiterId') };
         const o=await api<Offer>(id?`/offers/${id}`:`/organizations/${orgId}/offers`,id?'PUT':'POST',id?{data,expectedVersion:prior?.revision}:data); destination=`employer/${o.id}`;
       } else if (action === 'lifecycle') await api(`/offers/${id}/lifecycle`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed'),expectedVersion:currentOffer?.revision});
       else if (action === 'interest') { const p=await api<{id:string}>(`/offers/${id}/interest`,'POST',{offerVersion:currentOffer?.version,projectionConfirmed:f.has('projectionConfirmed'),confirmationToken:f.get('confirmationToken'),previousInterestId:f.get('previousInterestId'),renewalConfirmed:f.has('renewalConfirmed'),idempotencyKey:crypto.randomUUID()}); destination=`processes/${p.id}`; }
