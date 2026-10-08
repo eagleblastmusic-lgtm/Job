@@ -1,0 +1,11 @@
+# CP11-CT — Offline staging PostgreSQL preparation (2026-10-08)
+
+`npm run prepare:postgres:staging -- --source <offline-sqlite-file> --target-schema faro_rehearsal_<unique-name> --operator-confirmed --offline-confirmed` builds the existing importer and prepares only a new isolated schema. Set `FARO_PG_REHEARSAL_URL` in the executing process through protected operator environment configuration; never include its value in command history, repository, documentation or logs. This command does not activate HTTP or migrate a production schema. The operator must keep the source offline throughout execution.
+
+The source must be a regular non-symlink SQLite file with the accepted current migrations. Existing target schemas are refused. Import remains transactional; all 72 table counts/hashes, foreign keys and schema requirements are compared, and the source is re-read to verify it remained unchanged. Failure after import removes only the newly created target; failed cleanup requires quarantine and forbids activation. Output contains only aggregate evidence, never records or credentials.
+
+Database-only preparation refuses sources containing private upload metadata. Such sources need the existing encrypted physical backup/current-authority recovery workflow, including retained files; silently importing metadata without files would falsely declare readiness. Runtime activation requires a separate reviewed cutover and readiness acceptance.
+
+Actual PostgreSQL18.6/Node24.19.0 local acceptance: full native exercise PASS, new CLI child import and complete table/hash comparison PASS, existing-target refusal preserves all data, missing offline confirmation creates no schema, private-file refusal creates no schema. Full existing cutover/restart, recovered HTTP and encrypted recovery proofs PASS; 28 desktop/mobile browser cases PASS. Own loopback SCRAM cluster STOPPED/CLEANUP_PASS. Syntax, lint and diff checks PASS. Remote required acceptance pending publication.
+
+No paid resource, hosted PostgreSQL or production deployment/migration performed. Technical preparation does not establish infrastructure custody, measured production RPO/RTO or external legal/security/manual/user acceptance. Whole plan/release remains PARTIAL.
