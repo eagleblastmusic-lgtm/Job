@@ -1,0 +1,93 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "faro-postgres-review",
+      "runtime": "docker",
+      "repo": "https://github.com/eagleblastmusic-lgtm/Job",
+      "branch": "main",
+      "region": "frankfurt",
+      "plan": "0.5c-512mb",
+      "autoDeployTrigger": "off",
+      "healthCheckPath": "/api/health",
+      "dockerfilePath": "./Dockerfile",
+      "numInstances": 1,
+      "disk": {
+        "name": "faro-private-files",
+        "mountPath": "/app/data",
+        "sizeGB": 1
+      },
+      "envVars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "PORT",
+          "value": "10000"
+        },
+        {
+          "key": "DATA_DIR",
+          "value": "/app/data"
+        },
+        {
+          "key": "DATABASE_PATH",
+          "value": "/app/data/job.sqlite"
+        },
+        {
+          "key": "TRUST_PROXY",
+          "value": "true"
+        },
+        {
+          "key": "SESSION_DAYS",
+          "value": "1"
+        },
+        {
+          "key": "MAX_UPLOAD_BYTES",
+          "value": "5242880"
+        },
+        {
+          "key": "FARO_DATABASE_ENGINE",
+          "value": "postgresql"
+        },
+        {
+          "key": "FARO_PG_SCHEMA",
+          "value": "faro"
+        },
+        {
+          "key": "FARO_WORKER_ENABLED",
+          "value": "false"
+        },
+        {
+          "key": "FARO_PG_URL",
+          "fromDatabase": {
+            "name": "faro-postgres-review-db",
+            "property": "connectionString"
+          }
+        },
+        {
+          "key": "APP_ORIGIN",
+          "sync": false
+        },
+        {
+          "key": "FARO_MFA_ENCRYPTION_KEY",
+          "sync": false
+        },
+        {
+          "key": "FARO_RATE_LIMIT_KEY",
+          "sync": false
+        }
+      ]
+    }
+  ],
+  "databases": [
+    {
+      "name": "faro-postgres-review-db",
+      "region": "frankfurt",
+      "plan": "0.1c-256mb",
+      "postgresMajorVersion": "18",
+      "diskSizeGB": 1,
+      "ipAllowList": []
+    }
+  ]
+}

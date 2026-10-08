@@ -1038,3 +1038,8 @@ CP11-BS final local Node171/lint/typecheck/36 migrations/source-only71 tables PA
 ## CP11-BZ — Durable PostgreSQL request limits
 
 [Scope](CP11_BZ_DURABLE_POSTGRES_REQUEST_LIMITS.md). Shared hashed expiring transactional rate charges preserve auth/command policies across connections/restart; explicit protected key required. Full local PASS172/37 migrations/both restores/38 browsers; final targeted rollback/build/static/source72 tables37 migrations PASS. Actual PostgreSQL parallel/restart/rollback proof pending. BY2b1a5b9 FARO37764742956/CI37764743000 SUCCESS. All open historical FARO PR heads already ancestors of main; independent review still open. Whole plan/release PARTIAL; continue.
+
+
+## CP11-CA — Render inspected deployment draft (2026-10-08)
+
+[Scope](CP11_CA_RENDER_DEPLOYMENT_DRAFT.md). User confirmed Bartosz workspace. Connector service listings (including previews) returned literal null without error; PostgreSQL listing explicitly returned no instances. No service IDs available for environment/config inspection; do not interpret null as independently verified empty inventory. Separate paid-resource blueprint draft passes official Render JSON Schema; no provisioning, secret update or deploy performed. Existing staging blueprint unchanged. BZ8fd8a22 FARO37766181960 and CI37766182163 SUCCESS, including PostgreSQL18 Node22/24,26 native browsers per version and durable limiter race/restart/rollback. Whole plan/release PARTIAL; actual paid resources/production deploy require explicit user approval, external gates remain open.
