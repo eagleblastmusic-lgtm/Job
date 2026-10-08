@@ -438,6 +438,7 @@ test('economics is private, versioned and honest about unsupported automatic tax
     const stored=f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id) as {result:string};
     assert.deepEqual((JSON.parse(stored.result) as {units:unknown}).units,{money:'PLN_MINOR',netPeriod:'MONTH',commuteCostPeriod:'MONTH',commuteTime:'ROUND_TRIP_MINUTES_PER_WORK_DAY'});
     const input={salaryOptionIndex:0,netMin:420000,netMax:470000,commuteCost:30000,commuteMinutes:45,transport:'CAR',source:'candidate-scenario',observedAt:new Date().toISOString(),assumptions:'Jawne założenia miesięcznego scenariusza'};
+    for(const observedAt of ['2027-02-30T12:00:00Z','2026-04-31T12:00:00+02:00','2026-01-01T24:00:00Z'])await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,observedAt},400);
     await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteCostPeriod:'YEAR'},400);
     await f.request(`/api/faro/offers/${f.offer.id}/economics`,f.candidate.cookie,'PUT',{...input,commuteTimeBasis:'ONE_WAY'},400);
     assert.deepEqual(f.app.db.db.prepare('SELECT result FROM faro_economics WHERE candidate_id=? AND offer_id=?').get(f.candidate.id,f.offer.id),stored);

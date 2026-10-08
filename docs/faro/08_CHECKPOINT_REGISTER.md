@@ -1252,3 +1252,8 @@ CP03-F exact acceptance2026-10-09: f08e62f FARO37853704003 and CI37853704140 SUC
 
 
 CP03-G exact final acceptance2026-10-09: a308e44 FARO37855259036 and CI37855258998 SUCCESS, every required job. PostgreSQL18 Node22/24 actual withdrawal/audit-failure rollback/one-event proof, native and default desktop/mobile browsers, contracts and container/recovery checks accepted. Local profile5/build/lint/typecheck/syntax/diff PASS. No migration/client/hosted configuration change; staging remains accepted f08e62f with successful HTTPS smoke/cleanup. Whole plan/release PARTIAL; provider/license/independent validation and production custody dependencies unchanged.
+
+
+## CP11-CY — Strict calendar dates
+
+[Scope](CP11_CY_STRICT_CALENDAR_DATES.md). Shared Canonical date validator rejects impossible calendar/clock/offset inputs before Date.parse UTC normalization; valid leap dates/fractions/cross-day offsets retained. Actual economics refusal preserves stored scenario; native exercise uses same regression. Local targeted24/build/lint/typecheck/syntax/diff PASS; full local and required CI pending. No client/schema/migration/hosted configuration change, paid resource or production operation; whole plan/release PARTIAL.

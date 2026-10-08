@@ -21,7 +21,11 @@ export function array(value: unknown, max = 100): unknown[] {
 }
 export function date(value: unknown): string {
   const raw = text(value, 40);
-  if (!/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(raw) || !Number.isFinite(Date.parse(raw))) throw new HttpError(400, 'Podaj datę z godziną i strefą.', 'VALIDATION_ERROR');
+  const parts=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(raw);
+  if(!parts)throw new HttpError(400,'Podaj datę z godziną i strefą.','VALIDATION_ERROR');
+  const year=Number(parts[1]),month=Number(parts[2]),day=Number(parts[3]);
+  const leap=year%4===0&&(year%100!==0||year%400===0),days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  if(month<1||month>12||day<1||day>days[month-1]!||Number(parts[4])>23||Number(parts[5])>59||Number(parts[6])>59||Number(parts[8]??0)>23||Number(parts[9]??0)>59||!Number.isFinite(Date.parse(raw)))throw new HttpError(400,'Podaj istniejącą datę, godzinę i strefę.','VALIDATION_ERROR');
   return new Date(raw).toISOString();
 }
 export function nullableBoolean(value: unknown): boolean | null {
