@@ -109,6 +109,11 @@ jobs:
           FARO_PG_REHEARSAL_URL: postgres://faro_test:synthetic-ci-only@127.0.0.1:5432/faro_test
       - name: Install real Chromium for PostgreSQL browser acceptance
         run: npx playwright install --with-deps chromium
+      - name: Disposable staging bootstrap, restart and closed HTTP gate
+        run: node scripts/verify-free-postgres-staging.mjs
+        env:
+          FARO_PG_DISPOSABLE_BOOTSTRAP_TEST: '1'
+          FARO_PG_REHEARSAL_URL: postgres://faro_test:synthetic-ci-only@127.0.0.1:5432/faro_test
       - name: All existing canonical workspace browser contracts on PostgreSQL, desktop/mobile
         run: npx playwright test e2e/faro.spec.ts e2e/faro-employment.spec.ts e2e/faro-session.spec.ts e2e/faro-mfa.spec.ts e2e/faro-open-answer.spec.ts e2e/faro-incidents.spec.ts e2e/faro-restrictions.spec.ts e2e/browser.spec.ts
         env:

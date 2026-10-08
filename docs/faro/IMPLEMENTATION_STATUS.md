@@ -1177,3 +1177,8 @@ CN/CO final9c42699 acceptance2026-10-08: FARO37793582627 and CI37793582723 SUCCE
 ## Current CP11-CT evidence (2026-10-08)
 
 See [offline staging preparation](CP11_CT_OFFLINE_POSTGRES_PREPARATION.md) and [local PostgreSQL18 acceptance](CP11_CS_LOCAL_POSTGRES18.md). Local native exercise plus28 browsers PASS; new-target CLI fences and source preservation accepted. CS remote FARO37820553760/CI37820553769 SUCCESS on PostgreSQL18 Node22/24. Current staging remains SQLite; whole plan/release PARTIAL. Earlier absent-connector and missing-local-PostgreSQL statements are historical and superseded by CR/CS.
+
+
+## CP11-CV — Free PostgreSQL staging start (2026-10-08)
+
+[Implementation and actual bounded proof](CP11_CV_FREE_POSTGRES_STAGING_START.md). Approved free PostgreSQL18 instance exists with empty external allowlist. Prepared Blueprint private connection/key wiring and empty-only scoped bootstrap; actual local restart/nonempty refusal/HTTP/closed release gate PASS. Hosted configuration not applied: active session lost connector tools and browser attachment. CU2b8a4fe FARO37825102239/CI37825102288 SUCCESS, all jobs. New required remote acceptance pending. No paid resource/production migration; whole plan/release PARTIAL.

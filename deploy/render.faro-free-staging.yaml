@@ -43,7 +43,7 @@
         },
         {
           "key": "FARO_DATABASE_ENGINE",
-          "value": "sqlite"
+          "value": "postgresql"
         },
         {
           "key": "FARO_WORKER_ENABLED",
@@ -56,8 +56,35 @@
         {
           "key": "FARO_RATE_LIMIT_KEY_BASE64",
           "generateValue": true
+        },
+        {
+          "key": "FARO_PG_URL",
+          "fromDatabase": {
+            "name": "faro-free-staging-pg18",
+            "property": "connectionString"
+          }
+        },
+        {
+          "key": "FARO_PG_SCHEMA",
+          "value": "faro_rehearsal_render_staging"
+        },
+        {
+          "key": "FARO_STAGING_EMPTY_BOOTSTRAP",
+          "value": "confirmed"
         }
-      ]
+      ],
+      "dockerCommand": "node scripts/start-faro-free-postgres-staging.mjs"
+    }
+  ],
+  "databases": [
+    {
+      "name": "faro-free-staging-pg18",
+      "plan": "free",
+      "region": "frankfurt",
+      "postgresMajorVersion": "18",
+      "databaseName": "faro_free_staging_pg18",
+      "user": "faro_free_staging_pg18_user",
+      "ipAllowList": []
     }
   ]
 }

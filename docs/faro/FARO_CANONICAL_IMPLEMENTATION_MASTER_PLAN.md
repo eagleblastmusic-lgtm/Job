@@ -1175,3 +1175,8 @@ CS finalf375f8a acceptance2026-10-08: FARO37820553760 and CI37820553769 SUCCESS,
 ## CP11-CU — Provider-generated keys (2026-10-08)
 
 [Configuration and evidence](CP11_CU_PROVIDER_GENERATED_KEYS.md). Strict independent 256-bit Base64 inputs preserve existing hex cryptographic contracts and mandatory production MFA. Free staging Blueprint generates secrets provider-side; no live configuration change yet. Build/full181 Node/config-MFA11/lint/typecheck/diff and official Blueprint schema PASS. CT fcc4744 FARO37823699172/CI37823699233 SUCCESS, every required job. Hosted staging remains SQLite; whole plan/release PARTIAL.
+
+
+## CP11-CV — Free PostgreSQL staging start (2026-10-08)
+
+[Implementation and actual bounded proof](CP11_CV_FREE_POSTGRES_STAGING_START.md). Approved free PostgreSQL18 instance exists with empty external allowlist. Prepared Blueprint private connection/key wiring and empty-only scoped bootstrap; actual local restart/nonempty refusal/HTTP/closed release gate PASS. Hosted configuration not applied: active session lost connector tools and browser attachment. CU2b8a4fe FARO37825102239/CI37825102288 SUCCESS, all jobs. New required remote acceptance pending. No paid resource/production migration; whole plan/release PARTIAL.
