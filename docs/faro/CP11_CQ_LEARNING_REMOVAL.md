@@ -9,3 +9,6 @@ Real SQLite HTTP regression covers authentication, confirmation, ownership, stal
 Local/full and remote acceptance recorded below after verification. No migration, provider selection, Render resource creation or production deployment. Default runtime remains SQLite. Whole plan/release PARTIAL.
 
 Local acceptance2026-10-08: npm run check PASS — lint/typecheck/37 migrations,180 Node tests, both backup/restore exercises and38 browser cases, including learning add/remove desktop/mobile. Native source72 tables/37 migrations and script syntax/diff PASS. Actual PostgreSQL18 Node22/24 acceptance pending GitHub Actions.
+
+
+CQ actual acceptance2026-10-08:396a5e9 FARO37798340585 and CI37798340448 SUCCESS, every required job. PostgreSQL18 Node22/24 native HTTP verifies owned confirmed learning removal, stale-value refusal, real audit-failure rollback and idempotency;26 native desktop/mobile browser cases/version include learning add/remove. Local full180 Node,38 browsers, both restores and remote contracts/container/recovery PASS. No Render configuration/deploy change; default SQLite and external release dependencies remain open. Whole plan/release PARTIAL.
