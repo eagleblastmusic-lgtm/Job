@@ -96,3 +96,8 @@ No hosting on Render was requested. Workspace confirmation only authorized inspe
 ## CP11-CK — Authorized free Render staging (2026-10-08)
 
 [Scope](CP11_CK_FREE_RENDER_STAGING.md). User approved free Render; separate free-only disposable SQLite staging blueprint passes official schema. No paid resource/production gate/deploy authorized. Actual provisioning blocked by absent connector/CLI/API authentication; Render discovery confirms not installed, restoration suggested. Existing workspace/config inspection and zero-charge usage policy required before application. Independent technical work remains authorized. Whole plan/release PARTIAL.
+
+
+## CP11-CL — Bounded backup artifact reads (2026-10-08)
+
+[Scope](CP11_CL_BOUNDED_BACKUP_ARTIFACT_READS.md). Reject oversized/redirected/changing artifacts before unbounded allocation; bounded reader/decoder/writer256MiB. Standalone4/lint/diff PASS; native actual CLI acceptance pending. Free Render approved but no connector/auth available; independent technical work continued. Whole plan/release PARTIAL.
