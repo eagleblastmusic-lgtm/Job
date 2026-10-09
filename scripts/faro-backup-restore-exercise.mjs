@@ -143,6 +143,7 @@ try {
     assert.equal(db.prepare('SELECT skill_id FROM faro_learning WHERE user_id=? AND skill_id=?').get(kept.id,recoverySkill),undefined);
     assert.equal(JSON.parse(db.prepare('SELECT practice FROM faro_learning WHERE user_id=? AND skill_id=?').get(successor.id,recoverySkill).practice).context,'Bieżący prywatny kontekst.');
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,learning:[...ledger.learning,...ledger.learning]}),/Invalid current learning/);
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,learning:ledger.learning.map(row=>({...row,practice:'PRIVATE_BROKEN_LEARNING_JSON'}))}),error=>error.message==='Invalid current learning authority.');
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,claims:undefined}),/Missing current skill/);
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,learning:undefined}),/Missing current skill/);
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,activities:undefined}),/Missing current private activity/);

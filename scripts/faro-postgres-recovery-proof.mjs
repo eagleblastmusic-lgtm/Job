@@ -65,6 +65,7 @@ export async function proveNativeRecovery(snapshot,candidate,employer,org,offer)
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,activities:[...ledger.activities,...ledger.activities]},asOf,()=>{}),/Invalid current private activity/);
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,activities:ledger.activities.map(row=>row.id===retainedActivity?{...row,user_id:candidate.id}:row)},asOf,()=>{}),/ownership mismatch/);
   assert.equal((await target.query('SELECT id FROM faro_activities WHERE id=$1',[deletedActivity])).rowCount,1);
+  await assert.rejects(()=>reconcileRecovery(target,{...ledger,learning:ledger.learning.map(row=>({...row,practice:'PRIVATE_BROKEN_LEARNING_JSON'}))},asOf,()=>{}),error=>error.message==='Invalid current learning authority.');
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,claims:undefined},asOf,()=>{}),/Missing current skill/);
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,learning:undefined},asOf,()=>{}),/Missing current skill/);
   await assert.rejects(()=>reconcileRecovery(target,{...ledger,claims:[...ledger.claims,...ledger.claims]},asOf,()=>{}),/Invalid current skill/);

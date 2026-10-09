@@ -28,11 +28,12 @@ export function currentActivityAuthority(ledger:RecoveryLedger):Map<string,strin
  return activities;
 }
 export function recoveryLedgerFromRows(rows:Record<string,unknown>[][]):RecoveryLedger{if(rows.length!==recoveryLedgerQueries.length)throw new Error('Incomplete current authority snapshot.');return Object.fromEntries(recoveryLedgerQueries.map((query,index)=>[query.key,rows[index]??[]])) as unknown as RecoveryLedger;}
+function validatedLearningPractice(value:string){try{return JSON.stringify(profilePractice(JSON.parse(value),true));}catch{throw new Error('Invalid current learning authority.');}}
 export function currentSkillAuthority(ledger:RecoveryLedger){
  if(!Array.isArray(ledger.claims)||!Array.isArray(ledger.learning))throw new Error('Missing current skill withdrawal authority.');
  const claims=new Map<string,RecoveryLedger['claims'][number]>(),learning=new Map<string,RecoveryLedger['learning'][number]>();
  for(const row of ledger.claims){if(typeof row?.id!=='string'||!row.id||typeof row.user_id!=='string'||!row.user_id||claims.has(row.id)||(row.revoked_at!==null&&(typeof row.revoked_at!=='string'||!Number.isFinite(Date.parse(row.revoked_at)))))throw new Error('Invalid current skill withdrawal authority.');claims.set(row.id,row);}
- for(const row of ledger.learning){if(typeof row?.user_id!=='string'||!row.user_id||typeof row.skill_id!=='string'||!row.skill_id||!['SELF_DEVELOPING','WANTS_TO_LEARN'].includes(row.mode)||typeof row.practice!=='string')throw new Error('Invalid current learning authority.');profilePractice(JSON.parse(row.practice),true);const key=JSON.stringify([row.user_id,row.skill_id,row.mode]);if(learning.has(key))throw new Error('Invalid current learning authority.');learning.set(key,row);}
+ for(const row of ledger.learning){if(typeof row?.user_id!=='string'||!row.user_id||typeof row.skill_id!=='string'||!row.skill_id||!['SELF_DEVELOPING','WANTS_TO_LEARN'].includes(row.mode)||typeof row.practice!=='string')throw new Error('Invalid current learning authority.');const practice=validatedLearningPractice(row.practice),key=JSON.stringify([row.user_id,row.skill_id,row.mode]);if(learning.has(key))throw new Error('Invalid current learning authority.');learning.set(key,{...row,practice});}
  return {claims,learning};
 }
 interface RecoveryReadDatabase {readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;transaction<T>(work:()=>T|Promise<T>,options?:{readOnly?:boolean}):Promise<T>;}
