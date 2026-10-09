@@ -1,0 +1,9 @@
+# CP03-K — Private practice context
+
+DELTA_REQUIRED against Canonical report07: practice had quantity/unit but no context for tasks, tools or independence. Extend the existing practice JSON with optional private context (trimmed, maximum500 characters), preserving existing records and the exact existing claim/version/confirmation flow. Empty/omitted context is absent. Invalid input fails before mutations; a new declaration without context does not inherit an old note.
+
+Own profile displays escaped context for declarations and learning. The field is explicitly private; employer projection and task experience retain their quantity/unit allowlist. Clarification uses the original minimized practice parser and never shares this private field. No new fact, certification, score, inferred level or automatic summation of periods. Learning erasure compares context as well as quantity/unit, refusing a stale view after a context-only update. Own data export retains it; another account's export does not include it.
+
+Actual API regression covers bounds/type refusal and unchanged state, stored trimming, explicit low level retained despite nine months, DECLARED verification, minimized preview, foreign profile/export isolation, own export, clarification parser, context-only erasure conflict and replacement without implicit inheritance. Existing desktop/mobile journey tests persistence, escaped HTML and actual preview omission. Native PostgreSQL HTTP proof exercises private retention/projection and stale erasure.
+
+Local build, full196 Node tests, profile6, lint/typecheck/script syntax/diff and candidate/employer desktop/mobile2 PASS, zero skips and unchanged30-second timeout. Required exact native/broader CI pending. No migration, new resource, paid call or production operation. Full plan remains PARTIAL; independent release decisions and calibrated/reviewed evidence remain open.

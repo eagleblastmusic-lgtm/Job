@@ -18,7 +18,7 @@ let watchAlerts = new Map<string,boolean>();
 let interviews:Interview[]=[];
 const value = (f: FormData, name: string) => String(f.get(name) ?? '').trim();
 const number = (f: FormData, name: string) => Number(value(f, name));
-const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit') });
+const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit'),...(f.has('practiceContext')?{context:value(f,'practiceContext')}:{}) });
 const claim = (f: FormData) => ({ skillId: value(f, 'skillId'), level: value(f, 'level'), source: value(f, 'source'), practice: practice(f), confirmed: f.has('confirmed') });
 const toDate = (text: string) => { const d = new Date(text); if (!Number.isFinite(d.getTime())) throw new Error('Podaj prawidłowy termin.'); return d.toISOString(); };
 root.addEventListener('input',event=>{

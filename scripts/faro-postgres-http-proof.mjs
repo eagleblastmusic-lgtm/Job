@@ -36,9 +36,12 @@ export async function proveNativeHttp(database,config){
   const esco=catalog.skills.find(skill=>skill.id===escoId);
   assert.equal(esco.canonicalURI,'http://data.europa.eu/esco/skill/29c954f2-ed17-4900-bba5-4cfd294f3680');
   assert.equal(esco.taxonomyVersion,'ESCO-v1.2.1');assert.equal(esco.licenseRef,'esco-skills-v1.2.1-cc-by-4.0');
-  const escoLearning={skillId:escoId,mode:'WANTS_TO_LEARN',practice:{quantity:1,unit:'TASKS'}};
+  const escoLearning={skillId:escoId,mode:'WANTS_TO_LEARN',practice:{quantity:1,unit:'TASKS',context:'PRIVATE_NATIVE_PRACTICE_CONTEXT'}};
   await json('/api/faro/learning',candidate.cookie,'POST',escoLearning,201);
   assert.equal((await json('/api/faro/profile',candidate.cookie)).learning[0].skillId,escoId);
+  assert.equal((await json('/api/faro/profile',candidate.cookie)).learning[0].practice.context,escoLearning.practice.context);
+  assert.doesNotMatch(JSON.stringify(await json('/api/faro/profile/preview',candidate.cookie)),/PRIVATE_NATIVE_PRACTICE_CONTEXT/);
+  await json('/api/faro/learning',candidate.cookie,'DELETE',{...escoLearning,expectedPractice:{quantity:1,unit:'TASKS'},confirmed:true},409);
   await json('/api/faro/learning',candidate.cookie,'DELETE',{...escoLearning,expectedPractice:escoLearning.practice,confirmed:true});
   assert.equal((await json('/api/faro/profile',candidate.cookie)).learning.length,0);
   const conflictBaseline=await json('/api/faro/profile',candidate.cookie),conflictAudit=(await database.query('SELECT COUNT(*) n FROM audit_logs')).rows[0].n;

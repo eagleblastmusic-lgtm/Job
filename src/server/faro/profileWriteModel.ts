@@ -72,14 +72,15 @@ export async function saveProfileConstraints(database:ProfileWriteDatabase,userI
 function profileAuditQuery(userId:string,action:string,entityId:string,asOf:string) {
   return {text:'INSERT INTO audit_logs(id,user_id,action,entity_type,entity_id,metadata,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)',values:[randomUUID(),userId,action,'faro',entityId,'{}',asOf]};
 }
-export function profilePractice(input:unknown):Practice {
+export function profilePractice(input:unknown,privateContext=false):Practice {
   const practice=object(input);
-  return {quantity:practice.quantity===null?null:integer(practice.quantity,0,10000),unit:choice(practice.unit,['MONTHS','PROJECTS','TASKS'] as const)};
+  const context=privateContext&&practice.context!==undefined?text(practice.context,500,0):'';
+  return {quantity:practice.quantity===null?null:integer(practice.quantity,0,10000),unit:choice(practice.unit,['MONTHS','PROJECTS','TASKS'] as const),...(context?{context}:{})};
 }
 export function profileClaimQueries(userId:string,body:Record<string,unknown>,asOf:string) {
   const skillId=text(body.skillId,100);
   if(!skillById(skillId))throw new HttpError(400,'Wybierz znaną kompetencję.');
-  const level=choice(body.level,LEVELS),source=choice(body.source,SOURCES),practice=profilePractice(body.practice);
+  const level=choice(body.level,LEVELS),source=choice(body.source,SOURCES),practice=profilePractice(body.practice,true);
   if(body.confirmed!==true)throw new HttpError(400,'Potwierdź własną deklarację.','CONFIRMATION_REQUIRED');
   return [
     {text:'UPDATE faro_claims SET revoked_at=$1 WHERE user_id=$2 AND skill_id=$3 AND revoked_at IS NULL',values:[asOf,userId,skillId]},
@@ -93,20 +94,20 @@ export function profileRevokeQuery(userId:string,id:string,asOf:string) {
 export function profileRevokeAuditQuery(userId:string,id:string,asOf:string) {return profileAuditQuery(userId,'SKILL_WITHDRAWN',id,asOf);}
 export function profileLearningQuery(userId:string,body:Record<string,unknown>) {
   const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
-  return {text:'INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice',values:[userId,skillId,choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const),JSON.stringify(profilePractice(body.practice))]};
+  return {text:'INSERT INTO faro_learning(user_id,skill_id,mode,practice) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,skill_id,mode) DO UPDATE SET practice=excluded.practice',values:[userId,skillId,choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const),JSON.stringify(profilePractice(body.practice,true))]};
 }
 export function profileLearningEntryQuery(userId:string,body:Record<string,unknown>) {
   const skillId=text(body.skillId,100);if(!skillById(skillId))throw new HttpError(400,'Nieznana kompetencja.');
   const mode=choice(body.mode,['SELF_DEVELOPING','WANTS_TO_LEARN'] as const);
   if(body.confirmed!==true)throw new HttpError(400,'Potwierdź usunięcie kierunku nauki.','CONFIRMATION_REQUIRED');
-  profilePractice(body.expectedPractice);
+  profilePractice(body.expectedPractice,true);
   return {text:'SELECT practice FROM faro_learning WHERE user_id=$1 AND skill_id=$2 AND mode=$3',values:[userId,skillId,mode]};
 }
 export function profileLearningRemovalQueries(userId:string,body:Record<string,unknown>,row:Record<string,unknown>|undefined,asOf:string) {
-  const query=profileLearningEntryQuery(userId,body),expected=profilePractice(body.expectedPractice);
+  const query=profileLearningEntryQuery(userId,body),expected=profilePractice(body.expectedPractice,true);
   if(!row)return [];
-  const current=profilePractice(JSON.parse(row.practice as string));
-  if(current.quantity!==expected.quantity||current.unit!==expected.unit)throw new HttpError(409,'Kierunek nauki zmienił się. Odśwież profil.','VERSION_CONFLICT');
+  const current=profilePractice(JSON.parse(row.practice as string),true);
+  if(current.quantity!==expected.quantity||current.unit!==expected.unit||current.context!==expected.context)throw new HttpError(409,'Kierunek nauki zmienił się. Odśwież profil.','VERSION_CONFLICT');
   return [{text:'DELETE FROM faro_learning WHERE user_id=$1 AND skill_id=$2 AND mode=$3',values:query.values},profileAuditQuery(userId,'LEARNING_REMOVED',query.values[1]!,asOf)];
 }
 export function profileActivityQueries(userId:string,body:Record<string,unknown>,asOf:string) {

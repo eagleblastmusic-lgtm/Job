@@ -42,9 +42,13 @@ test('Faro real candidate and employer process, private watch, economics and res
     await expect(learning.locator('[name=skillId] option')).toHaveCount(2);
     await expect(learning.locator('[name=skillId]')).toHaveValue('');
     await learning.locator('[name=skillId]').selectOption('esco:29c954f2-ed17-4900-bba5-4cfd294f3680');
+    await learning.getByLabel('Prywatny kontekst praktyki (opcjonalnie)',{exact:true}).fill('PRIVATE_BROWSER_CONTEXT <img src=x onerror=alert(1)>');
     await learning.getByRole('button',{name:'Zapisz kierunek',exact:true}).click();
     await expect(page.getByRole('button',{name:'Usuń kierunek: posługiwać się językiem tureckim w mowie',exact:true})).toBeVisible();
     await page.reload();
+    await expect(page.getByText('Prywatny kontekst: PRIVATE_BROWSER_CONTEXT <img src=x onerror=alert(1)>',{exact:true})).toBeVisible();
+    await expect(page.locator('.f-row img[src=x]')).toHaveCount(0);
+    const privatePreview=await f.request('/api/faro/profile/preview',candidate.cookie);expect(JSON.stringify(privatePreview)).not.toContain('PRIVATE_BROWSER_CONTEXT');
     await page.getByRole('button',{name:'Usuń kierunek: posługiwać się językiem tureckim w mowie',exact:true}).click();
     await expect(page.getByRole('button',{name:'Usuń kierunek: posługiwać się językiem tureckim w mowie',exact:true})).toHaveCount(0);
     await learning.locator('[name=skillId]').selectOption('faro:legacy:4');

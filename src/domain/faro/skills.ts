@@ -6,7 +6,7 @@ export const LEVELS = ['BASICS', 'INDEPENDENT', 'FLUENT'] as const;
 export type SkillLevel = typeof LEVELS[number];
 export const SOURCES = ['WORK', 'SELF_LEARNING', 'HOBBY', 'SCHOOL', 'VOLUNTEERING'] as const;
 export type SkillSource = typeof SOURCES[number];
-export interface Practice { quantity: number | null; unit: 'MONTHS' | 'PROJECTS' | 'TASKS'; }
+export interface Practice { quantity: number | null; unit: 'MONTHS' | 'PROJECTS' | 'TASKS'; context?:string; }
 export interface Claim {
   id: string; skillId: string; level: SkillLevel; source: SkillSource; practice: Practice;
   verification: 'DECLARED' | 'REVIEWED_EVIDENCE' | 'FARO_ASSESSMENT'; version: number; confirmedAt: string;

@@ -3,6 +3,36 @@ import assert from 'node:assert/strict';
 import { faroFixture } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { employerProjection } from '../domain/faro/skills.js';
+import { profilePractice } from '../server/faro/profileWriteModel.js';
+
+test('practice context is bounded private evidence, survives reload and fences stale learning erasure',async()=>{
+  const f=await faroFixture();try{
+    const own=await f.user('PrivatePractice'),other=await f.user('OtherPractice');
+    await f.request('/api/faro/profile',own.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const practice={quantity:9,unit:'MONTHS',context:'  PRIVATE_CONTEXT_SENTINEL <script>narzędzia</script>  '};
+    const claim={skillId:'faro:legacy:4',level:'BASICS',source:'SELF_LEARNING',practice,confirmed:true};
+    await f.request('/api/faro/claims',own.cookie,'POST',claim,201);
+    const profile=new ProfileService(f.app.db).profile(own.id);assert.equal(profile.claims[0]!.practice.context,practice.context.trim());assert.equal(profile.claims[0]!.level,'BASICS');assert.equal(profile.claims[0]!.verification,'DECLARED');
+    for(const context of [null,0,{},'x'.repeat(501)])await f.request('/api/faro/claims',own.cookie,'POST',{...claim,practice:{...practice,context}},400);
+    assert.deepEqual(new ProfileService(f.app.db).profile(own.id),profile);
+    const preview=await f.request('/api/faro/profile/preview-confirmation',own.cookie);assert.doesNotMatch(JSON.stringify(preview),/PRIVATE_CONTEXT_SENTINEL|script|context/);
+    assert.doesNotMatch(JSON.stringify(await f.request('/api/faro/profile',other.cookie)),/PRIVATE_CONTEXT_SENTINEL/);
+    assert.match(JSON.stringify(await f.request('/api/export',own.cookie)),/PRIVATE_CONTEXT_SENTINEL/);
+    assert.doesNotMatch(JSON.stringify(await f.request('/api/export',other.cookie)),/PRIVATE_CONTEXT_SENTINEL/);
+    assert.deepEqual(profilePractice(practice),{quantity:9,unit:'MONTHS'}); // Process clarification remains a minimized shared declaration.
+    const learning={skillId:claim.skillId,mode:'SELF_DEVELOPING',practice:{...practice,context:'first private context'}};
+    await f.request('/api/faro/learning',own.cookie,'POST',learning,201);
+    const currentPractice={...learning.practice,context:'second private context'};
+    await f.request('/api/faro/learning',own.cookie,'POST',{...learning,practice:currentPractice},201);
+    await f.request('/api/faro/learning',own.cookie,'DELETE',{...learning,expectedPractice:learning.practice,confirmed:true},409);
+    assert.equal(new ProfileService(f.app.db).profile(own.id).learning[0]!.practice.context,currentPractice.context);
+    assert.doesNotMatch(JSON.stringify(await f.request('/api/faro/profile/preview',own.cookie)),/private context|context/);
+    await f.request('/api/faro/learning',own.cookie,'DELETE',{...learning,expectedPractice:currentPractice,confirmed:true});
+    assert.equal(new ProfileService(f.app.db).profile(own.id).learning.length,0);
+    await f.request('/api/faro/claims',own.cookie,'POST',{...claim,practice:{quantity:1,unit:'TASKS'}},201);
+    assert.equal(new ProfileService(f.app.db).profile(own.id).claims[0]!.practice.context,undefined);
+  }finally{await f.close();}
+});
 
 test('own private activity removal cascades proposals, preserves declarations and rolls back on audit failure',async()=>{
   const f=await faroFixture();try{
