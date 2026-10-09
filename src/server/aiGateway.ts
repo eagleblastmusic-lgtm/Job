@@ -10,7 +10,11 @@ export interface AiRequest<T> {
   system: string;
   input: string;
   validate: (value: unknown) => T;
+  maxOutputTokens?:number;
 }
+
+class AiGatewayError extends Error {}
+const MAX_AI_RESPONSE_BYTES=128*1024;
 
 export class AiGateway {
   constructor(private readonly db: JobDatabase, private readonly config: AppConfig) {}
@@ -21,19 +25,22 @@ export class AiGateway {
 
   async structured<T>(request: AiRequest<T>): Promise<T> {
     if (!this.config.aiBaseUrl || !this.config.aiApiKey || !this.config.aiModel) throw new Error('AI provider nie jest skonfigurowany.');
+    const maxTokens=request.maxOutputTokens??2048;
+    if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>4096||!Number.isSafeInteger(this.config.aiTimeoutMs)||this.config.aiTimeoutMs<1||this.config.aiTimeoutMs>60000||Buffer.byteLength(request.input)>32768||Buffer.byteLength(request.system)>32768)throw new AiGatewayError('AI_REQUEST_LIMIT');
     const started = Date.now();
     const inputHash = createHash('sha256').update(request.input).digest('hex');
     let success = 0;
-    let errorCode: string | null = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.aiTimeoutMs);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.config.aiTimeoutMs);
       const response = await fetch(`${this.config.aiBaseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST',
+        redirect:'error',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${this.config.aiApiKey}` },
         body: JSON.stringify({
           model: this.config.aiModel,
           temperature: 0,
+          max_tokens:maxTokens,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: request.system },
@@ -41,21 +48,28 @@ export class AiGateway {
           ]
         }),
         signal: controller.signal
-      }).finally(() => clearTimeout(timeout));
-      if (!response.ok) throw new Error(`AI_HTTP_${response.status}`);
-      const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { total_tokens?: number } };
+      });
+      if (!response.ok) {await response.body?.cancel();throw new AiGatewayError(`AI_HTTP_${response.status}`);}
+      const reader=response.body?.getReader();if(!reader)throw new AiGatewayError('AI_EMPTY_OUTPUT');
+      const chunks:Uint8Array[]=[];let bytes=0;
+      try {
+        while(true){const chunk=await reader.read();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>MAX_AI_RESPONSE_BYTES){await reader.cancel();throw new AiGatewayError('AI_RESPONSE_TOO_LARGE');}chunks.push(chunk.value);}
+      }finally{reader.releaseLock();}
+      let payload:{ choices?: Array<{ message?: { content?: string } }>; usage?: { total_tokens?: number } };
+      try {const parsed:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error();payload=parsed as typeof payload;}catch{throw new AiGatewayError('AI_INVALID_RESPONSE');}
       const content = payload.choices?.[0]?.message?.content;
-      if (!content) throw new Error('AI_EMPTY_OUTPUT');
-      const parsed: unknown = JSON.parse(content);
-      const validated = request.validate(parsed);
+      if (typeof content!=='string'||!content.trim()) throw new AiGatewayError('AI_EMPTY_OUTPUT');
+      let validated:T;
+      try {const parsed:unknown=JSON.parse(content);validated=request.validate(parsed);}catch{throw new AiGatewayError('AI_INVALID_OUTPUT');}
       success = 1;
-      this.log(request, inputHash, Date.now() - started, payload.usage?.total_tokens ?? null, success, null);
+      const usage=payload.usage?.total_tokens;
+      this.log(request, inputHash, Date.now() - started, typeof usage==='number'&&Number.isSafeInteger(usage)&&usage>=0?usage:null, success, null);
       return validated;
     } catch (error) {
-      errorCode = error instanceof Error ? error.message.slice(0, 80) : 'AI_UNKNOWN';
+      const errorCode = controller.signal.aborted?'AI_TIMEOUT':error instanceof AiGatewayError?error.message:'AI_TRANSPORT';
       this.log(request, inputHash, Date.now() - started, null, success, errorCode);
-      throw error;
-    }
+      throw new AiGatewayError(errorCode);
+    }finally{clearTimeout(timeout);}
   }
 
   private log<T>(request: AiRequest<T>, inputHash: string, latencyMs: number, tokenUsage: number | null, success: number, errorCode: string | null): void {
