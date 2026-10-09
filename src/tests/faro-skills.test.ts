@@ -11,7 +11,7 @@ import { faroFixture,offerInput } from './faro-fixture.js';
 import {explainOffer} from '../domain/faro/offers.js';
 import type {Claim} from '../domain/faro/skills.js';
 import type {OfferData} from '../domain/faro/offers.js';
-import {suggestSkills,LOCAL_SUGGESTION_VERSION} from '../domain/faro/skills.js';
+import {suggestSkills,LOCAL_SUGGESTION_VERSION,validateSkillProposalResponse,skillProposalProvenance,SKILL_PROPOSAL_SCHEMA_VERSION} from '../domain/faro/skills.js';
 
 test('local suggestions match complete aliases, preserve meaningful punctuation and never turn untrusted prose into a claim',async()=>{
   for(const text of ['administracja kadrami, warsztat i adres','PostScript, JSON, NoSQL, JavaScriptowy','Germania i Englishman','C+Extra, ADR123, UDTowy'])assert.deepEqual(suggestSkills(text),[],text);
@@ -83,5 +83,35 @@ test('pinned Polish ESCO member-skills preserve URI/provenance and require expli
     const projection=await f.request<{skillClaims:Array<{skill:{id:string;label:string}}>} >('/api/faro/profile/preview',user.cookie);
     assert.deepEqual(projection.skillClaims[0]!.skill,{id:concept.id,label:concept.label});
     await f.request('/api/faro/claims',user.cookie,'POST',{...declaration,skillId:concept.canonicalURI},400);
+  }finally{await f.close();}
+});
+
+test('versioned proposal schema accepts catalog IDs only and reports historical provenance without invented confidence',()=>{
+  for(const response of [null,[],{},'SQL',{skillIds:'SQL'},{skillIds:['unknown']},{skillIds:['faro:legacy:4','faro:legacy:4']},{skillIds:['faro:legacy:4'],verification:'FARO_ASSESSMENT'},{skillIds:['faro:legacy:4'],rationale:'private biography'},{skillIds:['http://data.europa.eu/esco/skill/29c954f2-ed17-4900-bba5-4cfd294f3680']},{skillIds:Array(51).fill('faro:legacy:4')}])assert.throws(()=>validateSkillProposalResponse(response),/SKILL_PROPOSAL_SCHEMA/);
+  assert.deepEqual(validateSkillProposalResponse({skillIds:[]}),[]);
+  const result=validateSkillProposalResponse({skillIds:['esco:29c954f2-ed17-4900-bba5-4cfd294f3680','faro:legacy:4']});
+  assert.deepEqual(result.map(s=>s.skillId),['esco:29c954f2-ed17-4900-bba5-4cfd294f3680','faro:legacy:4']);
+  assert.ok(result.every(s=>s.modelVersion===LOCAL_SUGGESTION_VERSION));assert.doesNotMatch(JSON.stringify(result),/verification|confidence|private biography/);
+  const current=skillProposalProvenance(LOCAL_SUGGESTION_VERSION);assert.equal(current.producer,'LOCAL_RULES');assert.equal(current.schemaVersion,SKILL_PROPOSAL_SCHEMA_VERSION);assert.equal(current.promptVersion,null);assert.equal(current.confidence,null);
+  for(const version of ['local-question-rules-v1','local-question-rules-v2']){const old=skillProposalProvenance(version);assert.equal(old.modelVersion,version);assert.equal(old.producer,'LOCAL_RULES');assert.equal(old.schemaVersion,null);assert.equal(old.confidence,null);}
+  assert.deepEqual(skillProposalProvenance('unrecognized-source'),{producer:'UNKNOWN',modelVersion:'unrecognized-source',schemaVersion:null,promptVersion:null,confidence:null});
+});
+
+test('own proposal lineage retains original versions and decisions without entering employer projection or surviving source removal',async()=>{
+  const f=await faroFixture();try{
+    const own=await f.user('ProposalLineage'),other=await f.user('ProposalLineageOther');
+    await f.request('/api/faro/profile',own.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    type Proposal={id:string;activity_id:string;model_version:string;status:string;created_at:string;decided_at:string|null;provenance:ReturnType<typeof skillProposalProvenance>};
+    const recorded=await f.request<{activities:Array<{id:string}>;proposals:Proposal[];claims:unknown[]}>('/api/faro/activities',own.cookie,'POST',{description:'LINEAGE_PRIVATE_SENTINEL SQL',source:'WORK',provenance:{producer:'AI',confidence:1},modelVersion:'forged'},201);
+    const proposal=recorded.proposals[0]!;assert.equal(proposal.activity_id,recorded.activities[0]!.id);assert.equal(proposal.model_version,LOCAL_SUGGESTION_VERSION);assert.equal(proposal.provenance.schemaVersion,SKILL_PROPOSAL_SCHEMA_VERSION);assert.equal(proposal.decided_at,null);assert.match(proposal.created_at,/^\d{4}-\d{2}-\d{2}T/);assert.equal(recorded.claims.length,0);
+    const foreign=await f.request<{activities:unknown[];proposals:unknown[]}>('/api/faro/profile',other.cookie);assert.deepEqual(foreign.activities,[]);assert.deepEqual(foreign.proposals,[]);
+    f.app.db.db.prepare('UPDATE faro_proposals SET model_version=? WHERE id=?').run('local-question-rules-v2',proposal.id);
+    const historical=await f.request<{proposals:Proposal[]}>('/api/faro/profile',own.cookie);assert.equal(historical.proposals[0]!.provenance.schemaVersion,null);
+    const accepted=await f.request<{proposals:Proposal[];claims:Claim[]}>(`/api/faro/proposals/${proposal.id}`,own.cookie,'POST',{status:'ACCEPTED',confirmed:true,level:'BASICS',source:'WORK',practice:{quantity:1,unit:'TASKS'},modelVersion:'forged',provenance:{confidence:1}});
+    assert.equal(accepted.proposals[0]!.status,'ACCEPTED');assert.equal(accepted.proposals[0]!.model_version,'local-question-rules-v2');assert.equal(accepted.proposals[0]!.created_at,proposal.created_at);assert.ok(accepted.proposals[0]!.decided_at);assert.equal(accepted.proposals[0]!.provenance.confidence,null);assert.equal(accepted.claims[0]!.verification,'DECLARED');
+    const projection=await f.request('/api/faro/profile/preview',own.cookie);assert.doesNotMatch(JSON.stringify(projection),/LINEAGE_PRIVATE_SENTINEL|activity_id|model_version|provenance|schemaVersion/);
+    await f.request(`/api/faro/claims/${accepted.claims[0]!.id}`,own.cookie,'DELETE',{});
+    const withdrawn=await f.request<{claims:unknown[];proposals:Proposal[]}>('/api/faro/profile',own.cookie);assert.equal(withdrawn.claims.length,0);assert.deepEqual(withdrawn.proposals,accepted.proposals);
+    const removed=await f.request<{activities:unknown[];proposals:unknown[]}>(`/api/faro/activities/${proposal.activity_id}`,own.cookie,'DELETE',{confirmed:true});assert.equal(removed.activities.length,0);assert.equal(removed.proposals.length,0);
   }finally{await f.close();}
 });

@@ -8,7 +8,7 @@ export interface Profile {
   firstName: string; phone: string | null; version: number;
   availability: { kind: string; value: string | null }; claims: Claim[]; learning: Learning[];
   activities: Array<{ id: string; description: string; source: string }>;
-  proposals: Array<{ id: string; skill_id: string; rationale: string; status: string }>;
+  proposals: Array<{ id: string; activity_id:string; skill_id: string; rationale: string; status: string; created_at:string; decided_at:string|null; provenance:{producer:string;modelVersion:string|null;schemaVersion:string|null;promptVersion:null;confidence:null} }>;
 }
 export interface Projection {
   firstName: string; skillClaims: Array<{ skill: Skill; level: string; source: string; verification: string; practice: Practice }>;

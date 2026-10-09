@@ -57,6 +57,11 @@ test('Faro real candidate and employer process, private watch, economics and res
     await page.locator('[data-form=activity] [name=description]').fill('PRIVATE_BROWSER_ERASURE SQL');
     await page.getByRole('button',{name:'Zapisz i sprawdź propozycje',exact:true}).click();
     await expect(page.getByText('PRIVATE_BROWSER_ERASURE SQL',{exact:true})).toBeVisible();
+    await page.getByText('SQL — potwierdź lub odrzuć',{exact:true}).click();
+    await expect(page.getByText(/Lokalne reguły Faro · local-question-rules-v3/)).toBeVisible();
+    await page.getByRole('button',{name:'To nie opisuje mojej praktyki',exact:true}).click();
+    await page.getByText('Historia decyzji o propozycjach',{exact:true}).click();
+    await expect(page.getByText(/SQL · Odrzucono propozycję/)).toBeVisible();
     await page.getByText('Usuń prywatny opis',{exact:true}).click();
     await page.getByLabel('Potwierdzam usunięcie tego opisu i jego propozycji.').check();
     await page.getByRole('button',{name:'Usuń opis i propozycje',exact:true}).click();

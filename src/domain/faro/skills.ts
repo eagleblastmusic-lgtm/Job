@@ -15,7 +15,19 @@ export interface Learning { skillId: string; mode: 'SELF_DEVELOPING' | 'WANTS_TO
 export interface Availability { kind: 'UNKNOWN' | 'IMMEDIATE' | 'AFTER_PERIOD' | 'ON_DATE'; value: string | null; updatedAt: string; }
 const skillsById=new Map(SKILL_CATALOG.map(skill=>[skill.id,skill]));
 export function skillById(id: string) { return skillsById.get(id); }
-export const LOCAL_SUGGESTION_VERSION = 'local-question-rules-v2';
+export const LOCAL_SUGGESTION_VERSION = 'local-question-rules-v3';
+export const SKILL_PROPOSAL_SCHEMA_VERSION='faro-skill-proposal-ids-v1';
+/** Producer output is untrusted. Only catalog IDs enter persisted pending questions. */
+export function validateSkillProposalResponse(response:unknown) {
+  if(!response||typeof response!=='object'||Array.isArray(response)||Object.keys(response).length!==1||!Object.hasOwn(response,'skillIds'))throw new Error('SKILL_PROPOSAL_SCHEMA');
+  const ids=(response as {skillIds:unknown}).skillIds;
+  if(!Array.isArray(ids)||ids.length>50||ids.some(id=>typeof id!=='string'||!skillById(id))||new Set(ids).size!==ids.length)throw new Error('SKILL_PROPOSAL_SCHEMA');
+  return (ids as string[]).map(skillId=>({skillId,rationale:`Czy wykonywano czynność: ${skillById(skillId)!.label}? Opis nie jest dowodem kompetencji.`,modelVersion:LOCAL_SUGGESTION_VERSION}));
+}
+export function skillProposalProvenance(modelVersion:unknown) {
+  const known=typeof modelVersion==='string'&&['local-question-rules-v1','local-question-rules-v2',LOCAL_SUGGESTION_VERSION].includes(modelVersion);
+  return {producer:known?'LOCAL_RULES':'UNKNOWN',modelVersion:typeof modelVersion==='string'?modelVersion:null,schemaVersion:modelVersion===LOCAL_SUGGESTION_VERSION?SKILL_PROPOSAL_SCHEMA_VERSION:null,promptVersion:null,confidence:null};
+}
 function containsAlias(text:string,alias:string) {
   const needle=normalizeText(alias);
   let offset=text.indexOf(needle);
@@ -28,8 +40,7 @@ function containsAlias(text:string,alias:string) {
 }
 export function suggestSkills(description: string) {
   const text = normalizeText(description);
-  return LOCAL_SKILL_CATALOG.filter(skill => skill.aliases.some(alias => containsAlias(text,alias)))
-    .map(skill => ({ skillId: skill.id, rationale: `Czy wykonywano czynność: ${skill.label}? Opis nie jest dowodem kompetencji.`, modelVersion: LOCAL_SUGGESTION_VERSION }));
+  return validateSkillProposalResponse({skillIds:LOCAL_SKILL_CATALOG.filter(skill => skill.aliases.some(alias => containsAlias(text,alias))).map(skill=>skill.id)});
 }
 
 /** No free text, arbitrary metadata, URLs or private activity descriptions cross this boundary. */
