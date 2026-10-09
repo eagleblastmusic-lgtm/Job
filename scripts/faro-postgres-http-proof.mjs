@@ -28,6 +28,14 @@ export async function proveNativeHttp(database,config){
   const retired=await json('/api/profile','','GET',undefined,410);assert.equal(retired.error.code,'RETIRED_FEATURE');
   await json('/api/faro/profile','','GET',undefined,401);
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
+  const geography=await json('/api/faro/geography',candidate.cookie);
+  assert.equal(geography.dataBasis,'OPENSTREETMAP');assert.equal(geography.publicServiceRequestsEnabled,false);
+  const distance=await json('/api/faro/geography/distance',candidate.cookie,'POST',{from:{latitude:0,longitude:179},to:{latitude:0,longitude:-179}});
+  assert.equal(distance.distanceMeters,222390);assert.equal(distance.commuteMinutes,null);assert.equal(distance.transitFare,null);
+  await json('/api/faro/geography/distance',candidate.cookie,'POST',{from:{latitude:91,longitude:0},to:{}},400);
+  for(const path of ['/api/job-search','/api/job-feed/import-user','/api/jobs/import']){
+    assert.equal((await json(path,candidate.cookie,'POST',{},410)).error.code,'RETIRED_FEATURE');
+  }
   await json('/api/auth/register','','POST',{name:'Foreign',email:'foreign@example.pl',password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true},403,{origin:'https://foreign.invalid'});
   await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
   const sourcePractice={quantity:24,unit:'MONTHS',context:'PRIVATE_NATIVE_ACTIVITY_CONTEXT'};

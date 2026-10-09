@@ -1,4 +1,5 @@
 import { fileDisposalStatusQuery } from './fileDisposalModel.js';
+import { geographyCapabilities, straightLineDistance } from '../../domain/faro/geography.js';
 import { clearSessionCookie } from '../app.js';
 import { revokeSessionsQueries } from './identityAccessModel.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -79,6 +80,11 @@ export interface FaroRouteServices {
 export async function routeFaroApi(req:IncomingMessage,res:ServerResponse,path:string,config:AppConfig,user:ReturnType<typeof requireExtendedUser>,body:Record<string,unknown>,services:FaroRouteServices,worker:FaroWorker){
  const {profiles,offers,recruitment,assessments,economics,trust}=services,method=req.method??'GET';
  const ok=(data:unknown,status=200)=>{sendJson(res,status,data);return true;};
+    if(path==='/api/faro/geography'&&method==='GET')return ok(geographyCapabilities());
+    if(path==='/api/faro/geography/distance'&&method==='POST'){
+      try{return ok(straightLineDistance(body.from,body.to));}
+      catch{throw new HttpError(400,'Podaj prawidłowe współrzędne.','VALIDATION_ERROR');}
+    }
     if(path==='/api/faro/sessions/revoke-all'&&method==='POST') {
       await services.revokeSessions(user,body);
       res.setHeader('set-cookie',clearSessionCookie(config));

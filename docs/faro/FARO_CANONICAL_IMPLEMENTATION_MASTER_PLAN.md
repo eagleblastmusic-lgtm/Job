@@ -1291,3 +1291,8 @@ Existing persisted claim confirmedAt/version are now visible in the own profile 
 
 
 Final CP03-M acceptance2026-10-09: exact32c07ae FARO37953185120 and CI37953184862 SUCCESS, every required job, including PostgreSQL18 Node22/24 native desktop/mobile browser contracts and compatibility/quality containers. Local build/lint/typecheck and default desktop/mobile main journey2 PASS. Existing accepted backend/recovery evidence remains valid. Existing Free service in Bartosz workspace deployed exact32c07ae as dep-db4gncnlk1mc73fvvbn0, Live in55.5s at17:44:42 Europe/Warsaw. New process6r5qt recorded0038 ALREADY_CURRENT and EXISTING_SCHEMA_RETAINED at17:44:36, listener port10000 at17:44:38. Final actual HTTPS smoke after Live PASS; ACCOUNT_CLEANUP_PASS. No resource/plan/secret/schema change or production operation. Screenshot retained locally outside Git. Whole-plan acceptance remains PARTIAL because the independent artifacts and protected operational inputs listed in EXTERNAL_ACCEPTANCE_PACKET.md are unavailable; CI and staging do not substitute for those decisions.
+
+
+## Founder update: native offers and OSM (2026-10-09)
+
+[Binding scope and current dependency classification](FOUNDER_UPDATE_NATIVE_OSM.md) supersedes incompatible historical rows. Only employer-authored native offers are eligible; external job-portal import and license procurement are excluded and cannot block launch. OSM is the geographic data basis with separate map/geocoder/router capabilities, no configured public or paid service, and retained manual Job Economics. Current implementation verification is recorded separately; independent production/legal/security/research/custody gates remain open.

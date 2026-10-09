@@ -1,0 +1,520 @@
+{
+  "schemaVersion": "faro-skill-validation-packet-v1",
+  "catalogHash": "8475ffac0aa6481629c6fbea4e69a6bd29e4faf30fa1d441773c26a331decdfe",
+  "conceptCount": 13962,
+  "participants": [],
+  "empiricalResults": [],
+  "aliasCollisions": [
+    {
+      "alias": "adr",
+      "skillIds": [
+        "faro:legacy:14",
+        "esco:cea50b44-932c-49ac-8511-5efdd8bb38ca"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "analizowac partytury muzyczne",
+      "skillIds": [
+        "esco:282a379e-249d-4cae-81ec-ce901a571801",
+        "esco:3e2d3720-84e3-4b4f-84db-013fe1fea42f"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "angielski",
+      "skillIds": [
+        "faro:legacy:15",
+        "esco:6d3edede-8951-4621-a835-e04323300fa0"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "badanie rynku",
+      "skillIds": [
+        "esco:8770350e-746f-4adb-9556-18ca68104be6",
+        "esco:b011c8b4-76e1-4bbc-8bb9-1d205e7b618a"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "biotechnologia",
+      "skillIds": [
+        "esco:609d6bb4-db16-4578-87fc-57b11a701cc2",
+        "esco:61bef658-d7f9-4759-b1b0-0f9cb3bc581a"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "chronic obszary naturalne",
+      "skillIds": [
+        "esco:5be72e00-e506-45ca-a251-b59500d7fca7",
+        "esco:e9d6ebab-13ad-45ce-a955-fc3f1e56add8"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "did",
+      "skillIds": [
+        "esco:4570a262-b51f-46a1-a834-13ff67bee1c8",
+        "esco:85ac537a-9233-42cc-a6e8-73851e77d214"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "dietetyka",
+      "skillIds": [
+        "esco:78521a78-d0b6-41ca-ae11-d1af9da8a3cb",
+        "esco:f190355a-cea5-4cd0-b6cd-a5c3d9a14985"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "geografia",
+      "skillIds": [
+        "esco:cf9c8e73-105d-419e-86dd-4304cc6cd718",
+        "esco:fa64c52c-08cf-4074-bc9b-a93075802166"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "handel miedzynarodowy",
+      "skillIds": [
+        "esco:11cbcf7f-8dc3-4c9a-9ec1-37f51b5cbc19",
+        "esco:77931759-69af-4637-8b26-c8376f9240e2"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "hodowac bydlo",
+      "skillIds": [
+        "esco:60ac9cee-9ece-4c2c-ad16-d94a51127976",
+        "esco:c669c40c-d8dc-4eff-8e06-7043ff4a860c"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "hodowac drob",
+      "skillIds": [
+        "esco:e04b5fe4-9664-48c0-8268-b4c35d908082",
+        "esco:fbc604e2-2574-4f2d-a8aa-0a9f9a89c635"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "immunologia kliniczna",
+      "skillIds": [
+        "esco:13af7f6b-6d72-4e7d-86f6-3e6d1bd6ef7a",
+        "esco:8ba9a58f-a491-4a23-9325-85f3b171aa53"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "improwizowac",
+      "skillIds": [
+        "esco:4327690a-e639-4b58-98b5-d078d6b90b07",
+        "esco:b40584aa-7c63-4eed-9422-a9798fb95fdc"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "interpretowac schematy elektryczne",
+      "skillIds": [
+        "esco:02c71cde-f513-43da-8952-0974763c7568",
+        "esco:fe96f581-4905-4282-819c-922c68bda989"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "javascript",
+      "skillIds": [
+        "faro:legacy:5",
+        "esco:3cd569a2-4f88-4c1e-9995-8dce8c5e51a7"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "korzystac z dokumentacji technicznej",
+      "skillIds": [
+        "esco:b3452779-ece5-4cc9-8872-87953f9fe0b4",
+        "esco:cffc3e97-e942-4b13-a2f3-0bf4910c06d3"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "metasploit",
+      "skillIds": [
+        "esco:50597e96-9b6a-4736-ac79-dd80f36c0269",
+        "esco:de586dcf-d7e5-4340-bf5b-d59026f1b436"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "nadzorowac prace porzadkowe",
+      "skillIds": [
+        "esco:00f12ec1-b416-4e3c-8ed7-c4f875c6b681",
+        "esco:a97353c8-f2a3-47be-86e1-f7c301fca630"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "niemiecki",
+      "skillIds": [
+        "faro:legacy:16",
+        "esco:4812a4ea-dc55-4dc6-b9b0-4a59bba2c647"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "obsluga klienta",
+      "skillIds": [
+        "faro:activity:customer-service",
+        "esco:15a33d76-4640-438d-ae64-fdc0c1d3eebc"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "obslugiwac sprzet do lutowania",
+      "skillIds": [
+        "esco:26ed52cf-30ca-451e-9699-a6c04a30649f",
+        "esco:f30a7ea4-77dd-452c-8a2d-b06c12606a7f"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "obslugiwac sprzet ogrodniczy",
+      "skillIds": [
+        "esco:69c865d1-39d6-48ae-b33f-75a7e9cc1811",
+        "esco:949fe489-274a-4ce5-8c00-334b46b144e3"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "ochrona danych",
+      "skillIds": [
+        "esco:86d2e2ea-1ba2-4aa6-b465-8a1f9abc81b8",
+        "esco:a4346013-a967-4a58-a533-6b32ad1364c5"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "opracowywac choreografie",
+      "skillIds": [
+        "esco:82a1fa7e-7361-45de-90fb-67709eb9d238",
+        "esco:de6bdb77-e160-4d19-bdf4-121e4fdada33"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "opracowywac materialy edukacyjne",
+      "skillIds": [
+        "esco:3a5b7435-c262-4a9d-893d-ee6c19bd9d92",
+        "esco:b6d14ab8-3441-4cbe-8a0e-5b4f7f994730"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "opracowywac modele prognostyczne",
+      "skillIds": [
+        "esco:38d49d88-9069-467b-b29e-3cae739bdd4d",
+        "esco:e2887d71-8ff4-4188-9926-22bdaefa7713"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "organizowac rezerwacje",
+      "skillIds": [
+        "esco:18d39e12-b7f5-4426-8b84-afd3d43af20e",
+        "esco:20697183-d42a-45fc-b8ad-03e49bdb7d9e",
+        "esco:345486f3-f265-4fc8-8ed0-5e96e768e333"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "organizowac transport i zakwaterowanie",
+      "skillIds": [
+        "esco:4b406514-b3ed-4906-a347-7ebe6be52450",
+        "esco:7c32a84c-2733-4bc7-8909-3b3413c9cc88"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "pierwsza pomoc przedmedyczna",
+      "skillIds": [
+        "esco:eaa4cdc0-43e0-4388-9b8a-e2779218d10e",
+        "esco:f7464f30-662b-4177-85a0-3df9693e9e58"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "platformy do e-learningu",
+      "skillIds": [
+        "esco:6c80d53c-d8c9-41fe-998f-091fca208834",
+        "esco:8bc3c77c-30c3-45e6-bd61-069ba433ecfe"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "prawo pracy",
+      "skillIds": [
+        "esco:08fe5910-8c4c-4679-a988-eb2ded3c4909",
+        "esco:b3f22ab4-b553-439d-80a2-5b8ae6d11e0d"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "programowanie sieciowe",
+      "skillIds": [
+        "esco:69bbd53f-fbb0-4476-b4b2-ef7844464e28",
+        "esco:b105ec9b-0857-41d6-8d07-a83e58b73d90"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "programowanie zwinne",
+      "skillIds": [
+        "esco:bec4359e-cb92-468f-a997-8fb28e32fba9",
+        "esco:dba46f87-0831-49cd-a1c7-340a653c0221"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "prowadzic badania naukowe",
+      "skillIds": [
+        "esco:485cdafb-3c7f-4104-ab1c-773e6131a39a",
+        "esco:4fabca9a-7435-4f33-b1da-3cdb00340fdc"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "przepisy dotyczace zywnosci",
+      "skillIds": [
+        "esco:713f1ba8-c7a8-43e5-a5cc-0b869474efe7",
+        "esco:e591f458-93c4-4cc7-a441-2340545c33f3"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "przyjmowac rezerwacje",
+      "skillIds": [
+        "esco:345486f3-f265-4fc8-8ed0-5e96e768e333",
+        "esco:936a42f0-a586-4595-9e47-ca93210761fd"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "radiologia i diagnostyka obrazowa",
+      "skillIds": [
+        "esco:30281a0e-a82a-4d13-bd74-4b0fd9964e02",
+        "esco:57e7593f-0871-421c-88b2-a02acd85d79e"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "rozwiazywac problemy",
+      "skillIds": [
+        "esco:334e3e49-fb02-4051-809a-f06adfdc1c40",
+        "esco:adc6dc11-3376-467b-96c5-9b0a21edc869"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "scinac drzewa",
+      "skillIds": [
+        "esco:51b4a8c4-6af7-41b7-a68d-f3c2fd63c9ec",
+        "esco:b8cfe3d0-15a7-4be4-a7f1-f5141ed11f16"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "skladac skamienialosci",
+      "skillIds": [
+        "esco:f996a41d-0255-4826-985b-69a409c6b3c6",
+        "esco:fc22be3f-e080-43a8-b3b2-ef95685dfbdf"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "spiewac",
+      "skillIds": [
+        "esco:e50a68c5-2a5d-4815-8bd1-e4334aed7683",
+        "esco:e78ac0fc-7a1d-4462-960a-a560c2e152ce"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "sql",
+      "skillIds": [
+        "faro:legacy:4",
+        "esco:598de5b0-5b58-4ea7-8058-a4bc4d18c742",
+        "esco:ab1e97ed-2319-4293-a8b7-072d2648822f"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "stacji",
+      "skillIds": [
+        "faro:activity:customer-service",
+        "faro:activity:cash-register",
+        "faro:activity:sales",
+        "faro:activity:shift-work",
+        "faro:activity:conflict-resolution"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "systemy fotowoltaiczne",
+      "skillIds": [
+        "esco:8248a071-5307-4a64-a62d-643a35ec31e2",
+        "esco:e45507ff-c1e2-4e0c-92fb-b6c0e6cb6245"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "techniki teledetekcji",
+      "skillIds": [
+        "esco:67785eab-0818-41f9-9756-a8e0a215b95b",
+        "esco:cbb330ab-55ac-4eec-b54c-b85c6219f508"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "tworzenie tresci cyfrowych",
+      "skillIds": [
+        "esco:d822b4b2-26c7-4bd9-970d-229c6504f615",
+        "esco:f5369f2f-e52b-43d8-8d31-79a6c11188d8"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "typescript",
+      "skillIds": [
+        "faro:legacy:6",
+        "esco:867137fb-ff1b-4ca3-99f3-cb6969aa2c68"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "udzielac informacji na temat produktow leczniczych",
+      "skillIds": [
+        "esco:077fb5d5-a9a2-4e27-b1b0-fe3149ba3da0",
+        "esco:4d8a78b7-b647-4d33-8bcf-1e472d3d5ba3"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "weryfikowac tlumaczenia",
+      "skillIds": [
+        "esco:da3fb416-d3ee-4d2b-864c-050d8122ee13",
+        "esco:e49978bc-1c11-4d8e-a04f-1d7f023aee9b"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "wspolpracowac z inzynierami",
+      "skillIds": [
+        "esco:94b2c46e-6338-4a1d-950a-d44eef018c53",
+        "esco:d1317634-ccea-44d0-9cdc-c863f9bf856b"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "wszczepiac zwierzetom mikrochipy",
+      "skillIds": [
+        "esco:749ae61c-fe7b-461b-8bc3-349f46617ee7",
+        "esco:d4ea6fc9-e533-480e-851e-285c0ffe5125"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "wybierac szklo",
+      "skillIds": [
+        "esco:02f115d8-9e14-499c-97c1-f9eac282edc5",
+        "esco:1493adef-8342-418b-bf61-87cf8a99c4d7"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zapewniac uslugi wsparcia dla gosci",
+      "skillIds": [
+        "esco:75dfe1ee-5935-42ce-b820-697f827825c3",
+        "esco:82c1ddba-af60-4061-a572-b33fc71d1baa"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zarzadzac odpadami skalnymi",
+      "skillIds": [
+        "esco:2fb4b423-c1e4-407d-ba48-38032d8dcda2",
+        "esco:8ddd7e74-d187-48a1-9009-ff06b268f6cc"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zarzadzac procesami",
+      "skillIds": [
+        "esco:75b30aeb-34c0-40f4-b77d-271d75a98b14",
+        "esco:940a70fa-7c58-423b-8d03-34920b59f0f7"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zarzadzac przychodami",
+      "skillIds": [
+        "esco:3e28860e-f520-461d-8282-a32264c4f4a1",
+        "esco:c1eb6a1a-e830-482a-8f13-f5c2f5b11b5d"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zarzadzac zapasami i wyposazeniem obozu",
+      "skillIds": [
+        "esco:27cea4fb-1441-4694-8771-f54376b8f50f",
+        "esco:4481bdde-c960-4b36-82fc-fa768d4474ad"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zarzadzanie tozsamoscia cyfrowa",
+      "skillIds": [
+        "esco:33efa504-2f26-424d-b662-cee77e6e9c93",
+        "esco:bc0b0b5d-f6be-405a-b224-b6902a4dbe97"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zasady zarzadzania projektami",
+      "skillIds": [
+        "esco:237db40b-4600-47c0-837f-4a2c4f3014ab",
+        "esco:7111b95d-0ce3-441a-9d92-4c75d05c4388"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    },
+    {
+      "alias": "zoonozy",
+      "skillIds": [
+        "esco:2465763d-2bc8-4d76-8705-4755a2a120ce",
+        "esco:f40f94f2-1d6d-47db-8005-11e0d7cc8d2e"
+      ],
+      "status": "HYPOTHESIS_REQUIRES_REVIEW"
+    }
+  ],
+  "reviewContract": {
+    "required": [
+      "catalogHash",
+      "skillIds",
+      "relation",
+      "reviewerReference",
+      "evidenceReference",
+      "studyScope",
+      "limitations"
+    ],
+    "permittedRelations": [
+      "DISTINCT",
+      "POSSIBLE_OVERLAP",
+      "POSSIBLE_PREREQUISITE"
+    ],
+    "matchingEffect": "NONE",
+    "empiricalValidation": "EXTERNAL_BLOCKED"
+  }
+}

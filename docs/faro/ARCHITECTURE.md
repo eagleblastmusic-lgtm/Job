@@ -15,3 +15,8 @@ CP10-F: reviewed result validity is a separate dimension from attempt lifecycle.
 CP06-I supersedes the missing local reservation mechanism: migration0030 adds durable SQLite leases and bounded claim budgets, with atomic write reservation/delivery and fencing. Two real competing processes on one SQLite file are exercised; this does not authorize multiple app deployments or prove PostgreSQL/distributed scheduling. Production scheduler remains disabled, inbox is the only delivery channel. Recovery invalidates snapshot lease tokens.
 
 CP03-H adds 13,939 pinned Polish ESCO v1.2.1 member-skills with canonical URI/version/aliases/source attribution and hash manifest, preserving all 23 authored nodes. Candidate/learning/offer selectors search the catalog locally with bounded DOM; the authenticated session loads it once and clears it at logout. Exact skill IDs remain the matching contract; no implicit equivalence or automatic verification. Production dataset/provider approval and empirical mapping validation remain separate.
+
+
+## Founder update: native offers and OSM (2026-10-09)
+
+[Binding scope and current dependency classification](FOUNDER_UPDATE_NATIVE_OSM.md) supersedes incompatible historical rows. Only employer-authored native offers are eligible; external job-portal import and license procurement are excluded and cannot block launch. OSM is the geographic data basis with separate map/geocoder/router capabilities, no configured public or paid service, and retained manual Job Economics. Current implementation verification is recorded separately; independent production/legal/security/research/custody gates remain open.

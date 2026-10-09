@@ -28,6 +28,8 @@ jobs:
       - run: npm run validate:migrations
       - name: Canonical invariants and reused authentication/security contracts
         run: npm run test:faro
+      - name: Skill validation tooling never fabricates empirical evidence
+        run: node --test scripts/faro-skill-validation-packet.test.mjs
       - name: Real-file Canonical erasure and authority recovery
         run: node scripts/faro-backup-restore-exercise.mjs
   browser:
