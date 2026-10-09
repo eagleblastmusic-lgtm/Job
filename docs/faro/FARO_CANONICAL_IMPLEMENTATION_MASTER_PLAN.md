@@ -1247,3 +1247,8 @@ Hosted CP03-H acceptance: exact d249839 deployed to existing Free service in Bar
 ## CP03-I — Versioned proposal boundary and private lineage
 
 [Scope](CP03_I_PROPOSAL_PROVENANCE.md). Existing local producer validates catalog-only output before persistence; new v3/schema provenance, existing source/time fields and private decision history are available in the own workspace. Prior v1/v2 decisions stay unchanged, unknown source stays unknown, measured confidence/prompt remain null. Actual API ownership/history/privacy/withdrawal/erasure and schema11 PASS; final full/browsers/native CI pending. No migration, external model, paid resource or production operation; work continues against the full plan.
+
+
+## CP03-J — Bounded AI transport and final staging verification
+
+[Scope](CP03_J_AI_TRANSPORT_BOUNDARY.md). Existing gateway now bounds the entire response deadline, bytes and token budget, rejects redirects, validates structured semantics and audits controlled error codes. Local targeted4/full195 Node/build/lint/typecheck/diff PASS, zero skips. Exact cd36d99 FARO37932153174 SUCCESS; general CI37932153248 SUCCESS, every required job. CP03-I1d5b8c9 FARO37931093665/CI37931093716 SUCCESS, every job. Free staging deployed exact1d5b8c9 as dep-db4e5ajncjis73cn6n00 in56.5s; process cqsc4 retained schema at14:49:33 Europe/Warsaw on2026-10-09, listener14:49:35, Live14:49:39. Synthetic HTTPS smoke and account cleanup PASS. No paid resource or production operation.
