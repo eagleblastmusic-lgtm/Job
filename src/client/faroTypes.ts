@@ -7,7 +7,7 @@ export interface Profile {
   preferences:{active?:boolean;workModels?:string[];contracts?:string[];noNights?:boolean;noWeekends?:boolean;maxCommuteMinutes?:number|null;salaryMinimum?:{amount:number;currency:string;basis:string;period:string;hoursPerPeriod:number;ftePercent:number}|null};
   firstName: string; phone: string | null; version: number;
   availability: { kind: string; value: string | null }; claims: Claim[]; learning: Learning[];
-  activities: Array<{ id: string; description: string; source: string }>;
+  activities: Array<{ id: string; description: string; source: string; created_at:string; practice:Practice|null }>;
   proposals: Array<{ id: string; activity_id:string; skill_id: string; rationale: string; status: string; created_at:string; decided_at:string|null; provenance:{producer:string;modelVersion:string|null;schemaVersion:string|null;promptVersion:null;confidence:null} }>;
 }
 export interface Projection {

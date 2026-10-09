@@ -1268,3 +1268,8 @@ CY exact final acceptance2026-10-09:054196a FARO37856922577 and CI37856922591 SU
 
 
 CP02-I exact final acceptance2026-10-09:e127089 FARO37857818844 and CI37857818846 SUCCESS, every required job. PostgreSQL18 Node22/24 rejects invalid phone edits with profile/audit state retained; native/default desktop/mobile browsers, full contracts and container/recovery checks accepted. Local profile/recruitment25 and final contact1/build/lint/typecheck/syntax/diff PASS. No schema/client/hosted configuration or production change. Staging remains accepted f08e62f; whole plan/release PARTIAL and independent external dependencies unchanged.
+
+
+## CP03-K/L — Private practice and source attribution
+
+[CP03-K](CP03_K_PRIVATE_PRACTICE_CONTEXT.md)49edb4f accepted by FARO37937977695/CI37937977838, every job; hosted Free deployment dep-db4evbss728c73aibf7g retains data/schema, HTTPS smoke/cleanup PASS. [CP03-L](CP03_L_ACTIVITY_PRACTICE.md) extends existing private activity with optional quantity/unit/context and source/date display, preserving unknown historical practice and separate explicit claims. One additive migration0038; local full198/default desktop/mobile2/build/lint/types/migrations/source-only PASS. Bounded optional hosted upgrade and native verification pending. Full plan remains PARTIAL; no paid resource or production operation.

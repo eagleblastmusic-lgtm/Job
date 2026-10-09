@@ -112,8 +112,9 @@ export function profileLearningRemovalQueries(userId:string,body:Record<string,u
 }
 export function profileActivityQueries(userId:string,body:Record<string,unknown>,asOf:string) {
   const description=text(body.description,3000),source=choice(body.source,SOURCES),id=randomUUID();
+  const practice=body.practice===undefined?null:JSON.stringify(profilePractice(body.practice,true));
   return [
-    {text:'INSERT INTO faro_activities(id,user_id,description,source,created_at) VALUES($1,$2,$3,$4,$5)',values:[id,userId,description,source,asOf]},
+    {text:'INSERT INTO faro_activities(id,user_id,description,source,created_at,practice) VALUES($1,$2,$3,$4,$5,$6)',values:[id,userId,description,source,asOf,practice]},
     ...suggestSkills(description).map(proposal=>({text:'INSERT INTO faro_proposals(id,user_id,activity_id,skill_id,rationale,model_version,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)',values:[randomUUID(),userId,id,proposal.skillId,proposal.rationale,proposal.modelVersion,asOf]})),
     profileAuditQuery(userId,'ACTIVITY_RECORDED',id,asOf)
   ];

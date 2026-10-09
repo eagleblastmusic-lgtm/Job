@@ -29,8 +29,23 @@ try {
  assert.equal((await target.query('SELECT value FROM public.private_sentinel')).rows[0].value,'synthetic preserved');
  assert.equal((await target.query('SELECT 1 FROM pg_namespace WHERE nspname=$1',[schema])).rows.length,0);await target.query('DROP TABLE public.private_sentinel');
  phase='PREPARE';const prepared=await run(process.execPath,args,{env,windowsHide:true});assert.match(prepared.stdout,/EMPTY_SCHEMA_PREPARED/);
- assert.equal(Number((await target.query(`SELECT count(*) FROM ${schema}.schema_migrations`)).rows[0].count),37);
+ assert.equal(Number((await target.query(`SELECT count(*) FROM ${schema}.schema_migrations`)).rows[0].count),38);
  assert.equal(Number((await target.query(`SELECT count(*) FROM ${schema}.users`)).rows[0].count),0);
+ phase='UPGRADE';
+ await target.query(`ALTER TABLE ${schema}.faro_activities DROP COLUMN practice`);await target.query(`DELETE FROM ${schema}.schema_migrations WHERE version='0038_faro_activity_practice'`);
+ await target.query(`INSERT INTO ${schema}.users(id,email,name,password_hash,role,created_at,updated_at) VALUES('upgrade-owner','upgrade-owner@example.pl','SyntheticOwner','synthetic','USER','2020-01-01','2020-01-01')`);
+ await target.query(`INSERT INTO ${schema}.faro_activities(id,user_id,description,source,created_at) VALUES('upgrade-activity','upgrade-owner','synthetic original source','WORK','2020-01-01')`);
+ const retainedBefore=(await target.query(`SELECT * FROM ${schema}.faro_activities`)).rows;
+ await assert.rejects(()=>run(process.execPath,args,{env,windowsHide:true}));assert.deepEqual((await target.query(`SELECT * FROM ${schema}.faro_activities`)).rows,retainedBefore);
+ const upgradeEnv={...env,FARO_STAGING_ACTIVITY_PRACTICE_UPGRADE:'confirmed'};
+ await target.query(`ALTER TABLE ${schema}.schema_migrations ADD CONSTRAINT reject_upgrade_ledger CHECK(version<>'0038_faro_activity_practice') NOT VALID`);
+ await assert.rejects(()=>run(process.execPath,args,{env:upgradeEnv,windowsHide:true}));
+ assert.deepEqual((await target.query(`SELECT * FROM ${schema}.faro_activities`)).rows,retainedBefore);await target.query(`ALTER TABLE ${schema}.schema_migrations DROP CONSTRAINT reject_upgrade_ledger`);
+ const upgraded=await run(process.execPath,args,{env:upgradeEnv,windowsHide:true});assert.match(upgraded.stdout,/UPGRADED_0038/);
+ const retainedAfter=(await target.query(`SELECT * FROM ${schema}.faro_activities`)).rows;assert.deepEqual(retainedAfter.map(({practice,...rest})=>{assert.equal(practice,null);return rest;}),retainedBefore);
+ assert.match((await run(process.execPath,args,{env:upgradeEnv,windowsHide:true})).stdout,/ALREADY_CURRENT/);
+ await target.query(`ALTER TABLE ${schema}.faro_activities ADD COLUMN foreign_sentinel TEXT`);await assert.rejects(()=>run(process.execPath,args,{env:upgradeEnv,windowsHide:true}));await target.query(`ALTER TABLE ${schema}.faro_activities DROP COLUMN foreign_sentinel`);
+ await target.query(`DELETE FROM ${schema}.users WHERE id='upgrade-owner'`);assert.equal(Number((await target.query(`SELECT count(*) FROM ${schema}.faro_activities`)).rows[0].count),0);
  await target.query(`UPDATE ${schema}.schema_migrations SET applied_at='2000-01-01T00:00:00.000Z' WHERE version='0001_init'`);
  phase='RESTART';const again=await run(process.execPath,args,{env,windowsHide:true});assert.match(again.stdout,/EXISTING_SCHEMA_RETAINED/);
  assert.equal((await target.query(`SELECT applied_at FROM ${schema}.schema_migrations WHERE version='0001_init'`)).rows[0].applied_at,'2000-01-01T00:00:00.000Z');
@@ -42,7 +57,7 @@ try {
  const registration=await fetch(`${origin}/api/auth/register`,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify({name:'StagingFixture',email:'staging-fixture@example.pl',password:'SyntheticStaging123',acceptTerms:true,acceptPrivacy:true})});assert.equal(registration.status,201);
  const cookie=registration.headers.get('set-cookie')?.split(';')[0];assert.ok(cookie);
  const gate=await fetch(`${origin}/api/faro/profile`,{headers:{cookie,origin}});assert.equal(gate.status,503);assert.equal((await gate.json()).error.code,'RELEASE_GATES_OPEN');
- console.log('FARO_FREE_POSTGRES_STAGING_PROOF_PASS scope/nonempty-target-refusal/37-migrations/empty-users/restart-preservation/actual-HTTP/closed-release; synthetic disposable loopback only.');
+ console.log('FARO_FREE_POSTGRES_STAGING_PROOF_PASS scope/nonempty-target-refusal/38-migrations/empty-users/retained-0038-upgrade/confirmation-refusal/DDL-rollback/idempotence/schema-refusal/restart-preservation/actual-HTTP/closed-release; synthetic disposable loopback only.');
 }catch {console.error('FARO_FREE_POSTGRES_STAGING_PROOF_FAILED phase='+phase+'; records and credentials withheld.');process.exitCode=1;}
 finally {
  if(child&&child.exitCode===null){await new Promise(done=>{child.once('exit',done);child.kill('SIGTERM');});}

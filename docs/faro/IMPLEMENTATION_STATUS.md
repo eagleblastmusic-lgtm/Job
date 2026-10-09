@@ -1254,3 +1254,8 @@ Hosted CP03-H acceptance: exact d249839 deployed to existing Free service in Bar
 ## CP03-J — Bounded AI transport and final staging verification
 
 [Scope](CP03_J_AI_TRANSPORT_BOUNDARY.md). Existing gateway now bounds the entire response deadline, bytes and token budget, rejects redirects, validates structured semantics and audits controlled error codes. Local targeted4/full195 Node/build/lint/typecheck/diff PASS, zero skips. Exact cd36d99 FARO37932153174 SUCCESS; general CI37932153248 SUCCESS, every required job. CP03-I1d5b8c9 FARO37931093665/CI37931093716 SUCCESS, every job. Free staging deployed exact1d5b8c9 as dep-db4e5ajncjis73cn6n00 in56.5s; process cqsc4 retained schema at14:49:33 Europe/Warsaw on2026-10-09, listener14:49:35, Live14:49:39. Synthetic HTTPS smoke and account cleanup PASS. No paid resource or production operation.
+
+
+## CP03-K/L — Private practice and source attribution
+
+[CP03-K](CP03_K_PRIVATE_PRACTICE_CONTEXT.md)49edb4f accepted by FARO37937977695/CI37937977838, every job; hosted Free deployment dep-db4evbss728c73aibf7g retains data/schema, HTTPS smoke/cleanup PASS. [CP03-L](CP03_L_ACTIVITY_PRACTICE.md) extends existing private activity with optional quantity/unit/context and source/date display, preserving unknown historical practice and separate explicit claims. One additive migration0038; local full198/default desktop/mobile2/build/lint/types/migrations/source-only PASS. Bounded optional hosted upgrade and native verification pending. Full plan remains PARTIAL; no paid resource or production operation.

@@ -30,6 +30,11 @@ export async function proveNativeHttp(database,config){
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
   await json('/api/auth/register','','POST',{name:'Foreign',email:'foreign@example.pl',password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true},403,{origin:'https://foreign.invalid'});
   await json('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+  const sourcePractice={quantity:24,unit:'MONTHS',context:'PRIVATE_NATIVE_ACTIVITY_CONTEXT'};
+  const sourceProfile=await json('/api/faro/activities',candidate.cookie,'POST',{description:'SQL Excel',source:'WORK',practice:sourcePractice},201);
+  assert.deepEqual(sourceProfile.activities[0].practice,sourcePractice);assert.equal(sourceProfile.claims.length,0);
+  assert.doesNotMatch(JSON.stringify(await json('/api/faro/profile/preview',candidate.cookie)),/PRIVATE_NATIVE_ACTIVITY_CONTEXT/);
+  await json(`/api/faro/activities/${sourceProfile.activities[0].id}`,candidate.cookie,'DELETE',{confirmed:true});
   const escoId='esco:29c954f2-ed17-4900-bba5-4cfd294f3680';
   const catalog=await json('/api/faro/catalog',candidate.cookie);
   assert.equal(catalog.skills.length,13962);

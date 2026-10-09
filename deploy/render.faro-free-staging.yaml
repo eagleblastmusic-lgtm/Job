@@ -71,6 +71,10 @@
         {
           "key": "FARO_STAGING_EMPTY_BOOTSTRAP",
           "value": "confirmed"
+        },
+        {
+          "key": "FARO_STAGING_ACTIVITY_PRACTICE_UPGRADE",
+          "value": "confirmed"
         }
       ],
       "dockerCommand": "node scripts/start-faro-free-postgres-staging.mjs"

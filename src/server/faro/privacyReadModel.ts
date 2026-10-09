@@ -5,7 +5,7 @@ export function ownExportQueries(userId:string){return [
  {key:'faro_mfa_security',text:'SELECT activated_at,pending_until FROM faro_mfa WHERE user_id=$1',values:[userId]},
  {key:'faro_mfa_recovery_uses',text:'SELECT used_at FROM faro_mfa_recovery WHERE user_id=$1 ORDER BY used_at',values:[userId]},
  {key:'faro_profiles',text:'SELECT user_id,first_name,availability,preferences,phone,version,updated_at FROM faro_profiles WHERE user_id=$1',values:[userId]},
- {key:'faro_activities',text:'SELECT id,user_id,description,source,created_at FROM faro_activities WHERE user_id=$1',values:[userId]},
+ {key:'faro_activities',text:'SELECT id,user_id,description,source,created_at,practice FROM faro_activities WHERE user_id=$1',values:[userId]},
  {key:'faro_proposals',text:'SELECT id,user_id,activity_id,skill_id,rationale,model_version,status,created_at,decided_at FROM faro_proposals WHERE user_id=$1',values:[userId]},
  {key:'faro_claims',text:'SELECT id,user_id,skill_id,level,source,practice,verification,version,confirmed_at,revoked_at FROM faro_claims WHERE user_id=$1',values:[userId]},
  {key:'faro_learning',text:'SELECT user_id,skill_id,mode,practice FROM faro_learning WHERE user_id=$1',values:[userId]},

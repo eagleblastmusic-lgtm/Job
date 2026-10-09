@@ -4,6 +4,36 @@ import { faroFixture } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { employerProjection } from '../domain/faro/skills.js';
 import { profilePractice } from '../server/faro/profileWriteModel.js';
+import { DatabaseSync } from 'node:sqlite';
+import { readFile } from 'node:fs/promises';
+
+test('activity practice remains private source evidence and is never copied into every proposed claim',async()=>{
+  const f=await faroFixture();try{
+    const own=await f.user('ActivityPractice'),other=await f.user('ActivityPracticeOther');
+    await f.request('/api/faro/profile',own.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    const activity={description:'SQL Excel',source:'WORK',practice:{quantity:24,unit:'MONTHS',context:'PRIVATE_ACTIVITY_PRACTICE'}};
+    const recorded=await f.request<{activities:Array<{id:string;created_at:string;practice:{quantity:number;context:string}|null}>;proposals:Array<{id:string}>;claims:unknown[]}>('/api/faro/activities',own.cookie,'POST',activity,201);
+    assert.equal(recorded.activities[0]!.practice!.quantity,24);assert.equal(recorded.activities[0]!.practice!.context,activity.practice.context);assert.ok(Number.isFinite(Date.parse(recorded.activities[0]!.created_at)));assert.equal(recorded.claims.length,0);
+    const before=new ProfileService(f.app.db).profile(own.id);
+    await f.request('/api/faro/activities',own.cookie,'POST',{...activity,practice:{...activity.practice,context:0}},400);assert.deepEqual(new ProfileService(f.app.db).profile(own.id),before);
+    const confirmed=await f.request<{claims:Array<{practice:unknown}>}>(`/api/faro/proposals/${recorded.proposals[0]!.id}`,own.cookie,'POST',{status:'ACCEPTED',level:'BASICS',source:'WORK',practice:{quantity:null,unit:'TASKS'},confirmed:true});
+    assert.deepEqual(confirmed.claims[0]!.practice,{quantity:null,unit:'TASKS'});
+    assert.doesNotMatch(JSON.stringify(await f.request('/api/faro/profile/preview',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE|24/);
+    assert.match(JSON.stringify(await f.request('/api/export',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);assert.doesNotMatch(JSON.stringify(await f.request('/api/export',other.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);
+    await f.request(`/api/faro/activities/${recorded.activities[0]!.id}`,own.cookie,'DELETE',{confirmed:true});assert.doesNotMatch(JSON.stringify(await f.request('/api/export',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);
+    const legacy=await f.request<{activities:Array<{practice:unknown}>}>('/api/faro/activities',own.cookie,'POST',{description:'opis bez określonej praktyki',source:'HOBBY'},201);assert.equal(legacy.activities[0]!.practice,null);
+  }finally{await f.close();}
+});
+
+test('0038 preserves historical activity source, relationships and unknown practice',async()=>{
+  const db=new DatabaseSync(':memory:');try{
+    db.exec("PRAGMA foreign_keys=ON; CREATE TABLE users(id TEXT PRIMARY KEY); CREATE TABLE faro_activities(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,description TEXT NOT NULL,source TEXT NOT NULL,created_at TEXT NOT NULL); INSERT INTO users VALUES('owner'); INSERT INTO faro_activities VALUES('original','owner','historical private description','WORK','2020-01-01T00:00:00.000Z');");
+    const before=db.prepare('SELECT * FROM faro_activities').get();
+    db.exec(await readFile(new URL('../../migrations/0038_faro_activity_practice.sql',import.meta.url),'utf8'));
+    const after=db.prepare('SELECT * FROM faro_activities').get()!;assert.equal(after.practice,null);const {practice:_,...retained}=after;assert.deepEqual(retained,{...before});assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+    db.exec("DELETE FROM users WHERE id='owner'");assert.equal(db.prepare('SELECT count(*) AS n FROM faro_activities').get()!.n,0);
+  }finally{db.close();}
+});
 
 test('practice context is bounded private evidence, survives reload and fences stale learning erasure',async()=>{
   const f=await faroFixture();try{

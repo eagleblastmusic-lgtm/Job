@@ -59,8 +59,12 @@ test('Faro real candidate and employer process, private watch, economics and res
     await expect(page.getByRole('button',{name:'Usuń kierunek: SQL',exact:true})).toHaveCount(0);
     expect((await f.request<{learning:unknown[]}>('/api/faro/profile',candidate.cookie)).learning).toHaveLength(0);
     await page.locator('[data-form=activity] [name=description]').fill('PRIVATE_BROWSER_ERASURE SQL');
+    await page.locator('[data-form=activity] [name=quantity]').fill('24');
+    await page.locator('[data-form=activity] [name=practiceContext]').fill('PRIVATE_BROWSER_ACTIVITY_CONTEXT');
     await page.getByRole('button',{name:'Zapisz i sprawdź propozycje',exact:true}).click();
     await expect(page.getByText('PRIVATE_BROWSER_ERASURE SQL',{exact:true})).toBeVisible();
+    await expect(page.getByText('Praktyka opisu: 24 miesięcy',{exact:true})).toBeVisible();
+    await expect(page.getByText('Prywatny kontekst: PRIVATE_BROWSER_ACTIVITY_CONTEXT',{exact:true})).toBeVisible();
     await page.getByText('SQL — potwierdź lub odrzuć',{exact:true}).click();
     await expect(page.getByText(/Lokalne reguły Faro · local-question-rules-v3/)).toBeVisible();
     await page.getByRole('button',{name:'To nie opisuje mojej praktyki',exact:true}).click();

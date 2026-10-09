@@ -6,6 +6,7 @@ import {join,dirname} from 'node:path';
 import {Client} from 'pg';
 import {JobDatabase} from '../dist/server/db.js';
 import {loadConfig} from '../dist/server/config.js';
+import {upgradeActivityPractice} from './upgrade-faro-free-activity-practice.mjs';
 
 // Empty disposable staging only: never migrate source application/user data at startup.
 const schema='faro_rehearsal_render_staging',service='srv-db3pb9rncjis73banf90';
@@ -27,7 +28,11 @@ try {
   phase='PREPARE';const proof=await promisify(execFile)(process.execPath,['scripts/prepare-faro-postgres.mjs','--source',source,'--target-schema',schema,'--operator-confirmed','--offline-confirmed'],{windowsHide:true,env:{...process.env,FARO_PG_REHEARSAL_URL:url.href},maxBuffer:65536});
   if(JSON.parse(proof.stdout).result!=='PASS')throw new Error();
   console.log('FARO_FREE_STAGING_EMPTY_SCHEMA_PREPARED; no application source data migrated.');
- }else console.log('FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no migration or reset.');
+ }else {
+  phase='ACTIVITY_PRACTICE_UPGRADE';const result=await upgradeActivityPractice(client,{allowUpgrade:process.env.FARO_STAGING_ACTIVITY_PRACTICE_UPGRADE==='confirmed'});
+  console.log(`FARO_FREE_STAGING_ACTIVITY_PRACTICE_${result}; additive nullable column only.`);
+  console.log('FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no data migration or reset.');
+ }
 }catch {
  console.error(`FARO_FREE_STAGING_START_REFUSED phase=${phase}; no credentials or records logged.`);process.exitCode=1;
 }finally {
