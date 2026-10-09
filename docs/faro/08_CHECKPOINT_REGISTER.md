@@ -1,6 +1,6 @@
 # CHECKPOINT REGISTER
 
-All rows retain their initial execution contracts; live status is updated with evidence. CP00: audit + complete saved plan, DONE in 8b2524a before production edits. As reviewed on 2026-09-17 against ea50b36, CP01–CP07 and CP09–CP10 have partial backend deliveries, not complete checkpoint acceptance. CP08 and CP11 remain planned. A delivery commit is not evidence of a working two-role workspace or release readiness. See IMPLEMENTATION_STATUS.md for verification and remaining scope.
+Rows below preserve initial execution contracts and subsequent acceptance evidence. Current implementation is integrated on main; the two-role workspace and native PostgreSQL18 staging/recovery are implemented and verified through CP03-L. Latest hosted/runtime acceptance and active technical work are maintained in IMPLEMENTATION_STATUS.md. Historical planned/partial statements below describe their original checkpoint dates. Full release remains PARTIAL because independent external artifacts and production custody are absent.
 
 ## CP01 — Foundation and retirement of rejected paths
 - ID: CP01
@@ -1283,3 +1283,10 @@ Final CP03-L acceptance2026-10-09: exact24801a8 FARO37940114752 and CI3794011456
 Current authority now includes only immutable activity/owner identities. Both existing SQLite and PostgreSQL offline recovery paths atomically delete stale absent sources with cascading proposal lineage, reject missing/duplicate authority and owner mismatch, and preserve retained descriptions and independent claims/snapshots. Fresh authority artifacts are required; old artifacts without activity authority fail closed. No migration or live database operation.
 
 Local acceptance2026-10-09: full198 Node, lint/typecheck/build, actual SQLite restore PASS. Real disposable PostgreSQL18 encrypted backup/authority/CLI recovery, rollback/refusal/idempotence, native HTTP/cutover/bootstrap and28 desktop/mobile browsers PASS; cluster STOPPED/CLEANUP_PASS. Initial synthetic fixture search_path failure42P01 fixed before accepted rerun. Required remote CI pending. Full plan continues; external acceptance and production custody remain open.
+
+
+## CP11-DA — Current skill withdrawals during recovery
+
+Existing protected authority now also captures claim identities/owners/revocation dates and current learning rows. Both SQLite and native PostgreSQL recovery preserve current withdrawals, delete absent stale claims/learning and replace retained learning practice with its current bounded private value. Recovery never inserts new post-backup claims or reactivates historical revoked claims. Current activity deletion continues to cascade proposal lineage independently of accepted declarations and immutable process snapshots. Missing/duplicate/malformed authority or changed immutable ownership refuses atomically. Old authority artifacts need a fresh protected current snapshot. No schema/migration, paid resource or production operation.
+
+Actual SQLite and encrypted PostgreSQL CLI recovery regressions pass for retained accounts, removed sources/proposals, withdrawn claims, erased learning and changed private context; real transaction rollback and repeated reconciliation checked. Local198 Node, targeted profile8, build/lint/types PASS. Final full native browsers and required remote CI pending. A local rebuild overlapping browser fixture creation caused missing dist modules; resolved by serializing build before the final full acceptance. The unrelated CP03-L privacy test matched24 in timestamps; replacement asserts exact structured practices and excluded context, retaining the criterion. Local --rehearsal-only explicitly reports narrower proof and keeps full default acceptance unchanged.

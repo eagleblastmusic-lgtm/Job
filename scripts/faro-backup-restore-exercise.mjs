@@ -4,6 +4,7 @@ import { mkdtemp,mkdir,writeFile,rm,stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,resolve,relative,isAbsolute } from 'node:path';
 import { JobDatabase } from '../dist/server/db.js';
+import { SKILL_CATALOG } from '../dist/domain/faro/skills.js';
 import { ProfileService } from '../dist/server/faro/profileService.js';
 import { PrivacyService } from '../dist/server/faro/privacyService.js';
 import { OfferService } from '../dist/server/faro/offerService.js';
@@ -103,10 +104,16 @@ try {
   assert.ok(f.app.db.db.prepare('SELECT id FROM faro_proposals WHERE activity_id=?').get(deletedActivity));
   profiles.activity(kept.id,{description:'Syntetyczny zachowany opis.',source:'HOBBY'});
   const retainedActivity=f.app.db.db.prepare('SELECT id FROM faro_activities WHERE user_id=? AND id<>?').get(kept.id,deletedActivity).id;
+  const recoverySkill=SKILL_CATALOG.find(row=>row.id!=='faro:activity:customer-service').id,learningBody={skillId:recoverySkill,mode:'WANTS_TO_LEARN',practice:{quantity:2,unit:'TASKS',context:'Prywatny usuwany kierunek.'}};
+  profiles.addClaim(kept.id,{skillId:recoverySkill,level:'BASICS',source:'HOBBY',practice:{quantity:2,unit:'TASKS'},confirmed:true});
+  const withdrawnClaim=f.app.db.db.prepare('SELECT id FROM faro_claims WHERE user_id=? AND skill_id=?').get(kept.id,recoverySkill).id;
+  profiles.learn(kept.id,learningBody);profiles.learn(successor.id,{...learningBody,mode:'SELF_DEVELOPING'});
   const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
   await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
   // Current source advances after the old snapshot: owner transfer and two erasures.
   profiles.removeActivity(kept.id,deletedActivity,{confirmed:true});
+  profiles.learn(successor.id,{...learningBody,mode:'SELF_DEVELOPING',practice:{quantity:3,unit:'TASKS',context:'Bieżący prywatny kontekst.'}});
+  profiles.revoke(kept.id,withdrawnClaim);profiles.removeLearning(kept.id,{skillId:recoverySkill,mode:'WANTS_TO_LEARN',expectedPractice:learningBody.practice,confirmed:true});
   new TrustService(f.app.db).restoreRestriction(successor.id,'recovery-legacy',{expectedVersion:1,idempotencyKey:'recovery-restoration',confirmed:true,reason:'Sprawdzono historyczne ograniczenie w niezależnym review.'});
   new PrivacyService(f.app.db).transferOwner(employer.id,org.id,successor.id);
   profiles.revokeMember(successor.id,org.id,revoked.id);
@@ -132,6 +139,12 @@ try {
     assert.equal(db.prepare('SELECT id FROM faro_activities WHERE id=?').get(deletedActivity),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_proposals WHERE activity_id=?').get(deletedActivity),undefined);
     assert.ok(db.prepare('SELECT id FROM faro_activities WHERE id=?').get(retainedActivity));
+    assert.ok(db.prepare('SELECT revoked_at FROM faro_claims WHERE id=?').get(withdrawnClaim).revoked_at);
+    assert.equal(db.prepare('SELECT skill_id FROM faro_learning WHERE user_id=? AND skill_id=?').get(kept.id,recoverySkill),undefined);
+    assert.equal(JSON.parse(db.prepare('SELECT practice FROM faro_learning WHERE user_id=? AND skill_id=?').get(successor.id,recoverySkill).practice).context,'Bieżący prywatny kontekst.');
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,learning:[...ledger.learning,...ledger.learning]}),/Invalid current learning/);
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,claims:undefined}),/Missing current skill/);
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,learning:undefined}),/Missing current skill/);
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,activities:undefined}),/Missing current private activity/);
     assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,activities:[...ledger.activities,...ledger.activities]}),/Invalid current private activity/);
     for(const u of [gone,employer])assert.equal(db.prepare('SELECT id FROM users WHERE id=?').get(u.id),undefined);

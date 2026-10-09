@@ -18,7 +18,10 @@ test('activity practice remains private source evidence and is never copied into
     await f.request('/api/faro/activities',own.cookie,'POST',{...activity,practice:{...activity.practice,context:0}},400);assert.deepEqual(new ProfileService(f.app.db).profile(own.id),before);
     const confirmed=await f.request<{claims:Array<{practice:unknown}>}>(`/api/faro/proposals/${recorded.proposals[0]!.id}`,own.cookie,'POST',{status:'ACCEPTED',level:'BASICS',source:'WORK',practice:{quantity:null,unit:'TASKS'},confirmed:true});
     assert.deepEqual(confirmed.claims[0]!.practice,{quantity:null,unit:'TASKS'});
-    assert.doesNotMatch(JSON.stringify(await f.request('/api/faro/profile/preview',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE|24/);
+    const preview=await f.request<{skillClaims:Array<{practice:unknown}>;taskExperience:Array<{practice:unknown}>}>('/api/faro/profile/preview',own.cookie);
+    assert.doesNotMatch(JSON.stringify(preview),/PRIVATE_ACTIVITY_PRACTICE/);
+    assert.deepEqual(preview.skillClaims.map(row=>row.practice),[{quantity:null,unit:'TASKS'}]);
+    assert.deepEqual(preview.taskExperience.map(row=>row.practice),[{quantity:null,unit:'TASKS'}]);
     assert.match(JSON.stringify(await f.request('/api/export',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);assert.doesNotMatch(JSON.stringify(await f.request('/api/export',other.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);
     await f.request(`/api/faro/activities/${recorded.activities[0]!.id}`,own.cookie,'DELETE',{confirmed:true});assert.doesNotMatch(JSON.stringify(await f.request('/api/export',own.cookie)),/PRIVATE_ACTIVITY_PRACTICE/);
     const legacy=await f.request<{activities:Array<{practice:unknown}>}>('/api/faro/activities',own.cookie,'POST',{description:'opis bez określonej praktyki',source:'HOBBY'},201);assert.equal(legacy.activities[0]!.practice,null);

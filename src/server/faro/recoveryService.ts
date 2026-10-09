@@ -1,9 +1,11 @@
 import { createHash,randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { PrivacyService } from './privacyService.js';
-import { currentActivityAuthority } from './recoveryReadModel.js';
+import { currentActivityAuthority,currentSkillAuthority } from './recoveryReadModel.js';
 
 export interface RecoveryLedger {
+  claims:Array<{id:string;user_id:string;revoked_at:string|null}>;
+  learning:Array<{user_id:string;skill_id:string;mode:string;practice:string}>;
   activities:Array<{id:string;user_id:string}>;
   erasures:Array<{subject_hash:string;erased_at:string;policy_version:string}>;
   owners:Array<{organization_id:string;user_id:string}>;
@@ -43,13 +45,15 @@ export class RecoveryService extends FaroStore {
     const members=new Map(ledger.members.map(m=>[JSON.stringify([m.organization_id,m.user_id]),m]));
     const assignments=new Set(ledger.assignments.map(a=>JSON.stringify([a.offer_id,a.user_id])));
     if(!Array.isArray(ledger.restrictions))throw new Error('Brak bieżącego rejestru ograniczeń. Odtworzenie wstrzymane.');
-    const activities=currentActivityAuthority(ledger);
+    const activities=currentActivityAuthority(ledger),skills=currentSkillAuthority(ledger);
     return this.transaction(()=>{
       // Cascades erase proposal lineage; accepted claims remain independent declarations.
       for(const old of this.db.prepare('SELECT id,user_id FROM faro_activities').all() as Array<{id:string;user_id:string}>){
         if(activities.has(old.id)&&activities.get(old.id)!==old.user_id)throw new Error('Private activity authority ownership mismatch.');
         if(!activities.has(old.id))this.db.prepare('DELETE FROM faro_activities WHERE id=?').run(old.id);
       }
+      for(const old of this.db.prepare('SELECT id,user_id FROM faro_claims').all() as Array<{id:string;user_id:string}>){const current=skills.claims.get(old.id);if(current&&current.user_id!==old.user_id)throw new Error('Skill authority ownership mismatch.');if(!current)this.db.prepare('DELETE FROM faro_claims WHERE id=?').run(old.id);else if(current.revoked_at)this.db.prepare('UPDATE faro_claims SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(current.revoked_at,old.id);}
+      for(const old of this.db.prepare('SELECT user_id,skill_id,mode FROM faro_learning').all() as Array<{user_id:string;skill_id:string;mode:string}>){const current=skills.learning.get(JSON.stringify([old.user_id,old.skill_id,old.mode]));if(!current)this.db.prepare('DELETE FROM faro_learning WHERE user_id=? AND skill_id=? AND mode=?').run(old.user_id,old.skill_id,old.mode);else this.db.prepare('UPDATE faro_learning SET practice=? WHERE user_id=? AND skill_id=? AND mode=?').run(current.practice,old.user_id,old.skill_id,old.mode);}
       let restoredOwnerships=0,closedOrganizations=0;
       const closedIds=new Set<string>();
       for(const user of erased) {
