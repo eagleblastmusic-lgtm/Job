@@ -98,9 +98,15 @@ try {
   const mfa=new MfaService(f.app.db,f.app.config),mfaUser=f.app.store.getUserById(kept.id),mfaToken=hashSessionToken(kept.cookie.split('=')[1]);
   const enrollment=mfa.setup(mfaUser,mfaToken,{password:'Bezpieczne123'}),mfaSecret=decodeMfa(enrollment.secret);
   const recoveryCodes=mfa.confirm(mfaUser,mfaToken,{code:totp(mfaSecret,Math.floor(Date.now()/30000))}).recoveryCodes;
+  profiles.activity(kept.id,{description:'Syntetyczna obsługa klienta do usunięcia po kopii.',source:'HOBBY',practice:{quantity:2,unit:'TASKS',context:'Prywatna notatka do usunięcia.'}});
+  const deletedActivity=f.app.db.db.prepare('SELECT id FROM faro_activities WHERE user_id=?').get(kept.id).id;
+  assert.ok(f.app.db.db.prepare('SELECT id FROM faro_proposals WHERE activity_id=?').get(deletedActivity));
+  profiles.activity(kept.id,{description:'Syntetyczny zachowany opis.',source:'HOBBY'});
+  const retainedActivity=f.app.db.db.prepare('SELECT id FROM faro_activities WHERE user_id=? AND id<>?').get(kept.id,deletedActivity).id;
   const snapshot=join(backup,'job.sqlite');f.app.db.db.exec(`VACUUM INTO '${snapshot.replaceAll("'","''")}'`);
   await writeFile(join(backup,'manifest.json'),JSON.stringify({format:1,createdAt:new Date().toISOString()}));
   // Current source advances after the old snapshot: owner transfer and two erasures.
+  profiles.removeActivity(kept.id,deletedActivity,{confirmed:true});
   new TrustService(f.app.db).restoreRestriction(successor.id,'recovery-legacy',{expectedVersion:1,idempotencyKey:'recovery-restoration',confirmed:true,reason:'Sprawdzono historyczne ograniczenie w niezależnym review.'});
   new PrivacyService(f.app.db).transferOwner(employer.id,org.id,successor.id);
   profiles.revokeMember(successor.id,org.id,revoked.id);
@@ -123,6 +129,11 @@ try {
   const restored=new JobDatabase(result.databasePath);
   try {
     const db=restored.db,pr=new ProfileService(restored),rec=new RecruitmentService(restored);
+    assert.equal(db.prepare('SELECT id FROM faro_activities WHERE id=?').get(deletedActivity),undefined);
+    assert.equal(db.prepare('SELECT id FROM faro_proposals WHERE activity_id=?').get(deletedActivity),undefined);
+    assert.ok(db.prepare('SELECT id FROM faro_activities WHERE id=?').get(retainedActivity));
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,activities:undefined}),/Missing current private activity/);
+    assert.throws(()=>new RecoveryService(restored).reconcile({...ledger,activities:[...ledger.activities,...ledger.activities]}),/Invalid current private activity/);
     for(const u of [gone,employer])assert.equal(db.prepare('SELECT id FROM users WHERE id=?').get(u.id),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(attempt.id),undefined);
     assert.equal(db.prepare('SELECT id FROM faro_attempts WHERE id=?').get(retry.id),undefined);

@@ -1260,3 +1260,10 @@ Hosted CP03-H acceptance: exact d249839 deployed to existing Free service in Bar
 
 
 Final CP03-L acceptance2026-10-09: exact24801a8 FARO37940114752 and CI37940114566 SUCCESS, every required job (PostgreSQL18 Node22/24, native/default desktop/mobile browsers, full198 contracts, container/recovery). Local full native28 and final targeted staging guards PASS; owned clusters STOPPED/CLEANUP_PASS. Existing Free service in Bartosz's workspace deployed exact24801a8 as dep-db4f7mfavr4c73ea05ug in1m16s. Process hf879 applied the bounded nullable0038 column and ledger transaction at16:03:11 Europe/Warsaw, retained existing schema/records, opened listener16:03:13, Live16:03:17. Actual HTTPS restart proof preserved the same synthetic account, original session, changed optional consent, fresh login and own export; closed release boundary and account cleanup PASS. Only the specific confirmed upgrade flag was added; no secret, plan, resource or production operation changed. Full plan remains PARTIAL: calibrated empirical mappings/validated Faro standard, live provider terms/protected configuration and independent external acceptance artifacts remain unavailable.
+
+
+## CP11-CZ — Private source erasure during recovery
+
+Current authority now includes only immutable activity/owner identities. Both existing SQLite and PostgreSQL offline recovery paths atomically delete stale absent sources with cascading proposal lineage, reject missing/duplicate authority and owner mismatch, and preserve retained descriptions and independent claims/snapshots. Fresh authority artifacts are required; old artifacts without activity authority fail closed. No migration or live database operation.
+
+Local acceptance2026-10-09: full198 Node, lint/typecheck/build, actual SQLite restore PASS. Real disposable PostgreSQL18 encrypted backup/authority/CLI recovery, rollback/refusal/idempotence, native HTTP/cutover/bootstrap and28 desktop/mobile browsers PASS; cluster STOPPED/CLEANUP_PASS. Initial synthetic fixture search_path failure42P01 fixed before accepted rerun. Required remote CI pending. Full plan continues; external acceptance and production custody remain open.

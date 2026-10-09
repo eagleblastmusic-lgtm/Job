@@ -1,8 +1,10 @@
 import { createHash,randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { PrivacyService } from './privacyService.js';
+import { currentActivityAuthority } from './recoveryReadModel.js';
 
 export interface RecoveryLedger {
+  activities:Array<{id:string;user_id:string}>;
   erasures:Array<{subject_hash:string;erased_at:string;policy_version:string}>;
   owners:Array<{organization_id:string;user_id:string}>;
   members:Array<{organization_id:string;user_id:string;role:'OWNER'|'ADMIN'|'RECRUITER'|'HIRING_MANAGER'}>;
@@ -41,7 +43,13 @@ export class RecoveryService extends FaroStore {
     const members=new Map(ledger.members.map(m=>[JSON.stringify([m.organization_id,m.user_id]),m]));
     const assignments=new Set(ledger.assignments.map(a=>JSON.stringify([a.offer_id,a.user_id])));
     if(!Array.isArray(ledger.restrictions))throw new Error('Brak bieżącego rejestru ograniczeń. Odtworzenie wstrzymane.');
+    const activities=currentActivityAuthority(ledger);
     return this.transaction(()=>{
+      // Cascades erase proposal lineage; accepted claims remain independent declarations.
+      for(const old of this.db.prepare('SELECT id,user_id FROM faro_activities').all() as Array<{id:string;user_id:string}>){
+        if(activities.has(old.id)&&activities.get(old.id)!==old.user_id)throw new Error('Private activity authority ownership mismatch.');
+        if(!activities.has(old.id))this.db.prepare('DELETE FROM faro_activities WHERE id=?').run(old.id);
+      }
       let restoredOwnerships=0,closedOrganizations=0;
       const closedIds=new Set<string>();
       for(const user of erased) {

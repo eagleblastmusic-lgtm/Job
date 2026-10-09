@@ -1,6 +1,7 @@
 import { createHash,randomUUID } from 'node:crypto';
 import type { RecoveryLedger } from './recoveryService.js';
 import { eraseDerivativesOwned } from './privacyErasureModel.js';
+import { currentActivityAuthority } from './recoveryReadModel.js';
 interface RecoveryDatabase {readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;query(text:string,values:readonly unknown[]):Promise<unknown>;transaction<T>(work:()=>T|Promise<T>):Promise<T>;}
 /** Offline reconciliation is confined to a new recovery/rehearsal schema, never the live runtime. */
 export async function reconcileRecovery(database:RecoveryDatabase,ledger:RecoveryLedger,asOf:string,authorizeOperator:()=>void|Promise<void>,privateFilesVerified=false){
@@ -28,6 +29,11 @@ export async function reconcileRecovery(database:RecoveryDatabase,ledger:Recover
   for(const user of users)if(!erasedIds.has(user.id as string)&&!accounts.has(user.id as string))throw new Error('Current ledger does not resolve a restored account.');
   if((!ledger.mfa||!ledger.mfaRecovery||!ledger.mfaLimits)&&(await read('SELECT 1 FROM faro_mfa WHERE active_cipher IS NOT NULL LIMIT 1')).length)throw new Error('Missing current MFA authority.');
   if(!Array.isArray(ledger.restrictions))throw new Error('Missing current restriction authority.');
+  const activities=currentActivityAuthority(ledger);
+  for(const old of await read('SELECT id,user_id FROM faro_activities')){
+   if(activities.has(old.id as string)&&activities.get(old.id as string)!==old.user_id)throw new Error('Private activity authority ownership mismatch.');
+   if(!activities.has(old.id as string))await write('DELETE FROM faro_activities WHERE id=$1',[old.id]);
+  }
   const owners=new Map<string,string>();for(const item of ledger.owners){if(owners.has(item.organization_id)&&owners.get(item.organization_id)!==item.user_id)throw new Error('Ambiguous current ownership ledger.');owners.set(item.organization_id,item.user_id);}
   const members=new Map(ledger.members.map(m=>[JSON.stringify([m.organization_id,m.user_id]),m])),assignments=new Set(ledger.assignments.map(a=>JSON.stringify([a.offer_id,a.user_id]))),closedIds=new Set<string>();
   let restoredOwnerships=0,closedOrganizations=0;
