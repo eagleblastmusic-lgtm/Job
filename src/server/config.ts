@@ -44,6 +44,7 @@ export interface AppConfig {
   aiApiKey: string | null;
   aiModel: string | null;
   aiTimeoutMs: number;
+  aiMaxDailyRequests: number;
   joobleApiKeyPl: string | null;
   joobleTimeoutMs: number;
   pdfRendererBin: string;
@@ -82,6 +83,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     aiApiKey: overrides.aiApiKey ?? (process.env.AI_API_KEY?.trim() || null),
     aiModel: overrides.aiModel ?? (process.env.AI_MODEL?.trim() || null),
     aiTimeoutMs: overrides.aiTimeoutMs ?? intEnv('AI_TIMEOUT_MS', 15000),
+    aiMaxDailyRequests: overrides.aiMaxDailyRequests ?? intEnv('AI_MAX_DAILY_REQUESTS', 100),
     joobleApiKeyPl: overrides.joobleApiKeyPl ?? (process.env.JOOBLE_API_KEY_PL?.trim() || null),
     joobleTimeoutMs: overrides.joobleTimeoutMs ?? intEnv('JOOBLE_TIMEOUT_MS', 8000),
     pdfRendererBin: overrides.pdfRendererBin ?? (process.env.PDF_RENDERER_BIN?.trim() || (process.platform === 'win32' ? 'python' : 'python3')),

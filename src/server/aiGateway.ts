@@ -26,9 +26,19 @@ export class AiGateway {
   async structured<T>(request: AiRequest<T>): Promise<T> {
     if (!this.config.aiBaseUrl || !this.config.aiApiKey || !this.config.aiModel) throw new Error('AI provider nie jest skonfigurowany.');
     const maxTokens=request.maxOutputTokens??2048;
+    if(!Number.isSafeInteger(this.config.aiMaxDailyRequests)||this.config.aiMaxDailyRequests<1||this.config.aiMaxDailyRequests>10000
+      ||[request.taskType,request.promptVersion,request.outputSchemaName].some(value=>typeof value!=='string'||!/^[A-Za-z0-9_.:/-]{1,120}$/.test(value)))throw new AiGatewayError('AI_REQUEST_LIMIT');
     if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>4096||!Number.isSafeInteger(this.config.aiTimeoutMs)||this.config.aiTimeoutMs<1||this.config.aiTimeoutMs>60000||Buffer.byteLength(request.input)>32768||Buffer.byteLength(request.system)>32768)throw new AiGatewayError('AI_REQUEST_LIMIT');
     const started = Date.now();
     const inputHash = createHash('sha256').update(request.input).digest('hex');
+    const requestId=randomUUID(),createdAt=new Date().toISOString(),dayStart=createdAt.slice(0,10)+'T00:00:00.000Z';
+    // One write statement reserves budget before egress, including failed/in-flight calls.
+    try{
+      const reserved=this.db.db.prepare(`INSERT INTO ai_requests(id,user_id,task_type,model,prompt_version,input_hash,output_schema,latency_ms,token_usage,estimated_cost,success,error_code,created_at)
+        SELECT ?,?,?,?,?,?,?,0,NULL,NULL,0,'AI_IN_FLIGHT',? WHERE (SELECT COUNT(*) FROM ai_requests WHERE created_at>=?)<?`).run(
+        requestId,request.userId,request.taskType,this.config.aiModel,request.promptVersion,inputHash,request.outputSchemaName,createdAt,dayStart,this.config.aiMaxDailyRequests);
+      if(Number(reserved.changes)!==1)throw new AiGatewayError('AI_DAILY_BUDGET');
+    }catch(error){if(error instanceof AiGatewayError)throw error;throw new AiGatewayError('AI_AUDIT_UNAVAILABLE');}
     let success = 0;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.aiTimeoutMs);
@@ -63,18 +73,17 @@ export class AiGateway {
       try {const parsed:unknown=JSON.parse(content);validated=request.validate(parsed);}catch{throw new AiGatewayError('AI_INVALID_OUTPUT');}
       success = 1;
       const usage=payload.usage?.total_tokens;
-      this.log(request, inputHash, Date.now() - started, typeof usage==='number'&&Number.isSafeInteger(usage)&&usage>=0?usage:null, success, null);
+      this.finish(requestId, Date.now() - started, typeof usage==='number'&&Number.isSafeInteger(usage)&&usage>=0?usage:null, success, null);
       return validated;
     } catch (error) {
       const errorCode = controller.signal.aborted?'AI_TIMEOUT':error instanceof AiGatewayError?error.message:'AI_TRANSPORT';
-      this.log(request, inputHash, Date.now() - started, null, success, errorCode);
+      this.finish(requestId, Date.now() - started, null, success, errorCode);
       throw new AiGatewayError(errorCode);
     }finally{clearTimeout(timeout);}
   }
 
-  private log<T>(request: AiRequest<T>, inputHash: string, latencyMs: number, tokenUsage: number | null, success: number, errorCode: string | null): void {
-    this.db.db.prepare(`INSERT INTO ai_requests(id,user_id,task_type,model,prompt_version,input_hash,output_schema,latency_ms,token_usage,estimated_cost,success,error_code,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      randomUUID(), request.userId, request.taskType, this.config.aiModel ?? 'unconfigured', request.promptVersion, inputHash, request.outputSchemaName, latencyMs, tokenUsage, null, success, errorCode, new Date().toISOString()
-    );
+  private finish(id:string, latencyMs: number, tokenUsage: number | null, success: number, errorCode: string | null): void {
+    try{this.db.db.prepare('UPDATE ai_requests SET latency_ms=?,token_usage=?,success=?,error_code=? WHERE id=?').run(latencyMs,tokenUsage,success,errorCode,id);}
+    catch{throw new AiGatewayError('AI_AUDIT_UNAVAILABLE');}
   }
 }

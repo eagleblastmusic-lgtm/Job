@@ -24,7 +24,7 @@ Official policy references checked 2026-10-09: [OSM copyright](https://www.opens
 | Empirical competency relationships/assessment validity | EXTERNAL_BLOCKED | Requires real expert/sample evidence; no invented calibration |
 | Local proposals/private lineage and bounded AI transport | DONE (CP03-I/J accepted evidence) | Manual confirmation; controlled response/time/token limits |
 | Live AI provider and financial/privacy acceptance | EXTERNAL_BLOCKED | Provider selection, protected credentials, terms and approved spend required; no personal-data calls |
-| OSM offline boundary/distance API | DELTA_REQUIRED until current verification recorded | No live map/geocoder/router claimed |
+| OSM offline boundary/distance API | DONE (e933a8c local native acceptance; remote CI tracked in status) | No live map/geocoder/router claimed |
 | Live geocoder/router/map provider | EXTERNAL_BLOCKED | Actual service/capacity/privacy/terms selection; no unlimited public access assumed |
 | MapLibre screen and automatic commute/transit economics | DEFERRED | Current manual flow retained; provider prerequisites unresolved |
 | PostgreSQL runtime/migrations/recovery and technical browser contracts | DONE (existing CP11 evidence) | Technical acceptance only; no production custody acceptance |
