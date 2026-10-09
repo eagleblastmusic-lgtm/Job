@@ -60,7 +60,7 @@ export const practiceFields = (privateContext=false) => input('quantity', 'Ile p
 export const claimFields = () => select('level', 'Poziom', ['BASICS','INDEPENDENT','FLUENT']) + select('source', 'Źródło', ['WORK','SELF_LEARNING','HOBBY','SCHOOL','VOLUNTEERING']) + practiceFields(true) + check('confirmed', 'Potwierdzam, że opis odpowiada temu, co potrafię.');
 export function projection(p: Projection) {
   return `<h3>${esc(p.firstName)}</h3><p class="f-muted">Dostępność: ${esc(label(p.availability.kind))} ${esc(p.availability.value)}</p>
-    <h4>Co potrafię</h4>${p.skillClaims.map(c => `<div class="f-row"><strong>${esc(c.skill.label)}</strong><p>${esc(label(c.level))} · ${esc(label(c.source))} · ${esc(label(c.verification))}</p><small>${c.practice.quantity ?? 'Nie określono'} ${esc(label(c.practice.unit))}</small></div>`).join('') || '<p>Brak deklaracji.</p>'}
+    <h4>Co potrafię</h4>${p.skillClaims.map(c => `<div class="f-row"><strong>${esc(c.skill.label)}</strong><p>${esc(label(c.level))} · ${esc(label(c.source))} · ${esc(label(c.verification))}</p><p class="f-muted">Potwierdzono: ${esc(date(c.evidence?.confirmedAt??null))} · Wersja deklaracji: ${esc(c.version)}</p><small>${c.practice.quantity ?? 'Nie określono'} ${esc(label(c.practice.unit))}</small></div>`).join('') || '<p>Brak deklaracji.</p>'}
     <h4>Mam doświadczenie w…</h4>${p.taskExperience.map(t => chip(t.task)).join('') || '<p>Brak potwierdzonych czynności.</p>'}
     <h4>Kierunek nauki</h4>${p.learningIntents.map(l => `<p>${esc(l.skill.label)} · ${esc(label(l.mode))}</p>`).join('') || '<p>Nie określono.</p>'}`;
 }

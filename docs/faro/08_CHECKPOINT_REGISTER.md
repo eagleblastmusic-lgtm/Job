@@ -1299,3 +1299,8 @@ Hosted CP11-CZ/DA proof2026-10-09: exact d5db274 deployed through connected Rend
 
 
 Final CP11-CZ/DA acceptance2026-10-09: exact d5db274 FARO37947692657 and CI37947692600 SUCCESS, every required job. FARO PostgreSQL18 Node22 browser job initially reached its10-minute limit after delayed browser installation; a single-job retry passed all criteria without code/timeout/test changes or repeating accepted jobs. Existing full local198 Node/native28 browsers, actual SQLite/encrypted native PostgreSQL recovery and final controlled-error regressions PASS; owned clusters STOPPED/CLEANUP_PASS. Existing Free Render staging is Live on this exact runtime, dep-db4g0o7lk1mc73ftrf70; actual retained-account/session/consent/login/export restart and cleanup PASS. Production remains closed; no paid resource or production operation. Remaining independent artifacts/owners, live provider permissions/protected configuration/calibrated empirical data and production custody/RPO/RTO are unavailable; this acceptance is not full-plan completion.
+
+
+## CP03-M — Visible declaration date and version
+
+Existing persisted claim confirmedAt/version are now visible in the own profile and the shared candidate-preview/employer-process projection renderer. Historical snapshots without confirmation date remain explicitly unknown; current claim edits never rewrite process snapshots. No new field is projected, no migration/provider/raw evidence or certification change. Local build/lint/types and actual default desktop/mobile main journey PASS, existing backend/recovery evidence retained. Required remote native/browser CI pending; continue authorized work.

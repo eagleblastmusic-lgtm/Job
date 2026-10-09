@@ -1,7 +1,7 @@
 export interface User { id: string; name: string; email: string; role: string; }
 export interface Skill { id: string; label: string;aliases?:readonly string[];canonicalURI?:string|null;taxonomyVersion?:string;licenseRef?:string;levelGuidance?:{version:string;status:'AUTHOR_DRAFT';BASICS:string;INDEPENDENT:string;FLUENT:string}; }
 export interface Practice { quantity: number | null; unit: string; context?:string; }
-export interface Claim { id: string; skillId: string; level: string; source: string; verification: string; practice: Practice; }
+export interface Claim { id: string; skillId: string; level: string; source: string; verification: string; practice: Practice; confirmedAt:string; version:number; }
 export interface Learning { skillId: string; mode: string; practice: Practice; }
 export interface Profile {
   preferences:{active?:boolean;workModels?:string[];contracts?:string[];noNights?:boolean;noWeekends?:boolean;maxCommuteMinutes?:number|null;salaryMinimum?:{amount:number;currency:string;basis:string;period:string;hoursPerPeriod:number;ftePercent:number}|null};
@@ -11,7 +11,7 @@ export interface Profile {
   proposals: Array<{ id: string; activity_id:string; skill_id: string; rationale: string; status: string; created_at:string; decided_at:string|null; provenance:{producer:string;modelVersion:string|null;schemaVersion:string|null;promptVersion:null;confidence:null} }>;
 }
 export interface Projection {
-  firstName: string; skillClaims: Array<{ skill: Skill; level: string; source: string; verification: string; practice: Practice }>;
+  firstName: string; skillClaims: Array<{ skill: Skill; level: string; source: string; verification: string; practice: Practice; version:number; evidence?:{kind:string;confirmedAt:string} }>;
   taskExperience: Array<{ task: string; practice: Practice }>;
   learningIntents: Array<{ skill: Skill; mode: string }>; availability: { kind: string; value: string | null };
 }

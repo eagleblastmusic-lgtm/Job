@@ -86,6 +86,8 @@ test('Faro real candidate and employer process, private watch, economics and res
     await claim.locator('[name=confirmed]').check();
     await claim.getByRole('button', { name: 'Zapisz deklarację' }).click();
     await expect(page.locator('.f-row').filter({hasText:'Obsługa klienta'})).toBeVisible();
+    await expect(page.locator('.f-row').filter({hasText:'Obsługa klienta'})).toContainText('Potwierdzono:');
+    await expect(page.locator('.f-row').filter({hasText:'Obsługa klienta'})).toContainText('Wersja deklaracji: 1');
     const constraints=page.locator('[data-form=constraints]');
     await constraints.locator('[name=active]').check();
     await constraints.locator('[name=workModels][value=REMOTE]').check();
@@ -117,6 +119,8 @@ test('Faro real candidate and employer process, private watch, economics and res
     expect(noInterest.processes).toHaveLength(0);
     await page.getByRole('button', { name: 'Zgłoś zainteresowanie', exact: true }).click();
     const preview = page.getByRole('dialog'); await expect(preview.getByRole('heading',{name:'Anna',exact:true})).toBeVisible();
+    await expect(preview).toContainText('Potwierdzono:');
+    await expect(preview).toContainText('Wersja deklaracji: 1');
     await preview.locator('[name=projectionConfirmed]').check();
     await preview.getByRole('button',{name:'Zgłoś zainteresowanie',exact:true}).click();
     await expect(page.locator('.f-detail').getByText('Zainteresowanie zgłoszone',{exact:true})).toBeVisible();
