@@ -37,7 +37,7 @@ class GeographyTransport {
   provenance(): GeoProvenance {
     return { provider: this.config.provider, datasetVersion: this.config.datasetVersion, observedAt: new Date(this.now()).toISOString() };
   }
-  async json(url: URL, signal: AbortSignal): Promise<unknown> {
+  async json(url: URL, signal: AbortSignal, osrmNoRoute=false): Promise<unknown> {
     if (signal.aborted) return fail('GEO_CANCELLED');
     const now = this.now(), day = new Date(now).toISOString().slice(0, 10);
     if (day !== this.day) { this.day = day; this.attempts = 0; }
@@ -55,7 +55,7 @@ class GeographyTransport {
     const work = async () => {
       const response = await this.fetcher(url, { method: 'GET', redirect: 'error', credentials: 'omit',
         headers: { accept: 'application/json', 'user-agent': this.config.userAgent }, signal: controller.signal });
-      if (controller.signal.aborted || !response.ok) {
+      if (controller.signal.aborted || (!response.ok&&!(osrmNoRoute&&response.status===400))) {
         void response.body?.cancel().catch(() => {});
         return fail(controller.signal.aborted ? 'GEO_CANCELLED' : response.status === 429 ? 'GEO_PROVIDER_RATE_LIMIT' : 'GEO_PROVIDER_UNAVAILABLE');
       }
@@ -69,7 +69,12 @@ class GeographyTransport {
         if (bytes > 65536) return fail('GEO_RESPONSE_TOO_LARGE');
         chunks.push(chunk.value);
       }
-      try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; } catch { return fail('GEO_INVALID_RESPONSE'); }
+      let data:unknown;
+      try { data=JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return fail('GEO_INVALID_RESPONSE'); }
+      // OSRM errors use HTTP 400. Only its service-specific NoRoute is a valid unknown route.
+      if(osrmNoRoute&&response.status===400&&record(data).code!=='NoRoute')return fail('GEO_INVALID_RESPONSE');
+      if(osrmNoRoute&&response.ok&&record(data).code==='NoRoute')return fail('GEO_INVALID_RESPONSE');
+      return data;
     };
     try { return await Promise.race([work(), deadline]); }
     catch (error) { if (error instanceof GeographyError) throw error; return fail('GEO_TRANSPORT'); }
@@ -119,7 +124,7 @@ export class OsrmRouter implements RoutingProvider {
     const profile = this.profiles[mode]; if (!profile) return fail('GEO_MODE_UNSUPPORTED');
     const url = new URL(`/route/v1/${profile}/${a.longitude},${a.latitude};${b.longitude},${b.latitude}`, this.transport.origin);
     url.search = new URLSearchParams({ overview: 'false', steps: 'false', alternatives: 'false' }).toString();
-    const data = record(await this.transport.json(url, signal));
+    const data = record(await this.transport.json(url, signal,true));
     if (data.code === 'NoRoute') return null;
     if (data.code !== 'Ok' || !Array.isArray(data.routes) || data.routes.length !== 1) return fail('GEO_INVALID_RESPONSE');
     const route = record(data.routes[0]);

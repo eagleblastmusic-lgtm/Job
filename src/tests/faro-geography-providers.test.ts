@@ -26,13 +26,32 @@ test('routing honors explicit profiles and coordinate order; no route never beco
   let time = 1760000000000, hits = 0;
   const router = new OsrmRouter(config(), { CAR: 'driving' }, async url => {
     hits++; assert.equal(url.pathname, '/route/v1/driving/21,52;19,51'); assert.equal(url.searchParams.get('steps'), 'false');
-    return Response.json(hits === 1 ? { code: 'Ok', routes: [{ distance: 12345.6, duration: 1500, geometry: 'PRIVATE_SENTINEL' }] } : { code: 'NoRoute' });
+    return hits===1?Response.json({ code: 'Ok', routes: [{ distance: 12345.6, duration: 1500, geometry: 'PRIVATE_SENTINEL' }] }):Response.json({code:'NoRoute'},{status:400});
   }, () => time);
   const a = { latitude: 52, longitude: 21 }, b = { latitude: 51, longitude: 19 };
   await assert.rejects(router.route(a, b, 'WALK', signal()), /GEO_MODE_UNSUPPORTED/); assert.equal(hits, 0);
   const result = await router.route(a, b, 'CAR', signal()); assert.equal(result?.distanceMeters, 12345.6);
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE_SENTINEL|transitFare/);
   time += 1000; assert.equal(await router.route(a, b, 'CAR', signal()), null);
+});
+test('FARO-AUDIT-004: OSRM HTTP400 NoRoute alone is unknown; status/body errors retain bounds and Nominatim semantics',async()=>{
+  const a={latitude:52,longitude:21},b={latitude:51,longitude:19};
+  const route=(response:()=>Response,timeoutMs=1000)=>new OsrmRouter({...config(),timeoutMs},{CAR:'driving'},async()=>response()).route(a,b,'CAR',signal());
+  assert.equal(await route(()=>Response.json({code:'NoRoute',message:'PRIVATE_SENTINEL'},{status:400})),null);
+  for(const [status,body,code] of [
+    [400,JSON.stringify({code:'InvalidQuery',message:'PRIVATE_SENTINEL'}),'GEO_INVALID_RESPONSE'],
+    [400,JSON.stringify({code:'Ok',routes:[{distance:1,duration:1}]}),'GEO_INVALID_RESPONSE'],
+    [400,'{malformed PRIVATE_SENTINEL','GEO_INVALID_RESPONSE'],
+    [400,JSON.stringify([]),'GEO_INVALID_RESPONSE'],
+    [200,JSON.stringify({code:'NoRoute'}),'GEO_INVALID_RESPONSE'],
+    [429,JSON.stringify({code:'NoRoute',message:'PRIVATE_SENTINEL'}),'GEO_PROVIDER_RATE_LIMIT'],
+    [500,JSON.stringify({code:'NoRoute',message:'PRIVATE_SENTINEL'}),'GEO_PROVIDER_UNAVAILABLE'],
+    [503,'PRIVATE_SENTINEL','GEO_PROVIDER_UNAVAILABLE'],
+    [400,'x'.repeat(65537),'GEO_RESPONSE_TOO_LARGE']
+  ] as const)await assert.rejects(route(()=>new Response(body,{status})),error=>String(error)===`Error: ${code}`);
+  await assert.rejects(route(()=>new Response(new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('{'));}}),{status:400}),40),/^Error: GEO_TIMEOUT$/);
+  const geocoder=new NominatimGeocoder(config(),async()=>Response.json({code:'NoRoute'},{status:400}));
+  await assert.rejects(geocoder.search('Łódź',signal()),/^Error: GEO_PROVIDER_UNAVAILABLE$/);
 });
 test('unapproved public endpoints, malformed input/results and private transport errors refuse safely', async () => {
   for (const endpoint of ['http://synthetic.invalid', 'https://user:secret@synthetic.invalid', 'https://synthetic.invalid?q=secret', 'https://synthetic.invalid/private', 'https://nominatim.openstreetmap.org', 'https://router.project-osrm.org', 'https://nominatim.openstreetmap.org.', 'https://router.project-osrm.org.']) {
