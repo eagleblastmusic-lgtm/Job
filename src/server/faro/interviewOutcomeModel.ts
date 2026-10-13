@@ -39,7 +39,7 @@ interface OutcomeDatabase {
 }
 export async function changeInterviewOutcome(database:OutcomeDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
  let row:InterviewRow,p:ProcessRow;
- return runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},asOf,async()=>{
+ await runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},asOf,async()=>{
   await authorize();row=interviewFromRows((await database.readBatch([interviewReadQuery(id)]))[0]??[]);p=await interviewProcessOwned(database,userId,row.process_id);
   if(p.candidate_id!==userId){const role=await requireAttemptEmployerOwned(database,userId,p);if(!['OWNER','ADMIN','RECRUITER'].includes(role))throw new HttpError(404,'Nie znaleziono zasobu.','NOT_FOUND');}
  },async()=>{
@@ -48,6 +48,7 @@ export async function changeInterviewOutcome(database:OutcomeDatabase,userId:str
   if(plan.caseId)for(const query of interviewCaseNotifications(plan.caseId,p,(await database.readBatch([interviewModeratorQuery()]))[0]??[],assigned,asOf))await database.query(query.text,query.values);
   for(const query of processEventQueries(p,userId,`INTERVIEW_${plan.command}`,plan.event,assigned,asOf))await database.query(query.text,query.values);
   if(plan.state==='COMPLETED')await recordMutualStageOwned(database,id);
-  return interviewViewOwned(database,userId,id);
+  return {id};
  });
+ return database.transaction(async()=>{await authorize();return interviewViewOwned(database,userId,id);},{readOnly:true});
 }

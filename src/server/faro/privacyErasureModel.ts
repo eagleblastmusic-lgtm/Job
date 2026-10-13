@@ -7,6 +7,7 @@ import { processCancelQueries } from './processWriteModel.js';
 import { processReadQuery,processFromRows } from './processReadModel.js';
 import { processRecruiterReadQuery,processEventQueries } from './interestWriteModel.js';
 import { offerNotificationRecipientsQuery,offerNotificationQueries } from './offerWriteModel.js';
+import { minimizeCommandPayloadsOwned } from './commandPayloads.js';
 
 export function erasureAccountQueries(userId:string){return [
  {text:'SELECT email FROM users WHERE id=$1',values:[userId]},
@@ -52,6 +53,7 @@ export async function eraseDerivativesOwned(database:ErasureDatabase,userId:stri
  if(!isolatedRecovery)requireDeletableOwnership((await database.readBatch([deletableOwnershipQuery(userId)]))[0]??[]);
  const account=await database.readBatch(erasureAccountQueries(userId)),email=account[0]?.[0]?.email;
  if(typeof email!=='string')throw new HttpError(404,'Nie znaleziono konta.');
+ await minimizeCommandPayloadsOwned(database);
  const execute=async(queries:Array<{text:string;values:readonly unknown[]}>)=>{for(const query of queries)await database.query(query.text,query.values);};
  const event=async(id:string,kind:string,data:Record<string,unknown>)=>{const row=processFromRows((await database.readBatch([processReadQuery(id)]))[0]??[]),recipients=(await database.readBatch([processRecruiterReadQuery(row.offer_id)]))[0]??[];await execute(processEventQueries(row,userId,kind,data,recipients,asOf));};
  for(const org of account[1]??[]){

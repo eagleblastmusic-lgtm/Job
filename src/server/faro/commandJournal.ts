@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { HttpError } from '../http.js';
 import { text } from './validation.js';
+import { minimalCommandPayload } from './commandPayloads.js';
 export function commandRequest(key:unknown,input:unknown) {
   return {key:text(key,150),hash:createHash('sha256').update(JSON.stringify(input)).digest('hex')};
 }
@@ -12,7 +13,9 @@ export function commandReplay<T>(rows:Record<string,unknown>[],hash:string):{fou
   return {found:true,result:JSON.parse(existing.result) as T};
 }
 export function commandSaveQuery(userId:string,request:ReturnType<typeof commandRequest>,result:unknown,asOf:string) {
-  return {text:'INSERT INTO faro_commands(user_id,command_key,input_hash,result,created_at) VALUES($1,$2,$3,$4,$5)',values:[userId,request.key,request.hash,JSON.stringify(result),asOf]};
+  const payload=JSON.stringify(result);
+  if(minimalCommandPayload(payload)!==payload)throw new Error('Command must return an acknowledgement, then read the current projection.');
+  return {text:'INSERT INTO faro_commands(user_id,command_key,input_hash,result,created_at) VALUES($1,$2,$3,$4,$5)',values:[userId,request.key,request.hash,payload,asOf]};
 }
 interface CommandDatabase {
   readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;

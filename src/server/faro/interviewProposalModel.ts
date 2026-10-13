@@ -44,11 +44,12 @@ interface InterviewProposalDatabase {
 }
 export async function proposeInterview(database:InterviewProposalDatabase,userId:string,processId:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
  let process:ProcessRow;
- return runCommandOnce(database,userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},asOf,async()=>{
+ const ack=await runCommandOnce(database,userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},asOf,async()=>{
   await authorize();process=await interviewProcessOwned(database,userId,processId);if(process.candidate_id===userId)throw new HttpError(403,'Propozycję terminu rozpoczyna rekruter.');const offer=offerFromRows((await database.readBatch([offerReadQuery(process.offer_id)]))[0]??[]);membershipFromRows((await database.readBatch([membershipReadQuery(userId,offer.organizationId)]))[0]??[],['OWNER','ADMIN','RECRUITER']);
  },async()=>{
   const rows=await database.readBatch([...interviewProposalContextQueries(processId),offerVersionReadQuery(process.offer_id,process.offer_version)]),version=offerVersionFromRows(rows[2]??[]),input=interviewProposalInput(process,Boolean(rows[0]?.length),rows[1]?.[0]?.n as number,version.interviewCount,body,asOf);requireInterviewSlot((await database.readBatch([interviewSlotQuery(process.candidate_id,userId,input.starts,input.ends)]))[0]??[]);const plan=interviewProposalPlan(userId,process,input,asOf);
   for(const query of plan.queries)await database.query(query.text,query.values);const recipients=(await database.readBatch([processRecruiterReadQuery(process.offer_id)]))[0]??[];for(const query of processEventQueries(process,userId,'INTERVIEW_PROPOSED',plan.event,recipients,asOf))await database.query(query.text,query.values);
-  return interviewViewOwned(database,userId,plan.id);
+  return {id:plan.id};
  });
+ return database.transaction(async()=>{await authorize();return interviewViewOwned(database,userId,ack.id);},{readOnly:true});
 }

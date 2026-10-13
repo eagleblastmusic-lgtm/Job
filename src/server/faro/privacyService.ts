@@ -3,6 +3,7 @@ import { erasureAccountQueries,organizationErasureReadQueries,erasureProcessQuer
 import { FaroStore } from './base.js';
 import { HttpError } from '../http.js';
 import { RecruitmentService } from './recruitmentService.js';
+import { commandPayloadReadQuery,commandPayloadCleanupQueries } from './commandPayloads.js';
 
 /** Account data rights do not grant organization-wide candidate export. */
 export class PrivacyService extends FaroStore {
@@ -20,6 +21,7 @@ export class PrivacyService extends FaroStore {
     const execute=(queries:Array<{text:string;values:readonly (string|number|null)[]}>)=>{for(const query of queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));};
     const account=erasureAccountQueries(userId).map(read),email=account[0]?.[0]?.email;
     if(typeof email!=='string')throw new HttpError(404,'Nie znaleziono konta.');
+    execute(commandPayloadCleanupQueries(this.db.prepare(commandPayloadReadQuery.text).all()));
     const recruitment=new RecruitmentService(this.database,this.clock);
     for(const org of account[1]??[]){
       const orgId=org.organization_id as string,rows=organizationErasureReadQueries(orgId).map(read);

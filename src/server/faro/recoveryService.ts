@@ -2,6 +2,7 @@ import { createHash,randomUUID } from 'node:crypto';
 import { FaroStore } from './base.js';
 import { PrivacyService } from './privacyService.js';
 import { currentActivityAuthority,currentSkillAuthority } from './recoveryReadModel.js';
+import { commandPayloadReadQuery,commandPayloadCleanupQueries } from './commandPayloads.js';
 
 export interface RecoveryLedger {
   claims:Array<{id:string;user_id:string;revoked_at:string|null}>;
@@ -47,6 +48,7 @@ export class RecoveryService extends FaroStore {
     if(!Array.isArray(ledger.restrictions))throw new Error('Brak bieżącego rejestru ograniczeń. Odtworzenie wstrzymane.');
     const activities=currentActivityAuthority(ledger),skills=currentSkillAuthority(ledger);
     return this.transaction(()=>{
+      for(const query of commandPayloadCleanupQueries(this.db.prepare(commandPayloadReadQuery.text).all()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       // Cascades erase proposal lineage; accepted claims remain independent declarations.
       for(const old of this.db.prepare('SELECT id,user_id FROM faro_activities').all() as Array<{id:string;user_id:string}>){
         if(activities.has(old.id)&&activities.get(old.id)!==old.user_id)throw new Error('Private activity authority ownership mismatch.');

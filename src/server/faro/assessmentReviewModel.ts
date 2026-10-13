@@ -32,12 +32,14 @@ interface ReviewDatabase {
 }
 export async function finalizeAssessment(database:ReviewDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
  let row:AttemptRow,process:ProcessRow;
- return runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},asOf,async()=>{
+ const authorizeOwned=async()=>{
   await authorize();row=attemptFromRows((await database.readBatch([attemptReadQuery(id)]))[0]??[]);process=processFromRows((await database.readBatch([processReadQuery(row.process_id)]))[0]??[]);await requireAttemptEmployerOwned(database,userId,process);
- },async()=>{
+ };
+ await runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},asOf,authorizeOwned,async()=>{
   const definition=assessmentDefinitionFromRows((await database.readBatch([assessmentDefinitionQuery(row.assessment_id,row.assessment_version)]))[0]??[]),incident=(await database.readBatch(attemptContextQueries(row).slice(1,2)))[0]?.[0] as {state:string}|undefined;
   for(const query of assessmentFinalizeQueries(userId,row,process,JSON.parse(definition.content) as Definition,incident,body,asOf))await database.query(query.text,query.values);
   const recipients=(await database.readBatch([processRecruiterReadQuery(process.offer_id)]))[0]??[];for(const query of processEventQueries(process,userId,'ASSESSMENT_FINALIZED',{attemptId:id},recipients,asOf))await database.query(query.text,query.values);
-  return attemptViewOwned(database,userId,id,asOf);
+  return {id};
  });
+ return database.transaction(async()=>{await authorizeOwned();return attemptViewOwned(database,userId,id,asOf);},{readOnly:true});
 }

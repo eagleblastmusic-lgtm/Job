@@ -525,9 +525,11 @@ test('human assessment result review is revision guarded and idempotent; termina
     f.app.db.db.exec("CREATE TRIGGER review_audit_failure BEFORE INSERT ON audit_logs WHEN NEW.action='ASSESSMENT_RESULT_REVIEWED' BEGIN SELECT RAISE(ABORT,'review audit failed'); END");
     await f.request(url,f.employer.cookie,'POST',current,500);assert.deepEqual({...service.row(a.id)},reviewBefore);assert.equal(service.resultHistory(a.id).length,0);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,current.idempotencyKey)!.n,0);
     f.app.db.db.exec('DROP TRIGGER review_audit_failure');
-    const result=await f.request<{state:string;revision:number}>(url,f.employer.cookie,'POST',current);
+    const result=await f.request<{state:string;revision:number;serverNow:string}>(url,f.employer.cookie,'POST',current);
     assert.equal(result.state,'FINALIZED');assert.equal(result.revision,body.expectedVersion+1);
-    assert.deepEqual(await f.request(url,f.employer.cookie,'POST',current),result);
+    const replay=await f.request<{serverNow:string}>(url,f.employer.cookie,'POST',current);
+    assert.ok(Date.parse(replay.serverNow)>=Date.parse(result.serverNow));
+    assert.deepEqual({...replay,serverNow:result.serverNow},result); // Current projection has a fresh clock, one unchanged effect.
     await f.request(url,f.employer.cookie,'POST',{...current,note:'Zmiana wyniku pod tym samym kluczem'},409);
     await f.request(url,f.employer.cookie,'POST',{...current,idempotencyKey:'second-review'},409);
     assert.equal(f.app.db.db.prepare("SELECT COUNT(*) n FROM faro_events WHERE process_id=? AND kind='ASSESSMENT_FINALIZED'").get(f.interest.id)!.n,1);
@@ -565,12 +567,14 @@ test('invalid result retains original evidence, informs both roles, rejects stal
     f.app.db.db.exec("CREATE TRIGGER invalidate_delivery_failure BEFORE INSERT ON faro_outbox BEGIN SELECT RAISE(ABORT,'invalidate delivery failed'); END");
     await f.request(url,f.employer.cookie,'POST',body,500);assert.deepEqual({...s.row(a.id)},invalidBefore);assert.deepEqual(s.resultHistory(a.id),invalidHistoryBefore);assert.deepEqual(r.row(f.interest.id),process);assert.equal(f.app.db.db.prepare('SELECT COUNT(*) n FROM faro_commands WHERE user_id=? AND command_key=?').get(f.employer.id,body.idempotencyKey)!.n,0);
     f.app.db.db.exec('DROP TRIGGER invalidate_delivery_failure');
-    const response=await f.request<{result:null;resultValidity:string;resultHistory:Array<{validity:string;result:{earned:number};reason:string}>}>(url,f.employer.cookie,'POST',body);
+    const response=await f.request<{serverNow:string;result:null;resultValidity:string;resultHistory:Array<{validity:string;result:{earned:number};reason:string}>}>(url,f.employer.cookie,'POST',body);
     assert.equal(response.result,null);assert.equal(response.resultValidity,'INVALIDATED');assert.equal(response.resultHistory.length,2);
     assert.equal(response.resultHistory[0]!.validity,'VALID');assert.equal(response.resultHistory[0]!.result.earned,0);
     assert.equal(response.resultHistory[1]!.reason,body.reason);assert.equal(s.row(a.id).result,old.result);assert.equal(s.row(a.id).answers,old.answers);
     assert.deepEqual(r.row(f.interest.id),process); // Both clocks, stage and recruitment decision stay untouched.
-    assert.deepEqual(await f.request(url,f.employer.cookie,'POST',body),response);
+    const replay=await f.request<{serverNow:string}>(url,f.employer.cookie,'POST',body);
+    assert.ok(Date.parse(replay.serverNow)>=Date.parse(response.serverNow));
+    assert.deepEqual({...replay,serverNow:response.serverNow},response);
     await f.request(url,f.employer.cookie,'POST',{...body,reason:'Zmiana przy tym samym kluczu'},409);
     await f.request(url,f.employer.cookie,'POST',{...command(),idempotencyKey:'invalid-twice'},409);
     const candidate=s.overview(f.candidate.id,a.id);assert.equal(candidate.result,null);assert.deepEqual(candidate.resultHistory,response.resultHistory);assert.equal(candidate.reviewTasks.length,0);

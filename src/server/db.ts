@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { commandPayloadReadQuery,commandPayloadCleanupQueries } from './faro/commandPayloads.js';
 
 export class JobDatabase {
   readonly db: DatabaseSync;
@@ -38,6 +39,12 @@ export class JobDatabase {
         throw new Error(`Migracja ${file} nie powiodła się: ${error instanceof Error ? error.message : String(error)}`);
       } finally {if(rebuild)this.db.exec('PRAGMA foreign_keys = ON;');}
     }
+    // Idempotent data migration also covers databases already at the current schema version.
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      for(const query of commandPayloadCleanupQueries(this.db.prepare(commandPayloadReadQuery.text).all()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value as string])));
+      this.db.exec('COMMIT');
+    } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
 
   close(): void {

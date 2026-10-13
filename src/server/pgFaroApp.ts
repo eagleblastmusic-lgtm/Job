@@ -1,4 +1,5 @@
 import { privateStorageReady } from './storageReadiness.js';
+import { minimizeCommandPayloadsOwned } from './faro/commandPayloads.js';
 import { enforceNativeRate } from './faro/requestLimitModel.js';
 import { enqueueFileDisposalsOwned,disposeFiles } from './faro/fileDisposalModel.js';
 import { createServer } from 'node:http';
@@ -27,7 +28,7 @@ export async function createPgFaroApp(options:{connection:ClientConfig;schema:st
  if(!/^[a-z][a-z0-9_]{0,62}$/.test(options.schema))throw new Error('Nieprawidłowy schemat PostgreSQL.');
  const database=new PgJobDatabase(options.connection);
  await database.connect();
- try {await database.query(`SET search_path TO "${options.schema}"`);const rows=await database.readBatch([{text:'SELECT version FROM schema_migrations ORDER BY version',values:[]}]),expected=readdirSync(resolve(process.cwd(),'migrations')).filter(name=>/^\d+_[a-zA-Z0-9_-]+\.sql$/.test(name)).sort().map(name=>name.slice(0,-4));if(JSON.stringify(rows[0]?.map(row=>row.version))!==JSON.stringify(expected))throw new Error('Wymagany zgodny, przygotowany schemat PostgreSQL.');const app=createConnectedPgFaroApp(database,options.overrides);return {...app,close:async()=>{await app.close();await database.end();}};}
+ try {await database.query(`SET search_path TO "${options.schema}"`);const rows=await database.readBatch([{text:'SELECT version FROM schema_migrations ORDER BY version',values:[]}]),expected=readdirSync(resolve(process.cwd(),'migrations')).filter(name=>/^\d+_[a-zA-Z0-9_-]+\.sql$/.test(name)).sort().map(name=>name.slice(0,-4));if(JSON.stringify(rows[0]?.map(row=>row.version))!==JSON.stringify(expected))throw new Error('Wymagany zgodny, przygotowany schemat PostgreSQL.');await database.transaction(()=>minimizeCommandPayloadsOwned(database));const app=createConnectedPgFaroApp(database,options.overrides);return {...app,close:async()=>{await app.close();await database.end();}};}
  catch(error){await database.end();throw error;}
 }
 /** Injected connection is already scoped to the validated schema; caller owns its lifecycle. */

@@ -26,11 +26,12 @@ export class InterviewService extends FaroStore {
 
   propose(userId:string,processId:string,body:Record<string,unknown>) {
     const authorize=()=>{const p=this.recruitment.authorize(userId,processId);if(p.candidate_id===userId)throw new HttpError(403,'Propozycję terminu rozpoczyna rekruter.');this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);};authorize();
-    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},()=>{
+    const ack=this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,processId,operation:'INTERVIEW_PROPOSE'},()=>{
       const p=this.recruitment.authorize(userId,processId),rows=interviewProposalContextQueries(processId).map(query=>this.db.prepare(query.text).all({$1:processId})),input=interviewProposalInput(p,Boolean(rows[0]?.length),rows[1]?.[0]?.n as number,this.recruitment.offers.version(p.offer_id,p.offer_version).interviewCount,body,this.now());this.available(p.candidate_id,userId,input.starts,input.ends);const plan=interviewProposalPlan(userId,p,input,this.now());
       for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
-      this.recruitment.event(p,userId,'INTERVIEW_PROPOSED',plan.event);return this.view(userId,plan.id);
+      this.recruitment.event(p,userId,'INTERVIEW_PROPOSED',plan.event);return {id:plan.id};
     },authorize);
+    return this.view(userId,ack.id);
   }
 
   tick() {
@@ -48,7 +49,7 @@ export class InterviewService extends FaroStore {
   }
   change(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>{const p=this.recruitment.authorize(userId,this.row(id).process_id);if(p.candidate_id!==userId)this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);};authorize();
-    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},()=>{
+    this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},()=>{
       const row=this.row(id),p=this.recruitment.authorize(userId,row.process_id),candidate=p.candidate_id===userId;
       if(!candidate)this.member(userId,this.recruitment.offers.get(p.offer_id).organizationId,['OWNER','ADMIN','RECRUITER']);
       const command=interviewChangeInput(row,p,body);
@@ -56,7 +57,7 @@ export class InterviewService extends FaroStore {
         const plan=interviewSchedulePlan(userId,row,p,body,this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours,this.now());
         if(command==='CONFIRM'){this.recruitment.offers.assigned(row.recruiter_id!,p.offer_id);this.available(p.candidate_id,row.recruiter_id!,row.starts_at,row.ends_at);}
         for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
-        this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);return this.view(userId,id);
+        this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);return {id};
       }
       const plan=interviewOutcomePlan(userId,row,p,body,this.recruitment.offers.get(p.offer_id).organizationId,this.recruitment.offers.version(p.offer_id,p.offer_version).decisionHours,this.now());
       for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
@@ -66,7 +67,8 @@ export class InterviewService extends FaroStore {
       }
       this.recruitment.event(p,userId,`INTERVIEW_${command}`,plan.event);
       if(plan.state==='COMPLETED')new AppStore(this.database).faroMutualStageCompleted(id);
-      return this.view(userId,id);
+      return {id};
     },authorize);
+    return this.view(userId,id);
   }
 }

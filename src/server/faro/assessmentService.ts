@@ -206,25 +206,27 @@ export class AssessmentService extends FaroStore {
   finalize(userId: string, id: string, body: Record<string, unknown>) {
     const initial=this.row(id);
     this.recruitment.offers.assigned(userId,this.recruitment.row(initial.process_id).offer_id);
-    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},()=>{
+    this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_FINALIZE'},()=>{
       const row=this.row(id),process=this.recruitment.row(row.process_id);
       this.recruitment.offers.assigned(userId,process.offer_id);
       const definition=JSON.parse(this.definition(row.assessment_id,row.assessment_version).content) as Definition;
       for(const query of assessmentFinalizeQueries(userId,row,process,definition,this.incident(id),body,this.now()))this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       this.recruitment.event(process,userId,'ASSESSMENT_FINALIZED',{attemptId:id});
-      return this.overview(userId,id);
+      return {id};
     },()=>{this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);});
+    return this.overview(userId,id);
   }
   invalidateResult(userId:string,id:string,body:Record<string,unknown>) {
     this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);
-    return this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_INVALIDATE'},()=>{
+    this.recruitment.commandOnce(userId,body.idempotencyKey,{...body,id,operation:'ASSESSMENT_INVALIDATE'},()=>{
       const row=this.row(id),process=this.recruitment.row(row.process_id);
       this.recruitment.offers.assigned(userId,process.offer_id);
       const plan=assessmentInvalidationPlan(row,process,this.resultHistory(id).at(-1),body,this.now());
       for(const query of plan.queries)this.db.prepare(query.text).run(Object.fromEntries(query.values.map((value,index)=>[`$${index+1}`,value])));
       this.recruitment.event(process,userId,'ASSESSMENT_RESULT_INVALIDATED',plan.event);
-      return this.overview(userId,id);
+      return {id};
     },()=>{this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);});
+    return this.overview(userId,id);
   }
   amendResult(userId:string,id:string,body:Record<string,unknown>) {
     const authorize=()=>this.recruitment.offers.assigned(userId,this.recruitment.row(this.row(id).process_id).offer_id);

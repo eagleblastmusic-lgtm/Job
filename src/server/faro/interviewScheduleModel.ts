@@ -30,12 +30,13 @@ interface InterviewScheduleDatabase {
 }
 export async function changeInterviewSchedule(database:InterviewScheduleDatabase,userId:string,id:string,body:Record<string,unknown>,asOf:string,authorize:()=>void|Promise<void>) {
  let row:InterviewRow,process:ProcessRow;
- return runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},asOf,async()=>{
+ await runCommandOnce(database,userId,body.idempotencyKey,{...body,id,operation:'INTERVIEW_CHANGE'},asOf,async()=>{
   await authorize();row=interviewFromRows((await database.readBatch([interviewReadQuery(id)]))[0]??[]);process=await interviewProcessOwned(database,userId,row.process_id);if(process.candidate_id!==userId){const role=await requireAttemptEmployerOwned(database,userId,process);if(!['OWNER','ADMIN','RECRUITER'].includes(role))throw new HttpError(404,'Nie znaleziono zasobu.','NOT_FOUND');}
  },async()=>{
   const version=offerVersionFromRows((await database.readBatch([offerVersionReadQuery(process.offer_id,process.offer_version)]))[0]??[]),plan=interviewSchedulePlan(userId,row,process,body,version.decisionHours,asOf);
   if(plan.command==='CONFIRM'){await requireAttemptEmployerOwned(database,row.recruiter_id!,process);requireInterviewSlot((await database.readBatch([interviewSlotQuery(process.candidate_id,row.recruiter_id!,row.starts_at,row.ends_at)]))[0]??[]);}
   for(const query of plan.queries)await database.query(query.text,query.values);const recipients=(await database.readBatch([processRecruiterReadQuery(process.offer_id)]))[0]??[];for(const query of processEventQueries(process,userId,`INTERVIEW_${plan.command}`,plan.event,recipients,asOf))await database.query(query.text,query.values);
-  return interviewViewOwned(database,userId,id);
+  return {id};
  });
+ return database.transaction(async()=>{await authorize();return interviewViewOwned(database,userId,id);},{readOnly:true});
 }

@@ -2,6 +2,7 @@ import { createHash,randomUUID } from 'node:crypto';
 import type { RecoveryLedger } from './recoveryService.js';
 import { eraseDerivativesOwned } from './privacyErasureModel.js';
 import { currentActivityAuthority,currentSkillAuthority } from './recoveryReadModel.js';
+import { minimizeCommandPayloadsOwned } from './commandPayloads.js';
 interface RecoveryDatabase {readBatch(queries:Array<{text:string;values:readonly unknown[]}>):Promise<Record<string,unknown>[][]>;query(text:string,values:readonly unknown[]):Promise<unknown>;transaction<T>(work:()=>T|Promise<T>):Promise<T>;}
 /** Offline reconciliation is confined to a new recovery/rehearsal schema, never the live runtime. */
 export async function reconcileRecovery(database:RecoveryDatabase,ledger:RecoveryLedger,asOf:string,authorizeOperator:()=>void|Promise<void>,privateFilesVerified=false){
@@ -12,6 +13,7 @@ export async function reconcileRecovery(database:RecoveryDatabase,ledger:Recover
   const write=(text:string,values:readonly unknown[]=[])=>database.query(text,values);
   const schema=(await get('SELECT current_schema() schema'))?.schema;
   if(typeof schema!=='string'||!/^faro_(recovery|rehearsal)_[a-z0-9_]{1,40}$/.test(schema))throw new Error('Isolated offline recovery schema required.');
+  await minimizeCommandPayloadsOwned(database);
   const uploaded=await read('SELECT id,user_id,storage_key,size_bytes,sha256 FROM uploaded_files');
   if(uploaded.length){
    if(!privateFilesVerified)throw new Error('Retained upload recovery requires a reviewed physical-file procedure.');

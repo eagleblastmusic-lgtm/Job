@@ -1,4 +1,5 @@
 import {execFile} from 'node:child_process';
+import {proveCommandJournal} from './faro-command-journal-proof.mjs';
 import {promisify} from 'node:util';
 import {proveNativePrivateFileRecovery} from './faro-postgres-private-file-recovery-proof.mjs';
 import { proveNativeRequestLimits } from './faro-postgres-request-limit-proof.mjs';
@@ -704,6 +705,7 @@ try {
     await nativeProof('WORKER',()=>proveNativeWorker(client,schema,employer.id,offer.id,asOf));
     await nativeProof('AUTH',()=>proveNativeAuth(client,schema,asOf));
     await nativeProof('ERASURE',()=>proveNativeErasure(client,employer.id,offer.id,definition.id,asOf));
+    await nativeProof('COMMAND_JOURNAL_ERASURE_REPLAY_RESTORE',()=>proveCommandJournal({native:true}));
     await nativeProof('MFA_ROTATION',()=>proveNativeMfaRotation(snapshot,candidate));
     await nativeProof('CUTOVER',()=>proveNativeCutover(snapshot,f,candidate,process));
     await nativeProof('RECOVERY',()=>proveNativeRecovery(snapshot,candidate,employer,org,offer));
