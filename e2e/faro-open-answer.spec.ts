@@ -86,7 +86,8 @@ test('FARO-AUDIT-003: no-click autosave confirms a revision, exact private text 
     expect((await f.request<Attempt>(f.url,f.owner.cookie)).reviewTasks).toEqual([]);
     await page.reload();await expect(page.locator('[name=task-1]')).toHaveValue(answer);expect((await f.read()).expiresAt).toBe(before.expiresAt);
     expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain('FARO_PRIVATE_AUTOSAVE_SENTINEL');
-    const cached=await page.evaluate(async()=>{const bodies:string[]=[];for(const name of await caches.keys()){const cache=await caches.open(name);for(const key of await cache.keys()){const response=await cache.match(key);if(response)bodies.push(await response.text());}}return bodies.join('');});expect(cached).not.toContain('FARO_PRIVATE_AUTOSAVE_SENTINEL');
+    const cached=await page.evaluate(async()=>{await navigator.serviceWorker.ready;const bodies:string[]=[],urls:string[]=[];for(const name of await caches.keys()){const cache=await caches.open(name);for(const key of await cache.keys()){urls.push(key.url);const response=await cache.match(key);if(response)bodies.push(await response.text());}}return {text:bodies.join(''),urls};});
+    expect(cached.text).not.toContain('FARO_PRIVATE_AUTOSAVE_SENTINEL');expect(cached.urls.some(url=>new URL(url).pathname==='/assessmentAutosave.js')).toBe(true);expect(cached.urls.some(url=>new URL(url).pathname.startsWith('/api/'))).toBe(false);
     expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
   }finally{await closeAutosave(page,f);}
 });
@@ -135,4 +136,20 @@ test('autosave 409 requires a choice between concurrent answers; server timeout 
     const expired=await f.read();expect(expired.state).toBe('EXPIRED');expect(expired.answers['task-1']).toBe('Druga zmiana w innej karcie.');await expect(page.getByRole('button',{name:'Zapisz',exact:true})).toBeDisabled();
     await f.request(f.url+'/submit',f.candidate.cookie,'POST',{expectedVersion:expired.revision,answers:{'task-1':'Spóźniony submit'}},409);expect((await f.read()).answers).toEqual(expired.answers);
   }finally{await closeAutosave(page,f);}
+});
+
+test('autosave confirmation arriving after the timer expires cannot reactivate editing or submit',async({page})=>{
+  const f=await autosaveFixture(page);let release=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});let committed=false;
+  try{
+    const end=new Date(Date.now()+3000).toISOString(),id=f.url.split('/').pop()!;
+    if('query' in f.app.db)await f.app.db.query('UPDATE faro_attempts SET expires_at=$1 WHERE id=$2',[end,id]);else f.app.db.db.prepare('UPDATE faro_attempts SET expires_at=? WHERE id=?').run(end,id);
+    await page.reload();await expect(page.locator('[name=task-1]')).toBeVisible();
+    await page.route('**/answers',async route=>{const response=await route.fetch();committed=true;await held;await route.fulfill({response});});
+    await page.locator('[name=task-1]').fill('Odpowiedź przyjęta przed upływem czasu.');await expect.poll(()=>committed).toBe(true);
+    await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','expired');release();
+    await expect(page.locator('#f-answer-save-status')).toContainText('Potwierdzono ostatni zapis');
+    await expect(page.locator('[name=task-1]')).toBeDisabled();await expect(page.getByRole('button',{name:'Zapisz',exact:true})).toBeDisabled();
+    const saved=await f.read();expect(saved.answers['task-1']).toBe('Odpowiedź przyjęta przed upływem czasu.');expect(saved.expiresAt).toBe(end);
+    const process=await f.request<{events:Array<{kind:string}>}>(`/api/faro/processes/${f.recruitment.id}`,f.candidate.cookie);expect(process.events.filter(e=>e.kind==='ATTEMPT_SUBMITTED')).toHaveLength(0);
+  }finally{release();await closeAutosave(page,f);}
 });

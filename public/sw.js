@@ -1,5 +1,5 @@
-const CACHE='faro-public-shell-v1';
-const ASSETS=['/','/styles.css','/faro.css','/faro.js','/faroUi.js','/faroTypes.js','/faroViews.js','/manifest.webmanifest','/login-background.png'];
+const CACHE='faro-public-shell-v2';
+const ASSETS=['/','/styles.css','/faro.css','/faro.js','/faroUi.js','/faroTypes.js','/faroViews.js','/assessmentAutosave.js','/manifest.webmanifest','/login-background.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener('fetch',event=>{

@@ -108,7 +108,7 @@ export class AssessmentAutosave {
           // A response confirms only its own snapshot; it never repaints newer typed text.
         }
         if(submit){this.ensureActive();const result=await this.api<Attempt>(`/attempts/${this.id}/submit`,'POST',{answers:{...this.desired},expectedVersion:this.attempt.revision},this.abort.signal);this.update(result);this.ended=true;}
-        this.show('saved',`Zapisano automatycznie. Wersja ${this.attempt.revision}.`);return this.attempt;
+        this.show(this.ended&&!submit?'expired':'saved',this.ended&&!submit?`Czas próby upłynął. Potwierdzono ostatni zapis: wersja ${this.attempt.revision}.`:`Zapisano automatycznie. Wersja ${this.attempt.revision}.`);return this.attempt;
       }catch(error){
         const failure=error as Error&{status?:number;code?:string};
         if(this.disposed)throw error;

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import type {AddressInfo} from 'node:net';
 import { NominatimGeocoder, OsrmRouter, type GeographyProviderConfig } from '../server/faro/geographyProviders.js';
 const config = (): GeographyProviderConfig => ({ endpoint: 'https://synthetic.invalid', provider: 'SYNTHETIC_TEST_ONLY', datasetVersion: 'TEST_ONLY',
   userAgent: 'Faro-Contract-Test/1.0', timeoutMs: 1000, minIntervalMs: 1000, maxDailyRequests: 2 });
@@ -52,6 +54,14 @@ test('FARO-AUDIT-004: OSRM HTTP400 NoRoute alone is unknown; status/body errors 
   await assert.rejects(route(()=>new Response(new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('{'));}}),{status:400}),40),/^Error: GEO_TIMEOUT$/);
   const geocoder=new NominatimGeocoder(config(),async()=>Response.json({code:'NoRoute'},{status:400}));
   await assert.rejects(geocoder.search('Łódź',signal()),/^Error: GEO_PROVIDER_UNAVAILABLE$/);
+  // Exercise actual HTTP400/native fetch without querying any public provider.
+  const server=createServer((_request,response)=>{response.writeHead(400,{'content-type':'application/json'});response.end(JSON.stringify({code:'NoRoute',message:'PRIVATE_SENTINEL'}));});
+  await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));
+  try{
+    const base=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const router=new OsrmRouter(config(),{CAR:'driving'},async(_url,options)=>fetch(base,options));
+    assert.equal(await router.route(a,b,'CAR',signal()),null);
+  }finally{server.closeAllConnections();await new Promise<void>((done,reject)=>server.close(error=>error?reject(error):done()));}
 });
 test('unapproved public endpoints, malformed input/results and private transport errors refuse safely', async () => {
   for (const endpoint of ['http://synthetic.invalid', 'https://user:secret@synthetic.invalid', 'https://synthetic.invalid?q=secret', 'https://synthetic.invalid/private', 'https://nominatim.openstreetmap.org', 'https://router.project-osrm.org', 'https://nominatim.openstreetmap.org.', 'https://router.project-osrm.org.']) {
