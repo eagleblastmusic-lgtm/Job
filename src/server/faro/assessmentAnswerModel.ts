@@ -16,7 +16,9 @@ export function attemptAnswerQueries(row:AttemptRow,definition:Definition,body:R
     const raw = object(body.answers), answers: Record<string, number|string> = {};
     for (const [key, value] of Object.entries(raw)) {
       const task = definition.tasks.find(t => t.id === key); if (!task) throw new HttpError(400, 'Nieznane zadanie.');
-      answers[key] = definition.type==='OPEN_ANSWER'?text(value,5000):integer(value, 0, task.options.length - 1);
+      // Validate nonempty/bounded text, preserving the exact candidate draft (including whitespace).
+      if(definition.type==='OPEN_ANSWER'){text(value,5000);if(typeof value!=='string'||value.length>5000)throw new HttpError(400,'Odpowiedź jest zbyt długa.');answers[key]=value;}
+      else answers[key]=integer(value, 0, task.options.length - 1);
     }
     const breakdown = definition.tasks.map(task => ({ taskId: task.id, earned: answers[task.id] === undefined||definition.type==='OPEN_ANSWER' ? null : answers[task.id] === task.answer ? task.points : 0, possible: task.points }));
     const result = { breakdown, earned: definition.type==='OPEN_ANSWER'?null:breakdown.reduce((sum, task) => sum + (task.earned ?? 0), 0), possible: breakdown.reduce((sum, task) => sum + task.possible, 0), unanswered:definition.tasks.filter(t=>answers[t.id]===undefined).length, assessmentVersion: row.assessment_version, rubricVersion: definition.rubricVersion, review: 'PENDING' };

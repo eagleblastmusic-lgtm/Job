@@ -2,6 +2,7 @@ import { faroPgFixture } from '../src/tests/faro-pg-fixture.js';
 import { test,expect,type Page } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { faroFixture,offerInput } from '../src/tests/faro-fixture.js';
+import type {Attempt} from '../src/client/faroTypes.js';
 async function login(page:Page,base:string,email:string) {
   await page.goto(base);await page.locator('#loginForm [name=email]').fill(email);await page.locator('#loginForm [name=password]').fill('Bezpieczne123');
   await page.getByRole('button',{name:'Zaloguj się',exact:true}).click();await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');
@@ -52,4 +53,86 @@ test('real open answer draft, pinned manual rubric, private save and human score
     await page.getByRole('button',{name:'Wyloguj',exact:true}).click();await login(page,f.base,candidate.email);await page.goto(`${f.base}/#attempts/${a.id}`);
     await expect(page.getByText('1 / 3 punktów. Bez odpowiedzi: 1.',{exact:true})).toBeVisible();expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);expect(errors).toEqual([]);
   }finally{if(!page.isClosed())await page.goto('about:blank');await f.close();}
+});
+
+async function autosaveFixture(page:Page){
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
+  const owner=await f.user('AutosaveOwner'),candidate=await f.user('AutosaveCandidate');
+  const org=await f.request<{id:string}>('/api/faro/organizations',owner.cookie,'POST',{name:'Synthetic autosave fixture'},201);
+  if('query' in f.app.db)await f.app.db.query("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=$1",[org.id]);else f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
+  const offer=await f.request<{id:string}>(`/api/faro/organizations/${org.id}/offers`,owner.cookie,'POST',offerInput(owner.id),201);
+  await f.request(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'REVIEW',expectedVersion:1});await f.request(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',availability:{kind:'IMMEDIATE'},expectedVersion:0});
+  const preview=await f.request<{confirmationToken:string}>('/api/faro/profile/preview-confirmation',candidate.cookie);
+  const recruitment=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'autosave-interest'},201);
+  await f.request(`/api/faro/processes/${recruitment.id}/commands`,owner.cookie,'POST',{command:'ADVANCE',expectedVersion:1,nextAction:'Synthetic autosave',dueAt:new Date(Date.now()+86400000).toISOString(),idempotencyKey:'autosave-advance'});
+  const definition=await f.request<{id:string}>(`/api/faro/offers/${offer.id}/assessments`,owner.cookie,'POST',{type:'OPEN_ANSWER',title:'Autosave assessment',timeLimitMinutes:5,expectedMinutes:3,rubricVersion:'autosave-r1',tasks:[{prompt:'Opisz następny krok.',evaluationCriteria:'Jasny krok i uzasadnienie.',points:2}]},201);
+  for(const action of ['REVIEW','APPROVE'])await f.request(`/api/faro/assessments/${definition.id}/versions/1`,owner.cookie,'POST',{action,confirmed:true});
+  const ack=await f.request<{id:string}>(`/api/faro/processes/${recruitment.id}/assessment`,owner.cookie,'POST',{assessmentId:definition.id,version:1,deadline:new Date(Date.now()+86400000).toISOString(),expectedVersion:2,idempotencyKey:'autosave-assign'},201),url=`/api/faro/attempts/${ack.id}`;
+  await f.request(url,candidate.cookie,'POST',{});await login(page,f.base,candidate.email);await page.goto(`${f.base}/#attempts/${ack.id}`);await expect(page.locator('[name=task-1]')).toBeVisible();
+  return {...f,owner,candidate,recruitment,url,read:()=>f.request<Attempt>(url,candidate.cookie)};
+}
+async function closeAutosave(page:Page,f:Awaited<ReturnType<typeof autosaveFixture>>){
+  if(!page.isClosed()){page.on('dialog',dialog=>{void dialog.accept();});await page.goto('about:blank');}await f.close();
+}
+
+test('FARO-AUDIT-003: no-click autosave confirms a revision, exact private text survives reload and expiry is unchanged',async({page})=>{
+  const f=await autosaveFixture(page);try{
+    const before=await f.read(),answer='  FARO_PRIVATE_AUTOSAVE_SENTINEL\nDokładna odpowiedź: żółć.  ';
+    let writes=0;page.on('request',request=>{if(request.method()==='PUT'&&request.url().endsWith('/answers'))writes++;});
+    await page.locator('[name=task-1]').fill(answer);
+    await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','saved');
+    const saved=await f.read();expect(saved.answers['task-1']).toBe(answer);expect(saved.revision).toBeGreaterThan(before.revision);expect(saved.expiresAt).toBe(before.expiresAt);expect(writes).toBe(1);
+    expect((await f.request<Attempt>(f.url,f.owner.cookie)).reviewTasks).toEqual([]);
+    await page.reload();await expect(page.locator('[name=task-1]')).toHaveValue(answer);expect((await f.read()).expiresAt).toBe(before.expiresAt);
+    expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain('FARO_PRIVATE_AUTOSAVE_SENTINEL');
+    const cached=await page.evaluate(async()=>{const bodies:string[]=[];for(const name of await caches.keys()){const cache=await caches.open(name);for(const key of await cache.keys()){const response=await cache.match(key);if(response)bodies.push(await response.text());}}return bodies.join('');});expect(cached).not.toContain('FARO_PRIVATE_AUTOSAVE_SENTINEL');
+    expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+  }finally{await closeAutosave(page,f);}
+});
+
+test('autosave serializes delayed snapshots with newer edits and submit; stale response never repaints the draft',async({page})=>{
+  const f=await autosaveFixture(page);let release=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});
+  const inputs:Array<{answers:Record<string,string>;expectedVersion:number}>=[];let committed=false;
+  try{
+    await page.route('**/answers',async route=>{inputs.push(route.request().postDataJSON() as typeof inputs[number]);const response=await route.fetch();if(inputs.length===1){committed=true;await held;}await route.fulfill({response});});
+    await page.locator('[name=task-1]').fill('Starsza odpowiedź A.');await expect.poll(()=>committed).toBe(true);
+    await page.locator('[name=task-1]').fill('Nowsza odpowiedź B — musi pozostać.');await page.locator('[name=operation]').selectOption('Prześlij do oceny');
+    await page.getByRole('button',{name:'Zapisz',exact:true}).click();expect(inputs.length).toBe(1);
+    release();await expect(page.getByText('Wynik czeka na review',{exact:true})).toBeVisible();
+    const saved=await f.read();expect(saved.state).toBe('SCORED_PENDING_REVIEW');expect(saved.answers['task-1']).toBe('Nowsza odpowiedź B — musi pozostać.');expect(inputs.length).toBe(2);expect(inputs[1]!.expectedVersion).toBe(inputs[0]!.expectedVersion+1);
+    const process=await f.request<{events:Array<{kind:string}>}>(`/api/faro/processes/${f.recruitment.id}`,f.candidate.cookie);expect(process.events.filter(e=>e.kind==='ATTEMPT_SUBMITTED')).toHaveLength(1);
+  }finally{release();await closeAutosave(page,f);}
+});
+
+test('autosave offline/reconnect and uncertain committed response preserve the draft; navigation waits for confirmation',async({page,context})=>{
+  const f=await autosaveFixture(page);try{
+    const expiry=(await f.read()).expiresAt;
+    await context.setOffline(true);await page.locator('[name=task-1]').fill('Odpowiedź wpisana offline.');
+    await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','offline');
+    await page.getByRole('link',{name:'Wróć do procesu',exact:true}).click();await expect(page.locator('[name=task-1]')).toHaveValue('Odpowiedź wpisana offline.');expect(page.url()).toContain('#attempts/');
+    expect((await f.read()).answers).toEqual({});await context.setOffline(false);
+    await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','saved');expect((await f.read()).answers['task-1']).toBe('Odpowiedź wpisana offline.');expect((await f.read()).expiresAt).toBe(expiry);
+    let lost=false;await page.route('**/answers',async route=>{await route.fetch();lost=true;await route.abort('failed');});
+    await page.locator('[name=task-1]').fill('Zapis przyjęty — odpowiedź sieci utracona.');await expect.poll(()=>lost).toBe(true);await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','error');
+    const accepted=await f.read();await page.unroute('**/answers');await page.getByRole('button',{name:'Ponów zapis',exact:true}).click();await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','saved');expect((await f.read()).revision).toBe(accepted.revision);
+    await page.locator('[name=task-1]').fill('Odpowiedź przed nawigacją.');await page.getByRole('link',{name:'Wróć do procesu',exact:true}).click();await expect(page.locator('[data-form=attempt-answers]')).toHaveCount(0);expect((await f.read()).answers['task-1']).toBe('Odpowiedź przed nawigacją.');
+  }finally{await context.setOffline(false);await closeAutosave(page,f);}
+});
+
+test('autosave 409 requires a choice between concurrent answers; server timeout stops saving and submission',async({page})=>{
+  const f=await autosaveFixture(page);try{
+    const initial=await f.read();await f.request(f.url+'/answers',f.candidate.cookie,'PUT',{answers:{'task-1':'Odpowiedź z innej karty.'},expectedVersion:initial.revision});
+    await page.locator('[name=task-1]').fill('Moja odpowiedź po konflikcie.');await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','conflict');
+    expect((await f.read()).answers['task-1']).toBe('Odpowiedź z innej karty.');await expect(page.locator('[name=task-1]')).toHaveValue('Moja odpowiedź po konflikcie.');
+    await page.getByRole('button',{name:'Zachowaj moją odpowiedź',exact:true}).click();await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','saved');expect((await f.read()).answers['task-1']).toBe('Moja odpowiedź po konflikcie.');
+    const version=await f.read();await f.request(f.url+'/answers',f.candidate.cookie,'PUT',{answers:{'task-1':'Druga zmiana w innej karcie.'},expectedVersion:version.revision});
+    await page.locator('[name=task-1]').fill('Zmiana do odrzucenia.');await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','conflict');
+    await page.getByRole('button',{name:'Wczytaj zapisaną odpowiedź',exact:true}).click();await expect(page.locator('[name=task-1]')).toHaveValue('Druga zmiana w innej karcie.');
+    const past=new Date(Date.now()-1000).toISOString(),id=f.url.split('/').pop()!;
+    if('query' in f.app.db)await f.app.db.query('UPDATE faro_attempts SET expires_at=$1 WHERE id=$2',[past,id]);else f.app.db.db.prepare('UPDATE faro_attempts SET expires_at=? WHERE id=?').run(past,id);
+    await page.locator('[name=task-1]').fill('Zmiana po serwerowym terminie.');await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','expired');
+    const expired=await f.read();expect(expired.state).toBe('EXPIRED');expect(expired.answers['task-1']).toBe('Druga zmiana w innej karcie.');await expect(page.getByRole('button',{name:'Zapisz',exact:true})).toBeDisabled();
+    await f.request(f.url+'/submit',f.candidate.cookie,'POST',{expectedVersion:expired.revision,answers:{'task-1':'Spóźniony submit'}},409);expect((await f.read()).answers).toEqual(expired.answers);
+  }finally{await closeAutosave(page,f);}
 });

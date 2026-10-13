@@ -1,6 +1,7 @@
 import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview, AssessmentDefinition, Reliability } from './faroTypes.js';
 import { esc, label, salary, scenarioSalary, money, date, chip, empty, input, select, area, check, form, button, projection,skillOptions } from './faroUi.js';
 import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView, assessmentEditor, assessmentTask, requirementFields, assessmentReview, reliabilityView } from './faroViews.js';
+import { AssessmentAutosave } from './assessmentAutosave.js';
 
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)!;
 const root = $('#appView');
@@ -16,6 +17,7 @@ const compared = new Set<string>();
 let watchIds = new Set<string>();
 let watchAlerts = new Map<string,boolean>();
 let interviews:Interview[]=[];
+let answerAutosave:AssessmentAutosave|null=null;
 const value = (f: FormData, name: string) => String(f.get(name) ?? '').trim();
 const number = (f: FormData, name: string) => Number(value(f, name));
 const practice = (f: FormData) => ({ quantity: value(f, 'quantity') ? number(f, 'quantity') : null, unit: value(f, 'unit'),...(f.has('practiceContext')?{context:value(f,'practiceContext')}:{}) });
@@ -39,7 +41,7 @@ async function api<T>(path: string, method = 'GET', body?: unknown, signal = con
   const data = await r.json() as T & { error?: { message?: string; code?: string } };
   if (r.status === 401 && data?.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
   if(data?.error?.code==='MFA_REQUIRED') {keyDraft=null;compared.clear();offers=[];currentOffer=null;currentProcess=null;currentAttempt=null;navigate('security');}
-  if (!r.ok) throw new Error(data?.error?.message ?? `Błąd ${r.status}`);
+  if (!r.ok) throw Object.assign(new Error(data?.error?.message ?? `Błąd ${r.status}`),{status:r.status,code:data?.error?.code});
   return data;
 }
 function interviewView(i:Interview,p:Process) {
@@ -54,6 +56,7 @@ function notify(text: string, error = false) {
   if (status) { status.textContent = text; status.classList.toggle('f-error', error); }
 }
 function loggedOut() { includeUnknown=false;keyDraft=null;
+  answerAutosave?.dispose();answerAutosave=null;
   mfaSetup=null;mfaRecoveryCodes=null;
   epoch++; controller.abort(); controller = new AbortController(); clearInterval(timer);
   user = null; skills = []; organizations = []; offers = []; compared.clear(); watchIds.clear(); watchAlerts.clear();
@@ -83,6 +86,12 @@ function card(o: Offer, base: string, selected: string) {
 }
 async function render() {
   if (!user) return;
+  const previous=answerAutosave;
+  if(previous){
+    try{await previous.flush();}catch(error){if(user){history.replaceState(null,'',`#attempts/${previous.id}`);role='candidate';notify((error as Error).message,true);}return;}
+    if(previous!==answerAutosave)return;
+    previous.dispose();answerAutosave=null;
+  }
   const mine = ++epoch; controller.abort(); controller = new AbortController(); clearInterval(timer); shell();
   currentOffer = null; currentProcess = null; currentAttempt = null; interviews=[];
   const [page = 'offers', id = '', version = ''] = location.hash.slice(1).split('/');
@@ -201,8 +210,10 @@ async function render() {
     if (mine !== epoch) return;
     $('#f-content').innerHTML = html; finish(mine);
     if (currentAttempt?.state === 'STARTED' && currentAttempt.expiresAt) {
+      const answers=$<HTMLFormElement>('[data-form=attempt-answers]');
+      if(answers)answerAutosave=new AssessmentAutosave(answers,currentAttempt,api,a=>{if(mine===epoch)currentAttempt=a;});
       const end = Date.parse(currentAttempt.expiresAt), server = Date.parse(currentAttempt.serverNow), started = performance.now();
-      const tick = () => { const element = $('#f-timer'); if (!element) return; const seconds = Math.max(0,Math.ceil((end-server-(performance.now()-started))/1000)); element.textContent = seconds ? `Pozostało ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}` : 'Czas upłynął. Serwer zweryfikuje zapis.'; };
+      const tick = () => { const element = $('#f-timer'); if (!element) return; const seconds = Math.max(0,Math.ceil((end-server-(performance.now()-started))/1000)); element.textContent = seconds ? `Pozostało ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}` : 'Czas upłynął. Serwer zweryfikuje zapis.';if(!seconds)answerAutosave?.expire(); };
       tick(); timer = setInterval(tick,1000);
     }
   } catch (e) {
@@ -242,7 +253,7 @@ root.addEventListener('click', event => {
       if(action==='assessment-remove-task') {
         const task=el.closest('[data-assessment-task]');if(task?.parentElement?.children.length===1)throw new Error('Assessment wymaga przynajmniej jednego zadania.');task?.remove();return;
       }
-      if (action === 'logout') { await api('/api/auth/logout','POST',{}); loggedOut(); location.hash=''; return; }
+      if (action === 'logout') { await answerAutosave?.flush();await api('/api/auth/logout','POST',{}); loggedOut(); location.hash=''; return; }
       if (action === 'retry') { await render(); return; }
       if (action === 'compare-add') { if (compared.size >= 4 && !compared.has(id)) throw new Error('Porównuj do 4 ofert jednocześnie.'); compared.add(id); notify('Oferta dodana. Otwórz Porównanie.'); return; }
       if (action === 'compare-remove') compared.delete(id);
@@ -285,6 +296,10 @@ root.addEventListener('click', event => {
 });
 root.addEventListener('submit', event => {
   const el = event.target as HTMLFormElement; if (!el.dataset.form) return; event.preventDefault();
+  if(el.dataset.form==='attempt-answers'&&answerAutosave){
+    const autosave=answerAutosave,submit=value(new FormData(el),'operation')==='Prześlij do oceny',mine=epoch;
+    void autosave.commit(submit).then(async()=>{if(mine!==epoch)return;if(submit)await render();else notify('Zapisano.');}).catch(error=>{if(mine===epoch)notify((error as Error).message,true);});return;
+  }
   const f = new FormData(el), action = el.dataset.form, id = el.dataset.id ?? '', mine = epoch;
   const fields = el.querySelector('fieldset'); if (fields?.disabled) return; if (fields) fields.disabled=true;
   void (async () => {
@@ -333,10 +348,7 @@ root.addEventListener('submit', event => {
       }
       else if (action === 'assessment-approve') await api(`/assessments/${id}/versions/${number(f,'version')}`,'POST',{action:value(f,'action'),confirmed:f.has('confirmed')});
       else if (action === 'assessment-assign') { await api(`/processes/${id}/assessment`,'POST',{assessmentId:value(f,'assessmentId'),version:number(f,'version'),deadline:toDate(value(f,'deadline')),expectedVersion:number(f,'expectedVersion'),idempotencyKey:crypto.randomUUID()}); destination=`processes/${id}`; }
-      else if (action === 'attempt-answers') {
-        const answers:Record<string,number|string>={}; for(const task of currentAttempt?.tasks ?? []) if(f.has(task.id)&&(currentAttempt?.type!=='OPEN_ANSWER'||value(f,task.id))) answers[task.id]=currentAttempt?.type==='OPEN_ANSWER'?value(f,task.id):number(f,task.id);
-        const submit=value(f,'operation')==='Prześlij do oceny'; await api(`/attempts/${id}/${submit?'submit':'answers'}`,submit?'POST':'PUT',{answers,expectedVersion:currentAttempt?.revision});
-      } else if (action === 'attempt-review') {const scores:Record<string,number|null>={};for(const t of currentAttempt?.reviewTasks??[])scores[t.id]=t.chosenOption===null&&t.chosenText===null?null:number(f,t.id);await api(`/attempts/${id}/review`,'POST',{...(currentAttempt?.type==='OPEN_ANSWER'?{scores}:{}),note:value(f,'note'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});}
+      else if (action === 'attempt-review') {const scores:Record<string,number|null>={};for(const t of currentAttempt?.reviewTasks??[])scores[t.id]=t.chosenOption===null&&t.chosenText===null?null:number(f,t.id);await api(`/attempts/${id}/review`,'POST',{...(currentAttempt?.type==='OPEN_ANSWER'?{scores}:{}),note:value(f,'note'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});}
       if(action==='attempt-incident')await api(`/attempts/${id}/incident`,'POST',{category:value(f,'category'),statement:value(f,'statement'),confirmed:f.has('confirmed'),expectedVersion:currentAttempt?.revision,processVersion:currentAttempt?.processVersion,idempotencyKey:crypto.randomUUID()});
       if(action==='restriction-open')destination=`restrictions/${encodeURIComponent(value(f,'organizationId'))}`;
       if(action==='restriction-appeal'||action==='restriction-restore')await api(`/restrictions/${id}/${action==='restriction-appeal'?'appeal':'restore'}`,'POST',{expectedVersion:number(f,'expectedVersion'),reason:value(f,'reason'),confirmed:f.has('confirmed'),idempotencyKey:crypto.randomUUID()});
@@ -363,6 +375,7 @@ for(const id of ['loginForm','registerForm']) $<HTMLFormElement>(`#${id}`).addEv
 });
 window.addEventListener('hashchange',()=>{if(user)void render();});
 window.addEventListener('offline',()=>notify('Jesteś offline. Zmiany wymagają połączenia z serwerem.',true));
-window.addEventListener('pagehide',()=>{controller.abort();clearInterval(timer);});
+window.addEventListener('beforeunload',event=>{if(answerAutosave?.pending){event.preventDefault();event.returnValue='';}});
+window.addEventListener('pagehide',()=>{answerAutosave?.dispose();answerAutosave=null;controller.abort();clearInterval(timer);});
 if('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(()=>{});
 root.replaceChildren(); void bootstrap();
