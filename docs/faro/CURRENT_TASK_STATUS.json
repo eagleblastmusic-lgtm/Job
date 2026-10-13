@@ -2,6 +2,12 @@
   "schemaVersion": "faro-current-task-status-v1",
   "asOf": "2026-10-13",
   "baseline": "119ef5d",
+  "latestEngineeringAcceptance": {
+    "commit": "720b7a5ed1d1629ad72615fa2c71677013ecb613",
+    "faroRun": "38334329330",
+    "ciRun": "38334329337",
+    "conclusion": "SUCCESS"
+  },
   "scope": "Full task status is distinct from gated release; DONE is never production approval",
   "tasks": [
     {
@@ -104,8 +110,8 @@
       "id": "K013",
       "requirement": "Centralna polityka egress",
       "checkpoint": "CP01",
-      "status": "DELTA_REQUIRED",
-      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
       "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
     },
     {
@@ -120,8 +126,8 @@
       "id": "K015",
       "requirement": "Redakcja logów i błędów",
       "checkpoint": "CP01",
-      "status": "DELTA_REQUIRED",
-      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
       "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
     },
     {
@@ -328,8 +334,8 @@
       "id": "K041",
       "requirement": "Jawne metryki rzetelności bez zbiorczego score",
       "checkpoint": "CP07",
-      "status": "DELTA_REQUIRED",
-      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
       "technicalEvidence": "Trust/reliability/case/restriction models; scoped aggregates and human review"
     },
     {

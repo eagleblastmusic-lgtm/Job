@@ -25,7 +25,7 @@ Official policy references checked 2026-10-09: [OSM copyright](https://www.opens
 | Local proposals/private lineage and bounded AI transport | DONE (CP03-I/J/O accepted evidence; P native proof recorded separately) | Manual confirmation; controlled response/time/token limits and shared admission contract |
 | Live AI provider and financial/privacy acceptance | EXTERNAL_BLOCKED | Provider selection, protected credentials, terms and approved spend required; no personal-data calls |
 | OSM offline boundary/distance API | DONE (e933a8c local native acceptance; remote CI tracked in status) | No live map/geocoder/router claimed |
-| Nominatim/OSRM adapter engineering | DELTA_REQUIRED (implemented; final remote acceptance pending) | Strict tested HTTPS transport, submitted search, explicit routing profiles; remains unconfigured |
+| Nominatim/OSRM adapter engineering | DONE (720b7a5 local and remote acceptance) | Strict tested HTTPS transport, submitted search, explicit routing profiles; remains unconfigured |
 | Live geocoder/router/map provider | EXTERNAL_BLOCKED | Actual service/capacity/privacy/terms selection; code availability does not authorize unlimited public access |
 | MapLibre screen and automatic commute/transit economics | DEFERRED | Current manual flow retained; provider prerequisites unresolved |
 | PostgreSQL runtime/migrations/recovery and technical browser contracts | DONE (existing CP11 evidence) | Technical acceptance only; no production custody acceptance |
