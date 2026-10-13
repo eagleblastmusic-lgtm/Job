@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { JobDatabase } from './db.js';
 import type { AppConfig } from './config.js';
+import { sqliteAiAdmission, type AiAdmissionStore } from './faro/aiAdmissionModel.js';
 
 export interface AiRequest<T> {
   userId: string | null;
@@ -17,7 +18,10 @@ class AiGatewayError extends Error {}
 const MAX_AI_RESPONSE_BYTES=128*1024;
 
 export class AiGateway {
-  constructor(private readonly db: JobDatabase, private readonly config: AppConfig) {}
+  private readonly admission: AiAdmissionStore;
+  constructor(database: JobDatabase | AiAdmissionStore, private readonly config: AppConfig) {
+    this.admission = 'db' in database ? sqliteAiAdmission(database) : database;
+  }
 
   isConfigured(): boolean {
     return Boolean(this.config.aiBaseUrl && this.config.aiApiKey && this.config.aiModel);
@@ -31,13 +35,11 @@ export class AiGateway {
     if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>4096||!Number.isSafeInteger(this.config.aiTimeoutMs)||this.config.aiTimeoutMs<1||this.config.aiTimeoutMs>60000||Buffer.byteLength(request.input)>32768||Buffer.byteLength(request.system)>32768)throw new AiGatewayError('AI_REQUEST_LIMIT');
     const started = Date.now();
     const inputHash = createHash('sha256').update(request.input).digest('hex');
-    const requestId=randomUUID(),createdAt=new Date().toISOString(),dayStart=createdAt.slice(0,10)+'T00:00:00.000Z';
-    // One write statement reserves budget before egress, including failed/in-flight calls.
+    const requestId=randomUUID(),createdAt=new Date().toISOString();
+    // Both storage adapters commit admission before egress, including failed/in-flight calls.
     try{
-      const reserved=this.db.db.prepare(`INSERT INTO ai_requests(id,user_id,task_type,model,prompt_version,input_hash,output_schema,latency_ms,token_usage,estimated_cost,success,error_code,created_at)
-        SELECT ?,?,?,?,?,?,?,0,NULL,NULL,0,'AI_IN_FLIGHT',? WHERE (SELECT COUNT(*) FROM ai_requests WHERE created_at>=?)<?`).run(
-        requestId,request.userId,request.taskType,this.config.aiModel,request.promptVersion,inputHash,request.outputSchemaName,createdAt,dayStart,this.config.aiMaxDailyRequests);
-      if(Number(reserved.changes)!==1)throw new AiGatewayError('AI_DAILY_BUDGET');
+      const reserved=await this.admission.reserve({id:requestId,userId:request.userId,taskType:request.taskType,model:this.config.aiModel,promptVersion:request.promptVersion,inputHash,outputSchema:request.outputSchemaName,createdAt,maxDailyRequests:this.config.aiMaxDailyRequests});
+      if(!reserved)throw new AiGatewayError('AI_DAILY_BUDGET');
     }catch(error){if(error instanceof AiGatewayError)throw error;throw new AiGatewayError('AI_AUDIT_UNAVAILABLE');}
     let success = 0;
     const controller = new AbortController();
@@ -73,17 +75,17 @@ export class AiGateway {
       try {const parsed:unknown=JSON.parse(content);validated=request.validate(parsed);}catch{throw new AiGatewayError('AI_INVALID_OUTPUT');}
       success = 1;
       const usage=payload.usage?.total_tokens;
-      this.finish(requestId, Date.now() - started, typeof usage==='number'&&Number.isSafeInteger(usage)&&usage>=0?usage:null, success, null);
+      await this.finish(requestId, Date.now() - started, typeof usage==='number'&&Number.isSafeInteger(usage)&&usage>=0?usage:null, success, null);
       return validated;
     } catch (error) {
       const errorCode = controller.signal.aborted?'AI_TIMEOUT':error instanceof AiGatewayError?error.message:'AI_TRANSPORT';
-      this.finish(requestId, Date.now() - started, null, success, errorCode);
+      await this.finish(requestId, Date.now() - started, null, success, errorCode);
       throw new AiGatewayError(errorCode);
     }finally{clearTimeout(timeout);}
   }
 
-  private finish(id:string, latencyMs: number, tokenUsage: number | null, success: number, errorCode: string | null): void {
-    try{this.db.db.prepare('UPDATE ai_requests SET latency_ms=?,token_usage=?,success=?,error_code=? WHERE id=?').run(latencyMs,tokenUsage,success,errorCode,id);}
+  private async finish(id:string, latencyMs: number, tokenUsage: number | null, success: number, errorCode: string | null): Promise<void> {
+    try{await this.admission.finish(id,latencyMs,tokenUsage,success,errorCode);}
     catch{throw new AiGatewayError('AI_AUDIT_UNAVAILABLE');}
   }
 }

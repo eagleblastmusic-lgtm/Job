@@ -5,7 +5,22 @@ import { faroFixture,offerInput } from './faro-fixture.js';
 import { ProfileService } from '../server/faro/profileService.js';
 import { OfferService } from '../server/faro/offerService.js';
 import { RecruitmentService } from '../server/faro/recruitmentService.js';
+import { offerPatternFacts } from '../domain/faro/offerPatterns.js';
+import { parseOffer } from '../server/faro/offerService.js';
+import { reliabilityFromRows } from '../server/faro/reliabilityReadModel.js';
 const from='2026-09-01T00:00:00.000Z',to='2026-09-10T00:00:00.000Z';
+test('repeated offer terms ignore record ids and expiry while preserving changed salary, skill identity and process commitments',()=>{
+  const original=parseOffer(offerInput('owner')),same=structuredClone(original);
+  same.closesAt='2099-01-01T00:00:00.000Z';same.recruiterId='other';same.requirements.forEach(r=>{r.id+='-new';});same.role=' OBSŁUGA  KLIENTA ';
+  const changedSalary=structuredClone(original);changedSalary.salary[0]!.min++;
+  const changedSkill=structuredClone(original);changedSkill.requirements[0]!.skillId='faro:legacy:4';
+  const changedClock=structuredClone(original);changedClock.responseHours++;
+  const rows=[original,same,changedSalary,changedSkill,changedClock].map((data,i)=>({id:String(i),data,publishedAt:i?'2026-09-02T00:00:00Z':null}));
+  const result=offerPatternFacts([...rows,rows[0]!]);
+  assert.equal(result.sampleSize,5);assert.equal(result.unknownPublicationDate,1);assert.equal(result.repeatedTermsGroups,1);assert.equal(result.offersInRepeatedTermsGroups,2);assert.equal(result.additionalOfferRecordsWithSameTerms,1);
+  assert.equal(result.interpretation,'MANUAL_CONTEXT_REQUIRED_NO_INTENT_OR_SANCTION');assert.doesNotMatch(JSON.stringify(result),/owner|skillId|score/);
+  assert.throws(()=>reliabilityFromRows([[],[],Array(10001).fill({})],from,to,to),/Zawęź okno/);
+});
 test('operational progression counts distinct mutually completed processes only, excluding invitations, unilateral completion and future or foreign evidence',()=>{
   const rows=['a','b'].map(id=>({id,createdAt:from,responseDueAt:to,firstResponseAt:null,status:'ACTIVE' as const,withdrawnAt:null}));
   const event=(processId:string,kind:string,mutuallyCompleted=false,createdAt=from)=>({processId,kind,mutuallyCompleted,createdAt});
@@ -37,6 +52,9 @@ test('reliability API is organization-owner scoped, aggregate only, and read doe
     f.app.db.db.prepare("UPDATE faro_organizations SET verification='VERIFIED' WHERE id=?").run(org.id);
     profiles.save(candidate.id,{firstName:'Anna',phone:'+48500100200',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
     const offer=offers.create(owner.id,org.id,offerInput(owner.id));offers.lifecycle(owner.id,offer.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(owner.id,offer.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    const repeated=offers.create(owner.id,org.id,offerInput(owner.id));offers.lifecycle(owner.id,repeated.id,{action:'REVIEW',expectedVersion:1});offers.lifecycle(owner.id,repeated.id,{action:'PUBLISH',expectedVersion:2,confirmed:true});
+    offers.create(owner.id,org.id,offerInput(owner.id));
+    f.app.db.db.prepare('UPDATE faro_offers SET created_at=? WHERE organization_id=?').run('2026-09-02T00:00:00.000Z',org.id);
     const interest=r.interest(candidate.id,offer.id,{offerVersion:1,projectionConfirmed:true,confirmationToken:profiles.previewConfirmation(candidate.id).confirmationToken,idempotencyKey:'metrics-interest'});
     f.app.db.db.prepare('UPDATE faro_interests SET created_at=?,response_due_at=? WHERE id=?').run('2026-09-02T00:00:00Z','2026-09-03T00:00:00Z',interest.id);
     const invite=profiles.invite(owner.id,org.id,{email:staff.email,role:'RECRUITER'});profiles.acceptInvite(staff.id,staff.email,invite.token);
@@ -44,7 +62,8 @@ test('reliability API is organization-owner scoped, aggregate only, and read doe
     await f.request(url(org.id),candidate.cookie,'GET',undefined,404);await f.request(url(org.id),other.cookie,'GET',undefined,404);
     await f.request(url(org.id),staff.cookie,'GET',undefined,404);
     const before=JSON.stringify(f.app.db.db.prepare('SELECT * FROM faro_offers WHERE id=?').get(offer.id));
-    const result=await f.request<ReturnType<typeof reliabilitySnapshot>>(url(org.id),owner.cookie);
+    const result=await f.request<ReturnType<typeof reliabilityFromRows>>(url(org.id),owner.cookie);
+    assert.equal(result.offerPatterns.sampleSize,2);assert.equal(result.offerPatterns.repeatedTermsGroups,1);assert.equal(result.offerPatterns.additionalOfferRecordsWithSameTerms,1);
     assert.equal(result.sampleSize,1);assert.equal(result.firstResponse.denominator,1);assert.equal(result.firstResponse.unanswered,1);assert.equal(result.firstResponse.medianAnsweredHours,null);
     assert.equal(result.progressionGaps.processesWithoutRecordedAdvance,1);assert.equal(result.progressionGaps.processesWithoutRecordedConfirmedInterview,1);assert.equal(result.progressionGaps.denominator,1);
     for(const secret of [candidate.id,interest.id,candidate.email,'48500100200','Anna'])assert.ok(!JSON.stringify(result).includes(secret));

@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { createConnectedPgFaroApp } from '../dist/server/pgFaroApp.js';
 import { offerInput } from '../dist/tests/faro-fixture.js';
 import { hashSessionToken } from '../dist/server/auth.js';
+import { proveNativeAi } from './faro-postgres-ai-proof.mjs';
+import { provePerformance } from './faro-performance-proof.mjs';
 
 /** Actual HTTP against the same disposable PostgreSQL schema, no SQLite facade. */
 export async function proveNativeHttp(database,config){
@@ -16,6 +18,7 @@ export async function proveNativeHttp(database,config){
  const json=async(...args)=>(await request(...args)).value;
  async function register(name){const response=await request('/api/auth/register','','POST',{name,email:`http-${name.toLowerCase()}@example.pl`,password:'Bezpieczne123',acceptTerms:true,acceptPrivacy:true,role:'ADMIN'},201);assert.equal(response.value.user.role,'USER');return {id:response.value.user.id,cookie:response.cookie};}
  try{
+  await proveNativeAi(database,config);
   const healthy=await json('/api/health');assert.equal(healthy.database,'ok');assert.equal(healthy.storage,'ok');
   assert.equal((await readdir(join(config.dataDir,'uploads'))).some(name=>name.startsWith('.faro-readiness-')),false);
   const uploads=join(config.dataDir,'uploads'),held=join(config.dataDir,'uploads-health-held');
@@ -28,6 +31,7 @@ export async function proveNativeHttp(database,config){
   const retired=await json('/api/profile','','GET',undefined,410);assert.equal(retired.error.code,'RETIRED_FEATURE');
   await json('/api/faro/profile','','GET',undefined,401);
   const owner=await register('Owner'),candidate=await register('Candidate'),moderator=await register('Moderator');
+  await provePerformance(base,candidate.cookie,'postgresql');
   const geography=await json('/api/faro/geography',candidate.cookie);
   assert.equal(geography.dataBasis,'OPENSTREETMAP');assert.equal(geography.publicServiceRequestsEnabled,false);
   const distance=await json('/api/faro/geography/distance',candidate.cookie,'POST',{from:{latitude:0,longitude:179},to:{latitude:0,longitude:-179}});
@@ -98,6 +102,13 @@ export async function proveNativeHttp(database,config){
   const offer=await json(`/api/faro/organizations/${org.id}/offers`,owner.cookie,'POST',offerInput(owner.id),201);
   await json(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'REVIEW',expectedVersion:1});
   await json(`/api/faro/offers/${offer.id}/lifecycle`,owner.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  const repeated=await json(`/api/faro/organizations/${org.id}/offers`,owner.cookie,'POST',offerInput(owner.id),201);
+  await json(`/api/faro/offers/${repeated.id}/lifecycle`,owner.cookie,'POST',{action:'REVIEW',expectedVersion:1});
+  await json(`/api/faro/offers/${repeated.id}/lifecycle`,owner.cookie,'POST',{action:'PUBLISH',expectedVersion:2,confirmed:true});
+  await json(`/api/faro/organizations/${org.id}/offers`,owner.cookie,'POST',offerInput(owner.id),201);
+  const patterns=(await json(`/api/faro/organizations/${org.id}/reliability`,owner.cookie)).offerPatterns;
+  assert.equal(patterns.sampleSize,2);assert.equal(patterns.repeatedTermsGroups,1);assert.equal(patterns.additionalOfferRecordsWithSameTerms,1);
+  await json(`/api/faro/organizations/${org.id}/reliability`,candidate.cookie,'GET',undefined,404);
   const recruitmentProcess=await json(`/api/faro/offers/${offer.id}/interest`,candidate.cookie,'POST',{offerVersion:1,projectionConfirmed:true,confirmationToken:preview.confirmationToken,idempotencyKey:'http-interest'},201);
   await json(`/api/faro/processes/${recruitmentProcess.id}`,owner.cookie);
   await json(`/api/faro/offers/${offer.id}/watch`,candidate.cookie,'POST');assert.equal((await json('/api/faro/watches',candidate.cookie)).offers.some(row=>row.id===offer.id),true);

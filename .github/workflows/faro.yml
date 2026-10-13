@@ -30,6 +30,17 @@ jobs:
         run: npm run test:faro
       - name: Skill validation tooling never fabricates empirical evidence
         run: node --test scripts/faro-skill-validation-packet.test.mjs
+      - name: Disposable loopback read performance budget
+        run: node scripts/faro-performance-proof.mjs
+      - name: Locked dependency inventory (CycloneDX SBOM)
+        run: npm sbom --sbom-format cyclonedx > faro-sbom.json
+      - name: Dependency vulnerability gate
+        run: npm audit --audit-level high
+      - uses: actions/upload-artifact@v4
+        with:
+          name: faro-sbom-node-${{ matrix.node }}
+          path: faro-sbom.json
+          retention-days: 14
       - name: Real-file Canonical erasure and authority recovery
         run: node scripts/faro-backup-restore-exercise.mjs
   browser:

@@ -77,6 +77,7 @@ export interface AssessmentDefinition {
 }
 
 export interface Reliability {
+  offerPatterns:{sampleSize:number;unknownPublicationDate:number;repeatedTermsGroups:number;offersInRepeatedTermsGroups:number;additionalOfferRecordsWithSameTerms:number};
   window:{from:string;to:string;asOf:string};sampleSize:number;maturedCohort:number;
   exclusions:{withdrawnBeforeOriginalDeadline:number};
   firstResponse:{numerator:number;denominator:number;answered:number;late:number;unanswered:number;rightCensored:number;medianAnsweredHours:number|null;medianSampleSize:number};

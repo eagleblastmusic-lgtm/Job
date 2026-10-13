@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { readFile, stat, realpath } from 'node:fs/promises';
+import { extname, relative, isAbsolute, resolve, sep } from 'node:path';
 
 export const DEFAULT_JSON_MAX_BYTES = 64 * 1024;
 
@@ -48,11 +48,17 @@ const MIME: Record<string, string> = {
 };
 
 export async function serveStatic(res: ServerResponse, publicDir: string, requestPath: string): Promise<boolean> {
-  const decoded = decodeURIComponent(requestPath.split('?')[0] ?? '/');
-  const relative = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
-  const safe = normalize(relative).replace(/^(\.\.(\/|\\|$))+/, '');
-  const path = join(publicDir, safe);
+  let decoded: string;
+  try { decoded = decodeURIComponent(requestPath.split('?')[0] ?? '/'); }
+  catch { throw new HttpError(400, 'Nieprawidłowy adres zasobu.', 'INVALID_URL'); }
+  if (/[\\:\x00]/.test(decoded)) return false;
+  const asset = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
+  const root = resolve(publicDir), path = resolve(root, asset);
+  const contained = (base: string, target: string) => { const child = relative(base, target); return child !== '..' && !child.startsWith('..' + sep) && !isAbsolute(child); };
+  if (!contained(root, path)) return false;
   try {
+    // A repository/deployment symlink must not publish a private file outside publicDir.
+    if (!contained(await realpath(root), await realpath(path))) return false;
     const info = await stat(path);
     if (!info.isFile()) return false;
     const body = await readFile(path);

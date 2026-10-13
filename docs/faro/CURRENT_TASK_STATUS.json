@@ -1,0 +1,696 @@
+{
+  "schemaVersion": "faro-current-task-status-v1",
+  "asOf": "2026-10-13",
+  "baseline": "119ef5d",
+  "scope": "Full task status is distinct from gated release; DONE is never production approval",
+  "tasks": [
+    {
+      "id": "K001",
+      "requirement": "KRAZ: pisemna kwalifikacja i realizacja wymaganych obowiązków",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K002",
+      "requirement": "Free-first obu stron i brak candidate checkout",
+      "checkpoint": "CP01",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K003",
+      "requirement": "AI intended purpose i klasyfikacja każdego modułu",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K004",
+      "requirement": "DPIA, art6/art22 i mapa ról administratorów",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K005",
+      "requirement": "Konstytucja, rejestr decyzji i kontrola superseded",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K006",
+      "requirement": "Wywiady z kandydatami i firmami z wielu sytuacji",
+      "checkpoint": "CP12",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K007",
+      "requirement": "Prototyp NO-CV i test dokładnej projekcji",
+      "checkpoint": "CP08",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+    },
+    {
+      "id": "K008",
+      "requirement": "Founder Employer Program na realne wakaty",
+      "checkpoint": "CP12",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K009",
+      "requirement": "Trwałość danych i restore",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K010",
+      "requirement": "Finalny runtime image",
+      "checkpoint": "CP11",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K011",
+      "requirement": "Zawiesić niedopuszczone fetch capabilities",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K012",
+      "requirement": "Naprawić czerwony CI importerów",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K013",
+      "requirement": "Centralna polityka egress",
+      "checkpoint": "CP01",
+      "status": "DELTA_REQUIRED",
+      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K014",
+      "requirement": "Bezpieczne uploady",
+      "checkpoint": "CP11",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K015",
+      "requirement": "Redakcja logów i błędów",
+      "checkpoint": "CP01",
+      "status": "DELTA_REQUIRED",
+      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K016",
+      "requirement": "PostgreSQL i model migracji",
+      "checkpoint": "CP11",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K017",
+      "requirement": "Granice modularnego monolitu",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K018",
+      "requirement": "Membership/RBAC i tenant isolation",
+      "checkpoint": "CP02",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K019",
+      "requirement": "MFA, recovery i revoke",
+      "checkpoint": "CP02",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K020",
+      "requirement": "Outbox i idempotentny worker",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K021",
+      "requirement": "Regulaminy, DPA i publikacja firmy",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K022",
+      "requirement": "Czteroczęściowy profil możliwości",
+      "checkpoint": "CP03",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "skillCatalog.ts / profile / admission models; CP03-H/M/O/P confirmation/source contracts"
+    },
+    {
+      "id": "K023",
+      "requirement": "ESCO foundation i polskie aliasy z rights manifest",
+      "checkpoint": "CP03",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Pinned ESCO labels/aliases/URI/version/manifest implemented; independent production-use review and empirical standard validation remain external.",
+      "technicalEvidence": "skillCatalog.ts / profile / admission models; CP03-H/M/O/P confirmation/source contracts"
+    },
+    {
+      "id": "K024",
+      "requirement": "Snapshot i serwerowa employer projection",
+      "checkpoint": "CP02",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K025",
+      "requirement": "Portal organizacji i zaproszenia",
+      "checkpoint": "CP02",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K026",
+      "requirement": "Weryfikacja firmy i first-offer review",
+      "checkpoint": "CP02",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K027",
+      "requirement": "Kreator natywnej oferty MUST/NICE/WILL_TEACH",
+      "checkpoint": "CP04",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "offerReadModel.ts / offerWriteModel.ts; immutable publication/version proofs"
+    },
+    {
+      "id": "K028",
+      "requirement": "Typed salary options i walidacja publikacji",
+      "checkpoint": "CP04",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "offerReadModel.ts / offerWriteModel.ts; immutable publication/version proofs"
+    },
+    {
+      "id": "K029",
+      "requirement": "Zweryfikować stare błędy scoringu i odłączyć legacy person score",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K030",
+      "requirement": "Explainable matching bez person score",
+      "checkpoint": "CP05",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "domain/faro/offers.ts; exact requirement/conditions/billing invariants"
+    },
+    {
+      "id": "K031",
+      "requirement": "Ranking independence contract i testy metamorfizmu",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K032",
+      "requirement": "Product shell obu ról",
+      "checkpoint": "CP08",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+    },
+    {
+      "id": "K033",
+      "requirement": "Interest i state machine",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K034",
+      "requirement": "Structured rejection i konkretny requirement",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K035",
+      "requirement": "Powiadomienia transakcyjne",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K036",
+      "requirement": "Dzisiaj / Action Bar",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K037",
+      "requirement": "Ręczna dostępność, propozycja i potwierdzenie rozmowy",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K038",
+      "requirement": "Report flow i moderation cases",
+      "checkpoint": "CP07",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Trust/reliability/case/restriction models; scoped aggregates and human review"
+    },
+    {
+      "id": "K039",
+      "requirement": "Deletion/export z pochodnymi",
+      "checkpoint": "CP11",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K040",
+      "requirement": "Dwa zegary, capacity i przypomnienia",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K041",
+      "requirement": "Jawne metryki rzetelności bez zbiorczego score",
+      "checkpoint": "CP07",
+      "status": "DELTA_REQUIRED",
+      "reason": "Current implementation done locally; final required remote acceptance pending.",
+      "technicalEvidence": "Trust/reliability/case/restriction models; scoped aggregates and human review"
+    },
+    {
+      "id": "K042",
+      "requirement": "No-show claims i appeals",
+      "checkpoint": "CP07",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Trust/reliability/case/restriction models; scoped aggregates and human review"
+    },
+    {
+      "id": "K043",
+      "requirement": "Marketplace metrics i NSM quality gates",
+      "checkpoint": "CP12",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Mutually completed pair/week consented producer and scoped operational facts implemented; population NSM/conversion and real quality acceptance cannot be inferred from consenting retained subset.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K044",
+      "requirement": "Bezpieczna beta procesu przed nationwide public launch",
+      "checkpoint": "CP12",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K045",
+      "requirement": "Assessment Definition draft/review/approved version",
+      "checkpoint": "CP10",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K046",
+      "requirement": "Walidacja pierwszego typu assessmentu",
+      "checkpoint": "CP10",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K047",
+      "requirement": "Timer serwerowy, autosave, awarie i podstawowa dostępność",
+      "checkpoint": "CP10",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K048",
+      "requirement": "Objective/manual grading i lokalne zestawienie wyników",
+      "checkpoint": "CP10",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K049",
+      "requirement": "AI gateway jako generator propozycji i draftów",
+      "checkpoint": "CP03",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Both admission backends and transport tested; live provider/secret/privacy/financial approval missing.",
+      "technicalEvidence": "skillCatalog.ts / profile / admission models; CP03-H/M/O/P confirmation/source contracts"
+    },
+    {
+      "id": "K050",
+      "requirement": "AI-assisted grading shadow evaluation",
+      "checkpoint": "CP10",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K051",
+      "requirement": "Fairness i human oversight gate",
+      "checkpoint": "CP10",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K052",
+      "requirement": "Anty-darmowa praca i jasny czas per assessment",
+      "checkpoint": "CP10",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K053",
+      "requirement": "Późniejsza walidacja WTP pracodawców",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K054",
+      "requirement": "Employer billing/entitlements narzędzi",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K055",
+      "requirement": "Dwie ścieżki marketingowe z inkluzywnym copy",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K056",
+      "requirement": "SEO z rzeczywistą wartością i prywatnym profilem",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K057",
+      "requirement": "Facebook job groups i segmented nationwide campaigns",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K058",
+      "requirement": "Employer acquisition i jakość wakatów",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K059",
+      "requirement": "Referral bez boost i danych znajomych",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K060",
+      "requirement": "Zgodny język marki i semantyczne tokens",
+      "checkpoint": "CP08",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+    },
+    {
+      "id": "K061",
+      "requirement": "PWA cache i asset update",
+      "checkpoint": "CP08",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+    },
+    {
+      "id": "K062",
+      "requirement": "WCAG krytycznych ścieżek",
+      "checkpoint": "CP08",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+    },
+    {
+      "id": "K063",
+      "requirement": "Performance i obserwowalność",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K064",
+      "requirement": "Supply chain i release gates",
+      "checkpoint": "CP01",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "SBOM/audit implemented; actual main unprotected, owner permissions/workflow decision and independent security acceptance missing.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K065",
+      "requirement": "Incident response i dyżury T&S",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K066",
+      "requirement": "Source Rights Registry v2",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K067",
+      "requirement": "Integracja źródła/ATS po licencji",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K068",
+      "requirement": "Integracje kalendarza po minimalnym schedulerze",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K069",
+      "requirement": "Ocena potrzeby Windows shell",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K070",
+      "requirement": "Ocena potrzeby native mobile",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K071",
+      "requirement": "Standard Faro i portable verified skills wallet",
+      "checkpoint": "CP10",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+    },
+    {
+      "id": "K072",
+      "requirement": "Regularny review rynku i jakości dowodów",
+      "checkpoint": "CP12",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    },
+    {
+      "id": "K073",
+      "requirement": "Prywatne obserwowanie i alerty",
+      "checkpoint": "CP06",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Recruitment/process/interview/outbox models; clocks/transactions/ICS/worker proofs"
+    },
+    {
+      "id": "K074",
+      "requirement": "Konkretny diff od zgłoszenia",
+      "checkpoint": "CP04",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "offerReadModel.ts / offerWriteModel.ts; immutable publication/version proofs"
+    },
+    {
+      "id": "K075",
+      "requirement": "JobEconomics model i ręczny fallback",
+      "checkpoint": "CP09",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison"
+    },
+    {
+      "id": "K076",
+      "requirement": "Versioned netto rules engine",
+      "checkpoint": "CP09",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison"
+    },
+    {
+      "id": "K077",
+      "requirement": "Routing fuel tariffs rail adapters",
+      "checkpoint": "CP09",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "OSM adapters implemented; actual provider/data/tariff/privacy/cache terms missing; manual fallback retained.",
+      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison"
+    },
+    {
+      "id": "K078",
+      "requirement": "Porównywarka wpływu pracy na życie",
+      "checkpoint": "CP09",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison"
+    },
+    {
+      "id": "K079",
+      "requirement": "Grant telefonu po zaakceptowaniu etapu",
+      "checkpoint": "CP02",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K080",
+      "requirement": "Activity decomposition z zatwierdzaniem",
+      "checkpoint": "CP03",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "skillCatalog.ts / profile / admission models; CP03-H/M/O/P confirmation/source contracts"
+    },
+    {
+      "id": "K081",
+      "requirement": "Periodic still-recruiting confirmation",
+      "checkpoint": "CP04",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "offerReadModel.ts / offerWriteModel.ts; immutable publication/version proofs"
+    },
+    {
+      "id": "K082",
+      "requirement": "Ghost-job pattern review",
+      "checkpoint": "CP07",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Repeated terms/progression facts implemented; staffed review, evergreen context and approved moderation policy missing.",
+      "technicalEvidence": "Trust/reliability/case/restriction models; scoped aggregates and human review"
+    },
+    {
+      "id": "K083",
+      "requirement": "Małoletni, pierwsza praca i warunki dostawcy",
+      "checkpoint": "CP11",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+    },
+    {
+      "id": "K084",
+      "requirement": "Canonical invariants regression suite",
+      "checkpoint": "CP01",
+      "status": "DONE",
+      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
+      "technicalEvidence": "faroApp.ts / pgFaroApp.ts; accepted security/runtime contracts"
+    },
+    {
+      "id": "K085",
+      "requirement": "Późniejszy zakres ujawnienia tożsamości",
+      "checkpoint": "CP02",
+      "status": "EXTERNAL_BLOCKED",
+      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
+      "technicalEvidence": "Identity/org/profile/contact models; accepted tenant/MFA/browser contracts"
+    },
+    {
+      "id": "K086",
+      "requirement": "Evidence-to-claim marketing gate",
+      "checkpoint": "CP12",
+      "status": "DEFERRED",
+      "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
+      "technicalEvidence": "External acceptance and canonical post-MVP register"
+    }
+  ]
+}

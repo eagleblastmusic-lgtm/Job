@@ -22,13 +22,16 @@ Official policy references checked 2026-10-09: [OSM copyright](https://www.opens
 | Job-portal import/licenses | DEFERRED (excluded by founder) | No launch dependency; historical evidence retained |
 | Pinned ESCO identifiers/aliases/version/source and explicit declarations | DONE (CP03-H/M accepted evidence) | 13,939 imported concepts; authored IDs retained; no implicit equivalence |
 | Empirical competency relationships/assessment validity | EXTERNAL_BLOCKED | Requires real expert/sample evidence; no invented calibration |
-| Local proposals/private lineage and bounded AI transport | DONE (CP03-I/J accepted evidence) | Manual confirmation; controlled response/time/token limits |
+| Local proposals/private lineage and bounded AI transport | DONE (CP03-I/J/O accepted evidence; P native proof recorded separately) | Manual confirmation; controlled response/time/token limits and shared admission contract |
 | Live AI provider and financial/privacy acceptance | EXTERNAL_BLOCKED | Provider selection, protected credentials, terms and approved spend required; no personal-data calls |
 | OSM offline boundary/distance API | DONE (e933a8c local native acceptance; remote CI tracked in status) | No live map/geocoder/router claimed |
-| Live geocoder/router/map provider | EXTERNAL_BLOCKED | Actual service/capacity/privacy/terms selection; no unlimited public access assumed |
+| Nominatim/OSRM adapter engineering | DELTA_REQUIRED (implemented; final remote acceptance pending) | Strict tested HTTPS transport, submitted search, explicit routing profiles; remains unconfigured |
+| Live geocoder/router/map provider | EXTERNAL_BLOCKED | Actual service/capacity/privacy/terms selection; code availability does not authorize unlimited public access |
 | MapLibre screen and automatic commute/transit economics | DEFERRED | Current manual flow retained; provider prerequisites unresolved |
 | PostgreSQL runtime/migrations/recovery and technical browser contracts | DONE (existing CP11 evidence) | Technical acceptance only; no production custody acceptance |
 | Production backup/key/current-authority custody and RPO/RTO | EXTERNAL_BLOCKED | Operator-controlled durable target and real acceptance |
 | KRAZ, DPIA/AI compliance, independent security, manual accessibility and real user research | EXTERNAL_BLOCKED | Existing packet requires actual independent artifacts and owners |
 
 These are current dependency decisions, not reclassification of every historical baseline row into DONE. The initial gap matrix remains a dated audit; use accepted checkpoint evidence and this superseding table for current scope. Public production gates and scheduling restrictions remain closed. Approved login, free-first nationwide skills-first policy and privacy projections are unchanged.
+
+Current2026-10-13: [full86-task reconciliation](CURRENT_SCOPE_STATUS.md) and [continued implementation](CP03_P_OSM_PORTABILITY_HARDENING.md) distinguish completed engineering from actual external gates. The former grouping of live-provider acceptance must never block local adapter implementation, native AI admission, static protection, repeated-offer aggregates, performance or supply-chain verification.
