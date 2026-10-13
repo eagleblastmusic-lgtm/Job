@@ -1,5 +1,7 @@
 # CP11-F — Canonical browser acceptance scope
 
+Current audit003 expansion: default24 scenarios/48 desktop-mobile executions; native PG existing spec list19 scenarios/38 executions on Node22/24. Open-answer spec adds five true autosave scenarios. Delayed/lost transport and offline are injected against the real server; no mocked success bodies, skips or relaxed assertions. Confirmed drafts stay private and retain expiry. Full manual accessibility/product validity remain external. Earlier counts below are historical.
+
 2026-10-04. Authority: the resumed Canonical implementation request, master plan sections 1/5/7/10/13, C001/C022 retirement, C020 private alerts, C024 explicit constraints and CP11-F handoff. This changes acceptance scope explicitly; it does not certify the retired client or close release gates.
 
 ## Current execution

@@ -1,5 +1,11 @@
 # Local operations and recovery
 
+Audit001/002 backfill: current binaries transactionally minimize old assessment/interview command DTOs at SQLite open and validated PG startup. No schema version change(38 migrations), drop/reset or command identity/hash/date deletion. Erasure and isolated recovery repeat the backfill before activation. Invalid journal JSON/failed update refuses startup/recovery and rolls back; resolve the data/permission error, never ignore it. Re-run is idempotent. Protected historical artifacts and independently current authority follow separately approved retention/custody.
+
+Free staging rollout: only existing srv-db3pb9rncjis73banf90 and its PG18 DB; require exact-commit FARO/CI SUCCESS before manual deploy. Keep engine/bootstrap/schema/MFA/rate keys/worker/release gates unchanged. Existing `staging-smoke.mjs --synthetic-account --operator-confirmed --restart-proof` retains synthetic account/original session/changed consent in memory across observed deploy, checks login/export/cleanup. No cache clearing, schema reset, paid resource or public Faro activation.
+
+Rollback preserves privacy: prepare the tested manual-save client from0968e86 if needed, retaining current minimization/erasure/recovery/OSRM server code; build/test/CI before deploying the existing free service. Do not select a pre-fix image that again retains private answers. No schema downgrade/DB reset; domain records/approved snapshots remain. Failed backfill is atomic and must be repaired before retry. This is staging, not production RPO/RTO/custody acceptance.
+
 ## Current free staging verification
 
 The user-authorized free Render staging explicitly selects PostgreSQL18; production recruitment and worker gates remain closed. See [hosted configuration](CP11_CW_HOSTED_POSTGRES_STAGING_ACCEPTANCE.md) and [actual retained-account restart proof](CP11_CX_HOSTED_RESTART_PERSISTENCE.md). Free database expiry and ephemeral private-file storage mean this remains disposable staging.

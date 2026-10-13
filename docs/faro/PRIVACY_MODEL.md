@@ -1,5 +1,9 @@
 # Faro privacy model — implemented boundary and open gates
 
+Audit001 remediation: no assessment/interview DTO is retained in another actor's journal. Known historical DTOs reduce to opaque IDs, preserving hashes/keys/dates and unrelated ack bytes. Backfill runs at SQLite open/validated PG startup, erasure and isolated current-authority restore. Failed scrub rolls the owning transaction back. Actual old-backup restore tests scan every operational table for the private-answer marker and preserve unrelated history. Approved definitions, submitted profile snapshots and result history are unchanged by minimization; erasure retains existing cascade/retention semantics. Production backup custody/retention stays external.
+
+Autosave keeps unconfirmed edits only in active form memory. No private localStorage/sessionStorage/Service Worker persistence is added; API stays no-store. Offline/uncertain writes stay visibly unconfirmed; reload recovers server-confirmed answers. Navigation drains saves, unload warns on an unconfirmed draft and session loss destroys private state.
+
 The authenticated session supplies the subject. Candidate profile, activities, proposals, learning, watches and economics are queried by that subject. Employer process access additionally requires active organization membership and offer assignment. `employerProjection` constructs every nested field explicitly; it excludes CV, surname, photo, age, private phone, raw activities, previous firms and titles. Claims are declarations until verified evidence exists.
 
 Initial projection is snapshotted on interest. Phone is a separate candidate grant for a nonterminal eligible process; acceptance into a stage does not grant it. Revocation and terminal transitions stop subsequent reads. Free-text clarification and preview/submission concurrency still require additional hardening; the complete privacy invariant is not certified by the projection helper alone.

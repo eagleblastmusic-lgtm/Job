@@ -1,5 +1,9 @@
 # CHECKPOINT REGISTER
 
+## Audit remediation — current override, 2026-10-13
+
+Confirmed001–004 reopen bounded acceptance of K039/K047/K048 and the technical OSRM part of K077. Implementation/regressions are in [remediation](FARO_AUDIT_REMEDIATION_2026.md). Journal0968e86, autosave2e83166 and OSRM71875bb have targeted acceptance; full212 Node/48 SQLite browsers and backup/restore PASS. Native PostgreSQL22 rehearsal PASS; native24 full rehearsal/38 browser executions/cleanup PASS; exact new CI pending. Requirements stay DELTA_REQUIRED until that acceptance. K077 keeps separate provider terms/data/retention EXTERNAL_BLOCKED. Historical entries do not supply the missing new proof.
+
 Rows below preserve initial execution contracts and subsequent acceptance evidence. Current implementation is integrated on main; the two-role workspace and native PostgreSQL18 staging/recovery are implemented and verified through CP03-L. Latest hosted/runtime acceptance and active technical work are maintained in IMPLEMENTATION_STATUS.md. Historical planned/partial statements below describe their original checkpoint dates. Full release remains PARTIAL because independent external artifacts and production custody are absent.
 
 ## CP01 — Foundation and retirement of rejected paths

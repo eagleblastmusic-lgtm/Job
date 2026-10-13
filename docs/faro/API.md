@@ -1,5 +1,9 @@
 # Canonical API
 
+Audit remediation2026-10-13: assessment review/invalidate and interview commands journal only `{id}`, then read the current authorized projection for execution/exact replay. Input hash/conflict409 and one event/outbox effect are preserved; reply has latest revision/validity/history and fresh server clock. Deletion/revoked membership/assignment deny replay. Historical private DTOs are minimized without dropping commands.
+
+PUT `/attempts/:id/answers` requires `expectedVersion`, returns confirmed revision and unchanged expiry, and preserves exact bounded nonempty OPEN_ANSWER text including whitespace. Client autosave uses a400ms serialized queue; submit waits for latest confirmation, then POSTs at that revision. Version409 never authorizes overwriting another draft without a fresh read and explicit choice. Server expiry is authoritative.
+
 All `/api/faro/*` routes require a session and mutation origin validation. Domain writes are rate limited; request JSON is bounded. Production use is blocked by unresolved release gates. IDs in request bodies never replace authenticated ownership or organization assignment.
 
 | Resource | Routes and commands |

@@ -1,5 +1,7 @@
 # Job — implementation status
 
+Current product authority is [Faro status](docs/faro/IMPLEMENTATION_STATUS.md), [all86 requirements](docs/faro/CURRENT_TASK_STATUS.json) and [audit remediation](docs/faro/FARO_AUDIT_REMEDIATION_2026.md). Findings001–004 have fixes and new local regressions; all local acceptance passed; exact new CI is pending. K039/K047/K048 remain DELTA_REQUIRED and K077 has a technical delta. The V2 material below is historical and does not authorize Faro production.
+
 Last refreshed: 2026-09-13
 
 This file records repository evidence against `JOB_APP_MASTER_IMPLEMENTATION_PLAN.md`. Repository code is never treated as proof of real-user, legal, provider or production-infrastructure acceptance.

@@ -1,5 +1,7 @@
 # Faro implementation architecture
 
+Audit remediation: `commandPayloads.ts` is a shared transaction-owned historical data backfill, without schema change. Journals persist acknowledgements and shared reads project current authorized state. `assessmentAutosave.ts` adds one in-memory revision queue for auto save, submit and navigation. OSRM admits only bounded400/NoRoute as unknown; Nominatim stays unchanged. [Remediation](FARO_AUDIT_REMEDIATION_2026.md) records evidence and external gates.
+
 `src/server/index.ts` starts `createFaroApp`, a Canonical allowlist around the existing Node HTTP authentication/static server. `/api/faro/*` dispatches to authorized services; retired CV/import/EHV/billing routes return 410. Production Canonical requests return `RELEASE_GATES_OPEN` while launch gates are unresolved.
 
 The modular monolith uses pure domain modules under `src/domain/faro` and services under `src/server/faro`. SQLite uses `JobDatabase`; the PostgreSQL18 runtime uses the shared parameterized read/write models, awaited SERIALIZABLE transactions and current-authority recovery. The authorized free Render staging explicitly selects PostgreSQL; SQLite remains the default configuration. Services reuse active membership, offer assignment and transactional helpers. Offer versions and process snapshots are distinct immutable records. Recruitment commands persist state, event and outbox together, with optimistic version checks and per-user idempotency keys.

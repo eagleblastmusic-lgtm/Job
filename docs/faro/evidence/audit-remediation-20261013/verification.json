@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "faro-audit-remediation-evidence-v1",
+  "asOf": "2026-10-13",
+  "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
+  "scope": "synthetic-only; no production activation",
+  "localVerification": {
+    "build": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "migrations": 38,
+    "fullNode": {
+      "fail": 0,
+      "skip": 0,
+      "pass": 212
+    },
+    "sqliteBrowser": {
+      "fail": 0,
+      "skip": 0,
+      "pass": 48
+    },
+    "postgresBrowserNode24": {
+      "fail": 0,
+      "skip": 0,
+      "pass": 38
+    },
+    "postgresRehearsal": {
+      "node22": "v22.23.3 PASS",
+      "erasureReplayRestore": "PASS",
+      "node24": "v24.19.0 PASS",
+      "clustersStoppedAndRemoved": "PASS",
+      "cleanupFailureRollback": "PASS",
+      "postgres": "18.6",
+      "startupBackfill": "PASS"
+    },
+    "tooling": {
+      "fail": 0,
+      "skip": 0,
+      "pass": 6
+    },
+    "legacyRestore": "PASS",
+    "canonicalRestore": "PASS",
+    "statusGenerator": "PASS",
+    "publicShellAutosaveBrowser": "12/12 PASS; additional real CacheStorage module/API/privacy check 2/2 PASS"
+  },
+  "counterproof": {
+    "FARO-AUDIT-001": "FAIL on old full private DTO acknowledgement",
+    "FARO-AUDIT-002": "FAIL on old replay revision4 versus current5",
+    "FARO-AUDIT-003": "FAIL desktop/mobile: no autosave confirmation or persistence",
+    "FARO-AUDIT-004": "FAIL on old HTTP400 NoRoute GEO_PROVIDER_UNAVAILABLE"
+  },
+  "ci": {
+    "requiredWorkflows": [
+      "FARO Canonical",
+      "CI"
+    ],
+    "status": "PENDING"
+  },
+  "stagingPreflight": {
+    "expiry": "2026-11-07",
+    "postgresVersion": 18,
+    "region": "Frankfurt",
+    "service": "srv-db3pb9rncjis73banf90",
+    "compute": "Free",
+    "externalDatabaseTraffic": "Blocked by PostgreSQL inbound rules",
+    "schemaMigrationCount": 38,
+    "database": "dpg-db3u3su7bikc73ado7v0-a",
+    "databaseStatus": "Available",
+    "rollback": "retain privacy server fixes; validated manual-save client fallback; no schema rollback/reset",
+    "deployment": "NOT_YET_PERFORMED",
+    "recordReset": false,
+    "schemaChange": false,
+    "existingCommit": "720b7a5ed1d1629ad72615fa2c71677013ecb613"
+  },
+  "logHashes": [
+    {
+      "file": "autosave-public-cache-proof.log",
+      "sha256": "edb966e9497db3841e5e957560011793ce8b55baafdb32a5c419fdfdea4e938a"
+    },
+    {
+      "file": "baseline-browser-counterproof.log",
+      "sha256": "9e9f05a4e0a084686d6131be778f1ea8287ddddefce284b22a8b834997a74228"
+    },
+    {
+      "file": "baseline-node-counterproof.log",
+      "sha256": "343889f82efcbbd135a35bfcd5f9ce0af99861155a8344544f781ae7b99e0065"
+    },
+    {
+      "file": "canonical-restore.log",
+      "sha256": "9bf22e7017b8ed41330475a28f00839db08a1d6cf560ec37cd562ff2213ac75d"
+    },
+    {
+      "file": "legacy-restore.log",
+      "sha256": "2491277949563414e16bee9f7793f6d5bddc3166d9b342f58529621826b5147d"
+    },
+    {
+      "file": "node24-full-final.log",
+      "sha256": "1213cd2dc4545f77745fb7483a067c2a89b53613a964b6edf6fd416eef5f3bf5"
+    },
+    {
+      "file": "node24-full.log",
+      "sha256": "1415bfabbffafa79495baeaec4c239c9db71cbe2b8ffb299586bffad60c015b2"
+    },
+    {
+      "file": "postgres18-node22.log",
+      "sha256": "37b3e8d000b819a2890acc13b1b9d7a8ff402318faddfeb98e67da5bd8724a1e"
+    },
+    {
+      "file": "postgres18-node24-final.log",
+      "sha256": "cb2fc0cc497132dae35d58d9741efc2fdcd5cdefba955fae4bb11cca4505827c"
+    },
+    {
+      "file": "public-shell-autosave-final.log",
+      "sha256": "8e934a50a04baeb8ff4692b9385fd255e26d7f2a0e122254d2b228adbe3e9577"
+    },
+    {
+      "file": "sqlite-browser-final.log",
+      "sha256": "f43fb4cf970aea40cfcc286016e3cfb20c9351789f4109fc4327af7e64f6ac9b"
+    },
+    {
+      "file": "sqlite-browser.log",
+      "sha256": "fa307cb86cfdab8ff443675cbf1e4f15fbbc396fb3e91c2a00359e9533e335f5"
+    },
+    {
+      "file": "tooling.log",
+      "sha256": "9d7755069435bd1b5d41f1fca398eb40b605387de6dfef1733ed2fd69afbba3b"
+    }
+  ]
+}

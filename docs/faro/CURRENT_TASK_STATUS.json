@@ -1,7 +1,7 @@
 {
   "schemaVersion": "faro-current-task-status-v1",
   "asOf": "2026-10-13",
-  "baseline": "119ef5d",
+  "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "latestEngineeringAcceptance": {
     "commit": "720b7a5ed1d1629ad72615fa2c71677013ecb613",
     "faroRun": "38334329330",
@@ -318,9 +318,9 @@
       "id": "K039",
       "requirement": "Deletion/export z pochodnymi",
       "checkpoint": "CP11",
-      "status": "DONE",
-      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
-      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+      "status": "DELTA_REQUIRED",
+      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
     },
     {
       "id": "K040",
@@ -382,17 +382,17 @@
       "id": "K047",
       "requirement": "Timer serwerowy, autosave, awarie i podstawowa dostępność",
       "checkpoint": "CP10",
-      "status": "DONE",
-      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
-      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+      "status": "DELTA_REQUIRED",
+      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
     },
     {
       "id": "K048",
       "requirement": "Objective/manual grading i lokalne zestawienie wyników",
       "checkpoint": "CP10",
-      "status": "DONE",
-      "reason": "Accepted bounded engineering; independent full release evidence is separate.",
-      "technicalEvidence": "Assessment models; pinned timer/version/human grading/incident/correction proofs"
+      "status": "DELTA_REQUIRED",
+      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
     },
     {
       "id": "K049",
@@ -623,8 +623,9 @@
       "requirement": "Routing fuel tariffs rail adapters",
       "checkpoint": "CP09",
       "status": "EXTERNAL_BLOCKED",
-      "reason": "OSM adapters implemented; actual provider/data/tariff/privacy/cache terms missing; manual fallback retained.",
-      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison"
+      "reason": "External provider/data/tariff/privacy/cache terms remain missing; FARO-AUDIT-004 technical adapter delta awaits final verification.",
+      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison",
+      "technicalStatus": "DELTA_REQUIRED"
     },
     {
       "id": "K078",
