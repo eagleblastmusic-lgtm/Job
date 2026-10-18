@@ -33,6 +33,11 @@ try {
   console.log(`FARO_FREE_STAGING_ACTIVITY_PRACTICE_${result}; additive nullable column only.`);
   console.log('FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no data migration or reset.');
  }
+ // This Free service has no durable disk. Refuse readiness rather than activate
+ // an empty container upload directory while PostgreSQL still references files.
+ phase='PRIVATE_FILES';
+ if(Number((await client.query(`SELECT count(*) AS count FROM ${schema}.uploaded_files`)).rows[0].count)!==0)throw new Error();
+ console.log('FARO_FREE_STAGING_PRIVATE_FILES_ZERO; no referenced private upload can be lost by this deployment.');
 }catch {
  console.error(`FARO_FREE_STAGING_START_REFUSED phase=${phase}; no credentials or records logged.`);process.exitCode=1;
 }finally {

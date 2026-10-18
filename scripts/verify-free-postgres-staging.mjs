@@ -44,6 +44,13 @@ try {
  const upgraded=await run(process.execPath,args,{env:upgradeEnv,windowsHide:true});assert.match(upgraded.stdout,/UPGRADED_0038/);
  const retainedAfter=(await target.query(`SELECT * FROM ${schema}.faro_activities`)).rows;assert.deepEqual(retainedAfter.map(({practice,...rest})=>{assert.equal(practice,null);return rest;}),retainedBefore);
  assert.match((await run(process.execPath,args,{env:upgradeEnv,windowsHide:true})).stdout,/ALREADY_CURRENT/);
+ phase='PRIVATE_FILES';
+ await target.query(`INSERT INTO ${schema}.uploaded_files(id,user_id,kind,original_name,mime_type,storage_key,size_bytes,sha256,created_at) VALUES('staging-file','upgrade-owner','CV','synthetic.txt','text/plain','synthetic-storage-key',1,'synthetic-hash','2020-01-01')`);
+ const filesBefore=(await target.query(`SELECT * FROM ${schema}.uploaded_files`)).rows;
+ await assert.rejects(()=>run(process.execPath,args,{env:upgradeEnv,windowsHide:true}),error=>/START_REFUSED phase=PRIVATE_FILES/.test(error.stderr));
+ assert.deepEqual((await target.query(`SELECT * FROM ${schema}.uploaded_files`)).rows,filesBefore);
+ await target.query(`DELETE FROM ${schema}.uploaded_files WHERE id='staging-file'`);
+ assert.match((await run(process.execPath,args,{env:upgradeEnv,windowsHide:true})).stdout,/PRIVATE_FILES_ZERO/);
  await target.query(`ALTER TABLE ${schema}.faro_activities ADD COLUMN foreign_sentinel TEXT`);await assert.rejects(()=>run(process.execPath,args,{env:upgradeEnv,windowsHide:true}));await target.query(`ALTER TABLE ${schema}.faro_activities DROP COLUMN foreign_sentinel`);
  await target.query(`DELETE FROM ${schema}.users WHERE id='upgrade-owner'`);assert.equal(Number((await target.query(`SELECT count(*) FROM ${schema}.faro_activities`)).rows[0].count),0);
  await target.query(`UPDATE ${schema}.schema_migrations SET applied_at='2000-01-01T00:00:00.000Z' WHERE version='0001_init'`);
@@ -57,7 +64,7 @@ try {
  const registration=await fetch(`${origin}/api/auth/register`,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify({name:'StagingFixture',email:'staging-fixture@example.pl',password:'SyntheticStaging123',acceptTerms:true,acceptPrivacy:true})});assert.equal(registration.status,201);
  const cookie=registration.headers.get('set-cookie')?.split(';')[0];assert.ok(cookie);
  const gate=await fetch(`${origin}/api/faro/profile`,{headers:{cookie,origin}});assert.equal(gate.status,503);assert.equal((await gate.json()).error.code,'RELEASE_GATES_OPEN');
- console.log('FARO_FREE_POSTGRES_STAGING_PROOF_PASS scope/nonempty-target-refusal/38-migrations/empty-users/retained-0038-upgrade/confirmation-refusal/DDL-rollback/idempotence/schema-refusal/restart-preservation/actual-HTTP/closed-release; synthetic disposable loopback only.');
+ console.log('FARO_FREE_POSTGRES_STAGING_PROOF_PASS scope/nonempty-target-refusal/38-migrations/empty-users/retained-0038-upgrade/confirmation-refusal/DDL-rollback/idempotence/private-file-refusal-and-preservation/schema-refusal/restart-preservation/actual-HTTP/closed-release; synthetic disposable loopback only.');
 }catch {console.error('FARO_FREE_POSTGRES_STAGING_PROOF_FAILED phase='+phase+'; records and credentials withheld.');process.exitCode=1;}
 finally {
  if(child&&child.exitCode===null){await new Promise(done=>{child.once('exit',done);child.kill('SIGTERM');});}
