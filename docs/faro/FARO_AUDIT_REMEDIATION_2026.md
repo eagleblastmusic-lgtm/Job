@@ -1,5 +1,7 @@
 # FARO audit remediation — 2026-10-13
 
+Current technical reacceptance,2026-10-18: **FARO-AUDIT-001/002/003/004 FIXED_VERIFIED** on `1e8d7041cbbfcf7551a91176bd98e92549f9ac3e`. [FARO39166787707](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39166787707) and [CI39166787717](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39166787717) both SUCCESS, all required jobs. Historical pending statements below describe their original verification stage. Full plan and production release remain PARTIAL.
+
 Baseline: `6d0c000ab64489f5abde88e6c87ab1ec3453a1fc`, clean canonical worktree and identical remote main verified before changes. The independent report and audit-evidence were read in full; findings 001–004 are accepted as confirmed. This is remediation and technical reacceptance, not a replacement audit or production approval.
 
 ## Journal package (001 + 002)
@@ -43,3 +45,49 @@ Local build/lint/typecheck/38 migrations PASS, full212/212 Node PASS,6/6 tooling
 Initial remote runs [FARO Canonical 38424718200](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/38424718200) and [CI 38424718195](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/38424718195) failed an immediate URL assertion after asynchronous blocked offline navigation. The regression now waits for the same required attempt URL and still checks the retained exact draft. Six repeated desktop/mobile runs passed; no acceptance criterion was relaxed.
 
 A narrow independent code review additionally reproduced loss of an accepted submit's HTTP response: retry incorrectly treated the submitted state as expiry and blocked navigation. Recovery now settles the fresh authorized terminal state, clears uncertain/pending recovery, disables obsolete editing and refreshes the view without another submit. Both retry and explicit load use this path. The new real-browser regression checks pending review, unchanged revision/answers/expiry, exactly one submit/event and working navigation. Before the fix it failed on both viewports (`lost-submit-counterproof.log`). Final replacement CI is still required before technical closure.
+
+## Final verification and change index
+
+Final exact-code CI: build/lint/typecheck/38 migration validation PASS; full212 Node tests,zero failures/skips;52 SQLite browser tests PASS;42 native PostgreSQL18 browser tests on each of Node22 and24 PASS. Both native jobs pass encrypted backup/actual restore/current authority, cross-actor journal cleanup failure rollback and single-event/outbox replay. Historical backup/restore, private-file envelope/bundle tests, production-image build and isolated closed-release smoke PASS. This supplements the earlier local PostgreSQL18.6 Node22.23.3/24.19.0 proofs and real Chromium desktop/mobile tests. No test was disabled or weakened. All four new finding regressions fail on isolated6d0c000 and pass on the corrected code; the additional lost-submit counterproof also fails beforeacc7926.
+
+| Finding/status | Changed files (relative to repository) | Fix commit and exact regression |
+|---|---|---|
+|001 FIXED_VERIFIED|`src/server/faro/commandPayloads.ts`, `commandJournal.ts`, `assessmentService.ts`, `assessmentReviewModel.ts`, `assessmentInvalidationModel.ts`, `interviewService.ts`, `interviewProposalModel.ts`, `interviewScheduleModel.ts`, `interviewOutcomeModel.ts`, `privacyService.ts`, `privacyErasureModel.ts`, `recoveryService.ts`, `recoveryWriteModel.ts`; `src/server/db.ts`, `pgFaroApp.ts`; `scripts/faro-command-journal-proof.mjs`, `faro-postgres-exercise.mjs`; `src/tests/faro-command-journal.test.ts`|0968e86; `FARO-AUDIT-001: real SQLite HTTP command journal regression`; native `FARO_AUDIT_001_ERASURE_RESTORE_PASS backend=postgresql` on both Node versions|
+|002 FIXED_VERIFIED|Same journal/assessment/proof files; `src/tests/faro-assessment-economics-trust.test.ts` asserts fresh serverNow separately from unchanged domain fields|0968e86; `FARO-AUDIT-002: real SQLite HTTP command journal regression`; native `FARO_AUDIT_002_REPLAY_PASS backend=postgresql` on both Node versions|
+|003 FIXED_VERIFIED|`src/client/assessmentAutosave.ts`, `faro.ts`; `src/server/faro/assessmentAnswerModel.ts`; `public/sw.js`; `e2e/faro-open-answer.spec.ts`|2e83166,c9f3607,acc7926; no-click exact reload/unchanged expiry, delayed serialization/submit, offline/reconnect/uncertain response/navigation,409 explicit choice, server timeout, late timer acknowledgement, lost-submit retry and explicit load.16 real browser cases across desktop/mobile in each backend suite|
+|004 FIXED_VERIFIED|`src/server/faro/geographyProviders.ts`; `src/tests/faro-geography-providers.test.ts`|71875bb,c9f3607; `FARO-AUDIT-004: OSRM HTTP400 NoRoute alone is unknown; status/body errors retain bounds and Nominatim semantics`, including actual loopback HTTP400 transport|
+
+Status tooling inb864bd4 validates explicit K001–K086 authority and fails missing/duplicate/unclassified/invalid entries; `scripts/faro-current-scope.test.mjs` and `src/tests/faro-current-scope.test.ts` prove it. K039/K047/K048 close only after the above exact CI; K077's technical OSRM subitem closes while its independent provider/data terms remain EXTERNAL_BLOCKED. Current classification is44 DONE,0 DELTA_REQUIRED,28 EXTERNAL_BLOCKED,14 DEFERRED.
+
+No locally resolvable technical delta from001–004 remains. Independent legal/KRAZ/service/DPA/DPIA/AI/privacy/retention, assessment validity/fairness, anti-commercial-work review, security/manual accessibility/user research, provider production rights, staffed moderation/incident response, production storage/backup/key/current-authority custody and measured RPO/RTO remain open. Main protection needs an owner decision consistent with the authorized direct-main procedure. These are separate acceptance requirements; no founder decision was changed.
+
+## All86 requirement classifications — 2026-10-18
+
+| Status | Explicit requirement IDs |
+|---|---|
+|DONE (44)|K005, K010, K011, K012, K013, K014, K015, K016, K017, K018, K019, K020, K022, K024, K025, K027, K028, K029, K030, K031, K032, K033, K034, K035, K036, K037, K039, K040, K041, K042, K045, K047, K048, K060, K061, K066, K073, K074, K075, K078, K079, K080, K081, K084|
+|DELTA_REQUIRED (0)|None|
+|EXTERNAL_BLOCKED (28)|K001, K002, K003, K004, K006, K007, K008, K009, K021, K023, K026, K038, K043, K044, K046, K049, K050, K051, K052, K062, K063, K064, K065, K072, K077, K082, K083, K085|
+|DEFERRED (14)|K053, K054, K055, K056, K057, K058, K059, K067, K068, K069, K070, K071, K076, K086|
+
+K077 remains EXTERNAL_BLOCKED with technicalStatus DONE. The JSON register preserves individual requirement text, checkpoint, reason and evidence.
+
+## Hosted reacceptance — 2026-10-18
+
+Existing Free Render service srv-db3pb9rncjis73banf90 and PostgreSQL18 database dpg-db3u3su7bikc73ado7v0-a were retained. Auto-deploy off, production intake/worker gates closed, network rules/secrets/configuration unchanged. Exact1e8d704 passed both complete workflows before manual deploy dep-dbajfiuq1p3s73btoav0; Live2026-10-18T21:20:03.970125Z. New instance v4mp4 logged retained0038/schema, PRIVATE_FILES_ZERO and listener21:19:59.664729247Z. Startup guard refuses nonzero file references before readiness and the native test proves metadata preservation. No schema reset/drop/downgrade.
+
+Actual HTTPS restart proof kept one synthetic account, original session and changed optional consent across the observed new listener; fresh login and own export PASS; release remains503 RELEASE_GATES_OPEN. Smoke PASS and account deletion/stale-session rejection cleanup PASS. No real candidate data was used. See evidence/audit-remediation-20261013/staging-rollout-20261018.json and verification.json; original local logs remain alongside their committed hashes.
+
+Rollback is a forward client-only repair from0968e86 retaining current privacy001/002,OSRM004 and file guard; use a new public-shell cache version and fresh build/tests/both CI before deploy. No ready fallback image is claimed; returning to manual save temporarily reopens003. Never select the previous720b7a5 image or restore stale DB merely to roll back this client.
+
+OSRM004 is storage-independent bounded HTTP transport; its native loopback/negative contract tests execute on Node22 and24. It has no separate SQL mutation to prove. SQLite and native PostgreSQL application suites remain green.
+
+Exact003 regression names in `e2e/faro-open-answer.spec.ts` (each runs desktop/mobile against SQLite and native PostgreSQL):
+
+- `FARO-AUDIT-003: no-click autosave confirms a revision, exact private text survives reload and expiry is unchanged`
+- `autosave serializes delayed snapshots with newer edits and submit; stale response never repaints the draft`
+- `autosave offline/reconnect and uncertain committed response preserve the draft; navigation waits for confirmation`
+- `autosave 409 requires a choice between concurrent answers; server timeout stops saving and submission`
+- `autosave confirmation arriving after the timer expires cannot reactivate editing or submit`
+- `autosave reconciles an accepted submit after a lost response via Ponów zapis without resubmission or a false expiry`
+- `autosave reconciles an accepted submit after a lost response via Wczytaj zapisaną odpowiedź without resubmission or a false expiry`

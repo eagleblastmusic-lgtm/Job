@@ -1,0 +1,33 @@
+{
+  "deployment": "dep-dbajfiuq1p3s73btoav0",
+  "commit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
+  "status": "live",
+  "finishedAt": "2026-10-18T21:20:03.970125Z",
+  "resource": "srv-db3pb9rncjis73banf90",
+  "logs": [
+    {
+      "timestamp": "2026-10-18T21:19:57.562060646Z",
+      "instance": "srv-db3pb9rncjis73banf90-v4mp4",
+      "message": "FARO_FREE_STAGING_ACTIVITY_PRACTICE_ALREADY_CURRENT; additive nullable column only."
+    },
+    {
+      "timestamp": "2026-10-18T21:19:57.562089337Z",
+      "instance": "srv-db3pb9rncjis73banf90-v4mp4",
+      "message": "FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no data migration or reset."
+    },
+    {
+      "timestamp": "2026-10-18T21:19:57.563531711Z",
+      "instance": "srv-db3pb9rncjis73banf90-v4mp4",
+      "message": "FARO_FREE_STAGING_PRIVATE_FILES_ZERO; no referenced private upload can be lost by this deployment."
+    },
+    {
+      "timestamp": "2026-10-18T21:19:59.664729247Z",
+      "instance": "srv-db3pb9rncjis73banf90-v4mp4",
+      "message": "Job działa na https://faro-free-staging.onrender.com (port 10000)."
+    }
+  ],
+  "smoke": "PASS",
+  "retainedAccountOriginalSessionChangedConsentFreshLoginOwnExport": "PASS",
+  "cleanup": "PASS",
+  "release": "NOT_ACCEPTED"
+}

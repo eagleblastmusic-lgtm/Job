@@ -1,11 +1,11 @@
 {
   "schemaVersion": "faro-current-task-status-v1",
-  "asOf": "2026-10-13",
+  "asOf": "2026-10-18",
   "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "latestEngineeringAcceptance": {
-    "commit": "720b7a5ed1d1629ad72615fa2c71677013ecb613",
-    "faroRun": "38334329330",
-    "ciRun": "38334329337",
+    "commit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
+    "faroRun": "39166787707",
+    "ciRun": "39166787717",
     "conclusion": "SUCCESS"
   },
   "scope": "Full task status is distinct from gated release; DONE is never production approval",
@@ -318,9 +318,9 @@
       "id": "K039",
       "requirement": "Deletion/export z pochodnymi",
       "checkpoint": "CP11",
-      "status": "DELTA_REQUIRED",
-      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
-      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
+      "status": "DONE",
+      "reason": "Bounded audit remediation accepted only after exact-commit complete FARO and CI success; independent full release acceptance remains separate.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; 1e8d704 FARO39166787707/CI39166787717 SUCCESS; SQLite and PostgreSQL22/24 erasure/replay/restore and desktop/mobile autosave regressions"
     },
     {
       "id": "K040",
@@ -382,17 +382,17 @@
       "id": "K047",
       "requirement": "Timer serwerowy, autosave, awarie i podstawowa dostępność",
       "checkpoint": "CP10",
-      "status": "DELTA_REQUIRED",
-      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
-      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
+      "status": "DONE",
+      "reason": "Bounded audit remediation accepted only after exact-commit complete FARO and CI success; independent full release acceptance remains separate.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; 1e8d704 FARO39166787707/CI39166787717 SUCCESS; SQLite and PostgreSQL22/24 erasure/replay/restore and desktop/mobile autosave regressions"
     },
     {
       "id": "K048",
       "requirement": "Objective/manual grading i lokalne zestawienie wyników",
       "checkpoint": "CP10",
-      "status": "DELTA_REQUIRED",
-      "reason": "Confirmed independent audit finding; remediation has targeted evidence but final full verification and exact new CI remain pending.",
-      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; new journal/autosave regressions and current-authority restore proofs"
+      "status": "DONE",
+      "reason": "Bounded audit remediation accepted only after exact-commit complete FARO and CI success; independent full release acceptance remains separate.",
+      "technicalEvidence": "FARO_AUDIT_REMEDIATION_2026.md; 1e8d704 FARO39166787707/CI39166787717 SUCCESS; SQLite and PostgreSQL22/24 erasure/replay/restore and desktop/mobile autosave regressions"
     },
     {
       "id": "K049",
@@ -623,9 +623,9 @@
       "requirement": "Routing fuel tariffs rail adapters",
       "checkpoint": "CP09",
       "status": "EXTERNAL_BLOCKED",
-      "reason": "External provider/data/tariff/privacy/cache terms remain missing; FARO-AUDIT-004 technical adapter delta awaits final verification.",
-      "technicalEvidence": "economicsModel.ts / domain/faro/economics.ts; private manual scenario/comparison",
-      "technicalStatus": "DELTA_REQUIRED"
+      "reason": "External provider/data/tariff/privacy/cache terms remain missing; FARO-AUDIT-004 technical adapter accepted after exact-commit full CI.",
+      "technicalEvidence": "OSRM HTTP400 NoRoute bounded transport regression 71875bb/c9f3607; 1e8d704 FARO39166787707/CI39166787717 SUCCESS; production provider terms remain external",
+      "technicalStatus": "DONE"
     },
     {
       "id": "K078",

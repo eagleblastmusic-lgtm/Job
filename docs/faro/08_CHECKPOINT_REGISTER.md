@@ -1,8 +1,8 @@
 # CHECKPOINT REGISTER
 
-## Audit remediation — current override, 2026-10-13
+## Audit remediation — current override, 2026-10-18
 
-Confirmed001–004 reopen bounded acceptance of K039/K047/K048 and the technical OSRM part of K077. Implementation/regressions are in [remediation](FARO_AUDIT_REMEDIATION_2026.md). Journal0968e86, autosave2e83166 and OSRM71875bb have targeted acceptance; full212 Node/48 SQLite browsers and backup/restore PASS. Native PostgreSQL22 rehearsal PASS; native24 full rehearsal/38 browser executions/cleanup PASS; exact new CI pending. Requirements stay DELTA_REQUIRED until that acceptance. K077 keeps separate provider terms/data/retention EXTERNAL_BLOCKED. Historical entries do not supply the missing new proof.
+Confirmed001–004 are now FIXED_VERIFIED after exact1e8d704 FARO39166787707/CI39166787717 SUCCESS. [Remediation](FARO_AUDIT_REMEDIATION_2026.md) records causes/files/commits/counterproofs. Build/lint/typecheck/38 migrations,212 Node with zero skips/failures,52 SQLite browsers,42 native PostgreSQL browsers per Node22/24, real backup/restore/current authority, cleanup rollback and container smoke PASS. K039/K047/K048 bounded technical acceptance closes only on these new results; K077 technical OSRM closes while separate provider terms/data/retention stays EXTERNAL_BLOCKED.44 DONE/0 DELTA_REQUIRED/28 EXTERNAL_BLOCKED/14 DEFERRED are explicit reviewed classifications, validated without default DONE. Historical entries supply no independent production acceptance.
 
 Rows below preserve initial execution contracts and subsequent acceptance evidence. Current implementation is integrated on main; the two-role workspace and native PostgreSQL18 staging/recovery are implemented and verified through CP03-L. Latest hosted/runtime acceptance and active technical work are maintained in IMPLEMENTATION_STATUS.md. Historical planned/partial statements below describe their original checkpoint dates. Full release remains PARTIAL because independent external artifacts and production custody are absent.
 

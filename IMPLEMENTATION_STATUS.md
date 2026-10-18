@@ -1,6 +1,6 @@
 # Job — implementation status
 
-Current product authority is [Faro status](docs/faro/IMPLEMENTATION_STATUS.md), [all86 requirements](docs/faro/CURRENT_TASK_STATUS.json) and [audit remediation](docs/faro/FARO_AUDIT_REMEDIATION_2026.md). Findings001–004 have fixes and new local regressions; all local acceptance passed; exact new CI is pending. K039/K047/K048 remain DELTA_REQUIRED and K077 has a technical delta. The V2 material below is historical and does not authorize Faro production.
+Current product authority is [Faro status](docs/faro/IMPLEMENTATION_STATUS.md), [all86 requirements](docs/faro/CURRENT_TASK_STATUS.json) and [audit remediation](docs/faro/FARO_AUDIT_REMEDIATION_2026.md). Findings001–004 FIXED_VERIFIED after exact1e8d704 FARO39166787707/CI39166787717 SUCCESS;212 Node/52 SQLite browsers/42 native PostgreSQL browsers per Node22/24 and actual restore/current authority PASS. Explicit classification:44 DONE,0 DELTA_REQUIRED,28 EXTERNAL_BLOCKED,14 DEFERRED. K039/K047/K048 and K077's technical subitem close only within tested engineering scope. The V2 material below is historical and does not authorize Faro production.
 
 Last refreshed: 2026-09-13
 

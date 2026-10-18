@@ -1,6 +1,6 @@
 {
   "schemaVersion": "faro-audit-remediation-evidence-v1",
-  "asOf": "2026-10-13",
+  "asOf": "2026-10-18",
   "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "scope": "synthetic-only; no production activation",
   "localVerification": {
@@ -53,7 +53,25 @@
       "FARO Canonical",
       "CI"
     ],
-    "status": "PENDING"
+    "status": "SUCCESS",
+    "commit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
+    "faroRun": "39166787707",
+    "ciRun": "39166787717",
+    "allJobs": "SUCCESS",
+    "fullNode": 212,
+    "nodeSkipped": 0,
+    "nodeFailed": 0,
+    "sqliteBrowser": 52,
+    "postgresBrowserPerNode": 42,
+    "nativePostgresNodeVersions": [
+      22,
+      24
+    ],
+    "migrations": 38,
+    "backupRestoreCurrentAuthority": "PASS",
+    "cleanupFailureRollback": "PASS",
+    "initialRuns": "38424718200/38424718195 failed asynchronous URL harness assertion; corrected without relaxing criteria",
+    "acceptedSubmitFix": "acc7926 FARO39166632380/CI39166632306 SUCCESS"
   },
   "stagingPreflight": {
     "expiry": "2026-11-07",
@@ -65,16 +83,24 @@
     "schemaMigrationCount": 38,
     "database": "dpg-db3u3su7bikc73ado7v0-a",
     "databaseStatus": "Available",
-    "rollback": "retain privacy server fixes; validated manual-save client fallback; no schema rollback/reset",
-    "deployment": "NOT_YET_PERFORMED",
+    "rollback": "Forward rollback plan: manual-save client from0968e86 with current server privacy/OSRM/file-guard fixes and new public-shell version; fresh build/tests/both CI required; no schema reset or pre-fix image",
+    "deployment": "LIVE dep-dbajfiuq1p3s73btoav0",
     "recordReset": false,
     "schemaChange": false,
-    "existingCommit": "720b7a5ed1d1629ad72615fa2c71677013ecb613"
+    "existingCommit": "720b7a5ed1d1629ad72615fa2c71677013ecb613",
+    "currentCommit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
+    "privateFileReferences": 0,
+    "retainedAccountRestart": "PASS account/original-session/changed-consent/fresh-login/own-export/release-boundary",
+    "smokeAndCleanup": "PASS"
   },
   "logHashes": [
     {
       "file": "autosave-public-cache-proof.log",
       "sha256": "edb966e9497db3841e5e957560011793ce8b55baafdb32a5c419fdfdea4e938a"
+    },
+    {
+      "file": "autosave-recovery-browser.log",
+      "sha256": "19b6b192f3ece246f0764ee3d204a1e988bfa365b586f415aacc853a0636c3a8"
     },
     {
       "file": "baseline-browser-counterproof.log",
@@ -85,12 +111,48 @@
       "sha256": "343889f82efcbbd135a35bfcd5f9ce0af99861155a8344544f781ae7b99e0065"
     },
     {
+      "file": "build-recovery.log",
+      "sha256": "82951d38ddbb87d77c83225d271bf7c743aa875aea21670006a1295819aedddb"
+    },
+    {
       "file": "canonical-restore.log",
       "sha256": "9bf22e7017b8ed41330475a28f00839db08a1d6cf560ec37cd562ff2213ac75d"
     },
     {
+      "file": "ci-faro-1e8d704.log",
+      "sha256": "8e8196300df37ea4edaf9f28fe506f035a53fba4162533c1fef89eaf97df786d"
+    },
+    {
+      "file": "ci-faro-accepted-submit.log",
+      "sha256": "06d83629a41d37048407155e28fd8a8df37eadf951a22223370c29dc2b19eeeb"
+    },
+    {
+      "file": "ci-faro-initial-failure.log",
+      "sha256": "025d6cea6890d390de35204b1b736e641f4e6b1437da3abe08a24b2a6cfd6bdf"
+    },
+    {
+      "file": "ci-faro-watch.log",
+      "sha256": "4ce70550e6292b104a35daa543451f043af625761395770d189fbf2086c5b34d"
+    },
+    {
+      "file": "ci-general-1e8d704.log",
+      "sha256": "f82fadd949cf7e59d5e923ee7df1fa87946e69a8ecf31dec9125ea03524b336e"
+    },
+    {
+      "file": "ci-general-initial-failure.log",
+      "sha256": "7b51bef6674c64db79a8fd8ab59be26e5281adf6c24dfbdcadadce17612af255"
+    },
+    {
+      "file": "ci-general-watch.log",
+      "sha256": "8c0a9cb75bba9436da7b987092ccbd87fce3216799541ff6068ea0342b19a708"
+    },
+    {
       "file": "legacy-restore.log",
       "sha256": "2491277949563414e16bee9f7793f6d5bddc3166d9b342f58529621826b5147d"
+    },
+    {
+      "file": "lost-submit-counterproof.log",
+      "sha256": "e93e3e3f3fec9c644cc3cc41648289d4d18e3c71a00bedfbf3121006c5d1b3c9"
     },
     {
       "file": "node24-full-final.log",
@@ -119,6 +181,18 @@
     {
       "file": "sqlite-browser.log",
       "sha256": "fa307cb86cfdab8ff443675cbf1e4f15fbbc396fb3e91c2a00359e9533e335f5"
+    },
+    {
+      "file": "staging-file-guard.log",
+      "sha256": "572e7904c1e12990cd50a376f4a9d2353d7e8377cd66e32b56c707e88cd4ffb5"
+    },
+    {
+      "file": "staging-preflight-smoke.log",
+      "sha256": "0b0644c6d0c480407311a053b699b0715f2d2bc452b182e0f464c66ec80ad9d7"
+    },
+    {
+      "file": "staging-retained-account.log",
+      "sha256": "e69b03ea854625efd94214af79671bc2f85c98278688d20386d5ffff669e0bc2"
     },
     {
       "file": "tooling.log",
