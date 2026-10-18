@@ -211,7 +211,7 @@ async function render() {
     $('#f-content').innerHTML = html; finish(mine);
     if (currentAttempt?.state === 'STARTED' && currentAttempt.expiresAt) {
       const answers=$<HTMLFormElement>('[data-form=attempt-answers]');
-      if(answers)answerAutosave=new AssessmentAutosave(answers,currentAttempt,api,a=>{if(mine===epoch)currentAttempt=a;});
+      if(answers)answerAutosave=new AssessmentAutosave(answers,currentAttempt,api,(a,recovered)=>{if(mine===epoch){currentAttempt=a;if(recovered)void render();}});
       const end = Date.parse(currentAttempt.expiresAt), server = Date.parse(currentAttempt.serverNow), started = performance.now();
       const tick = () => { const element = $('#f-timer'); if (!element) return; const seconds = Math.max(0,Math.ceil((end-server-(performance.now()-started))/1000)); element.textContent = seconds ? `Pozostało ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}` : 'Czas upłynął. Serwer zweryfikuje zapis.';if(!seconds)answerAutosave?.expire(); };
       tick(); timer = setInterval(tick,1000);

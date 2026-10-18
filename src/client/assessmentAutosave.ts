@@ -25,7 +25,7 @@ export class AssessmentAutosave {
   private retry=document.createElement('button');
   private discard=document.createElement('button');
 
-  constructor(private form:HTMLFormElement,attempt:Attempt,private api:Request,private accept:(attempt:Attempt)=>void) {
+  constructor(private form:HTMLFormElement,attempt:Attempt,private api:Request,private accept:(attempt:Attempt,recovered?:boolean)=>void) {
     this.attempt=attempt;this.desired={...attempt.answers};this.base={...attempt.answers};
     this.deadline=performance.now()+Date.parse(attempt.expiresAt!)-Date.parse(attempt.serverNow);
     this.status.id='f-answer-save-status';this.status.setAttribute('role','status');this.status.setAttribute('aria-live','polite');
@@ -76,7 +76,13 @@ export class AssessmentAutosave {
   };
   private offline=()=>{if(this.pending)this.show('offline','Offline — odpowiedź czeka na zapis w tej karcie. Pozostaw ją otwartą.');};
   private reconnect=()=>{if(this.pending&&!this.ended&&!this.finishing&&!this.conflict){this.refreshRequired=true;void this.flush().catch(()=>{});}};
-  private update(attempt:Attempt){this.attempt=attempt;this.base={...attempt.answers};this.accept(attempt);}
+  private update(attempt:Attempt,recovered=false){this.attempt=attempt;this.base={...attempt.answers};this.accept(attempt,recovered);}
+  private recoverClosed(latest:Attempt){
+    if(latest.state==='STARTED'||latest.state==='EXPIRED')return false;
+    this.desired={...latest.answers};this.refreshRequired=false;this.uncertain=null;this.conflict=null;this.ended=true;clearTimeout(this.delay);
+    const fields=this.form.querySelector('fieldset');if(fields)fields.disabled=true;
+    this.update(latest,true);return true;
+  }
   private ensureActive(){
     if(this.disposed)throw new Error('Widok próby został zamknięty.');
     if(this.ended||this.attempt.state!=='STARTED'||performance.now()>=this.deadline){this.expire();throw new Error('Czas próby upłynął. Niezapisane zmiany nie zostały przesłane.');}
@@ -85,6 +91,7 @@ export class AssessmentAutosave {
   }
   private async reconcile(){
     const latest=await this.api<Attempt>(`/attempts/${this.id}`,'GET',undefined,this.abort.signal);
+    if(this.recoverClosed(latest))return;
     if(latest.state!=='STARTED'||Date.parse(latest.expiresAt!)<=Date.parse(latest.serverNow)){this.update(latest);this.expire();throw new Error('Próba nie jest już aktywna.');}
     if(!same(latest.answers,this.base)&&(!this.uncertain||!same(latest.answers,this.uncertain))){
       this.conflict=latest;this.remote.textContent='Odpowiedź zapisana na serwerze:\n'+latest.tasks.map(t=>`${t.prompt}\n${latest.answers[t.id]??'Brak odpowiedzi'}`).join('\n\n');
@@ -99,8 +106,9 @@ export class AssessmentAutosave {
     if(!submit&&!this.pending&&!this.refreshRequired)return this.attempt;
     const work=async()=>{
       try {
-        this.ensureActive();
         if(this.refreshRequired)await this.reconcile();
+        if(this.attempt.state!=='STARTED')return this.attempt;
+        this.ensureActive();
         while(!same(this.desired,this.base)){
           this.ensureActive();const answers={...this.desired};this.uncertain=answers;this.show('saving','Zapisuję odpowiedź…');
           const saved=await this.api<Attempt>(`/attempts/${this.id}/answers`,'PUT',{answers,expectedVersion:this.attempt.revision},this.abort.signal);
@@ -132,7 +140,8 @@ export class AssessmentAutosave {
   }
   private async loadSaved(){
     clearTimeout(this.delay);while(this.request){try{await this.request;}catch{/* Read current state after an uncertain write. */}}
-    try{const latest=this.conflict??await this.api<Attempt>(`/attempts/${this.id}`,'GET',undefined,this.abort.signal);this.update(latest);this.desired={...latest.answers};this.paint(this.desired);this.conflict=null;this.refreshRequired=false;this.uncertain=null;
+    try{const latest=this.conflict??await this.api<Attempt>(`/attempts/${this.id}`,'GET',undefined,this.abort.signal);if(this.recoverClosed(latest))return;this.update(latest);this.desired={...latest.answers};this.paint(this.desired);this.conflict=null;this.refreshRequired=false;this.uncertain=null;
+      if(latest.state==='EXPIRED'||Date.parse(latest.expiresAt!)<=Date.parse(latest.serverNow))this.expire();
       this.show(this.ended?'expired':'saved',this.ended?'Czas próby upłynął. Wczytano ostatnią zapisaną odpowiedź.':`Wczytano zapisaną odpowiedź. Wersja ${latest.revision}.`);
     }catch(error){this.show('error','Nie można wczytać zapisu. Odpowiedź pozostaje w tej karcie.');throw error;}
   }

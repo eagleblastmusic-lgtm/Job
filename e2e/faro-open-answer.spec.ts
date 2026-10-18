@@ -111,7 +111,7 @@ test('autosave offline/reconnect and uncertain committed response preserve the d
     const expiry=(await f.read()).expiresAt;
     await context.setOffline(true);await page.locator('[name=task-1]').fill('Odpowiedź wpisana offline.');
     await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','offline');
-    await page.getByRole('link',{name:'Wróć do procesu',exact:true}).click();await expect(page.locator('[name=task-1]')).toHaveValue('Odpowiedź wpisana offline.');expect(page.url()).toContain('#attempts/');
+    await page.getByRole('link',{name:'Wróć do procesu',exact:true}).click();await expect(page).toHaveURL(new RegExp(`#attempts/${f.url.split('/').pop()!}$`));await expect(page.locator('[name=task-1]')).toHaveValue('Odpowiedź wpisana offline.');
     expect((await f.read()).answers).toEqual({});await context.setOffline(false);
     await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','saved');expect((await f.read()).answers['task-1']).toBe('Odpowiedź wpisana offline.');expect((await f.read()).expiresAt).toBe(expiry);
     let lost=false;await page.route('**/answers',async route=>{await route.fetch();lost=true;await route.abort('failed');});
@@ -135,6 +135,23 @@ test('autosave 409 requires a choice between concurrent answers; server timeout 
     await page.locator('[name=task-1]').fill('Zmiana po serwerowym terminie.');await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','expired');
     const expired=await f.read();expect(expired.state).toBe('EXPIRED');expect(expired.answers['task-1']).toBe('Druga zmiana w innej karcie.');await expect(page.getByRole('button',{name:'Zapisz',exact:true})).toBeDisabled();
     await f.request(f.url+'/submit',f.candidate.cookie,'POST',{expectedVersion:expired.revision,answers:{'task-1':'Spóźniony submit'}},409);expect((await f.read()).answers).toEqual(expired.answers);
+  }finally{await closeAutosave(page,f);}
+});
+
+for(const recovery of ['Ponów zapis','Wczytaj zapisaną odpowiedź'])test(`autosave reconciles an accepted submit after a lost response via ${recovery} without resubmission or a false expiry`,async({page})=>{
+  const f=await autosaveFixture(page);let submits=0;
+  try{
+    const expiry=(await f.read()).expiresAt;
+    await page.route('**/submit',async route=>{submits++;await route.fetch();await route.abort('failed');});
+    await page.locator('[name=task-1]').fill('Odpowiedź przesłana mimo utraconego potwierdzenia.');
+    await page.locator('[name=operation]').selectOption('Prześlij do oceny');await page.getByRole('button',{name:'Zapisz',exact:true}).click();
+    await expect(page.locator('#f-answer-save-status')).toHaveAttribute('data-save-state','error');
+    const accepted=await f.read();expect(accepted.state).toBe('SCORED_PENDING_REVIEW');
+    await page.getByRole('button',{name:recovery,exact:true}).click();
+    await expect(page.getByText('Wynik czeka na review',{exact:true})).toBeVisible();
+    const recovered=await f.read();expect(recovered.revision).toBe(accepted.revision);expect(recovered.answers).toEqual(accepted.answers);expect(recovered.expiresAt).toBe(expiry);expect(submits).toBe(1);
+    const process=await f.request<{events:Array<{kind:string}>}>(`/api/faro/processes/${f.recruitment.id}`,f.candidate.cookie);expect(process.events.filter(e=>e.kind==='ATTEMPT_SUBMITTED')).toHaveLength(1);
+    await page.getByRole('link',{name:'Wróć do procesu',exact:true}).click();await expect(page).toHaveURL(new RegExp(`#processes/${f.recruitment.id}$`));
   }finally{await closeAutosave(page,f);}
 });
 
