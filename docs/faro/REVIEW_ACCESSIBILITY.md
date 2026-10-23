@@ -22,6 +22,8 @@ Poprawki ograniczone do przyczyny: fokusowany error alert, aria-labelledby dialo
 
 ## Gotowy protokół manualny recenzenta
 
+Uzupełnienie UI: [dopracowanie2026-10-23](UI_POLISH_2026_10_23.md), cachev4. Piąty scenariusz sprawdza zachowanie wpisywanych danych po opóźnionym początkowym401, przed submit. Kontrolki desktopowe mają margines przewijania24px, zachowano ostrą asercję pełnej widoczności. Łącznie10 wykonań K062 na dwóch viewportach; nie zastępują manualnego AT.
+
 Recenzent zapisuje actual build/URL, datę, OS, przeglądarkę/wersję, rozmiar i ustawienia zoom/tekstu, urządzenie wejściowe, czytnik/wersję i zakres niezależności. Syntetyczne konta z właściwymi rolami, bez realnych odpowiedzi/telefonów. Nie wyłączać MFA/RBAC, żeby ułatwić test.
 
 | Próba | Działanie i oczekiwany obserwowalny efekt | Dowód zwrotny |

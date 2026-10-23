@@ -3,9 +3,9 @@
   "asOf": "2026-10-23",
   "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "latestEngineeringAcceptance": {
-    "commit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
-    "faroRun": "39166787707",
-    "ciRun": "39166787717",
+    "commit": "94b7bc2257f45783243e5a7f76b9522cfb8883ca",
+    "faroRun": "39988429533",
+    "ciRun": "39988428650",
     "conclusion": "SUCCESS"
   },
   "scope": "Full task status is distinct from gated release; DONE is never production approval",
@@ -504,7 +504,7 @@
       "checkpoint": "CP08",
       "status": "EXTERNAL_BLOCKED",
       "reason": "Technical keyboard/error/dialog/reflow controls extended with real-browser regressions; independent manual screen-reader/native-zoom/physical-mobile acceptance remains missing.",
-      "technicalEvidence": "REVIEW_ACCESSIBILITY.md; INDEPENDENT_READINESS_2026_10_23.md; e2e/faro-accessibility.spec.ts and existing critical flows; exact new CI pending"
+      "technicalEvidence": "REVIEW_ACCESSIBILITY.md; INDEPENDENT_READINESS_2026_10_23.md; e2e/faro-accessibility.spec.ts and existing critical flows; exact new CI pending; UI_POLISH_2026_10_23.md: responsive controls/filters/details, initial anonymous-probe and keyboard focus regressions"
     },
     {
       "id": "K063",

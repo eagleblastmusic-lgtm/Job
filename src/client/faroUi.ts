@@ -40,12 +40,13 @@ export const date = (value: string | null) => value ? new Intl.DateTimeFormat('p
 export const salary = (s: Salary) => `${money(s.min)} – ${money(s.max)} ${s.contract === 'B2B' ? 'na fakturze bez VAT' : 'brutto'} / ${label(s.period)}`;
 export const scenarioSalary=(e:Economics)=>`${money(e.result.grossOrInvoiceMin)} – ${money(e.result.grossOrInvoiceMax)} ${e.result.basis==='B2B_NET_INVOICE_EXCL_VAT'?'na fakturze bez VAT':'brutto'} / ${label(e.result.period)}`;
 export const chip = (value: string, tone = '') => `<span class="f-chip ${esc(tone)}">${esc(value)}</span>`;
-export const empty = (title: string, description: string) => `<div class="f-empty"><span aria-hidden="true">↗</span><h2>${esc(title)}</h2><p>${esc(description)}</p></div>`;
+export const directionIcon = '<svg class="f-direction-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg>';
+export const empty = (title: string, description: string) => `<div class="f-empty">${directionIcon}<h2>${esc(title)}</h2><p>${esc(description)}</p></div>`;
 export const options = (items: string[], selected = '') => items.map(item => `<option value="${esc(item)}" ${item === selected ? 'selected' : ''}>${esc(label(item))}</option>`).join('');
 export const select = (name: string, title: string, items: string[], selected = '') => `<label>${esc(title)}<select name="${esc(name)}">${options(items, selected)}</select></label>`;
 export const input = (name: string, title: string, value: unknown = '', type = 'text', extra = 'required') => `<label>${esc(title)}<input name="${esc(name)}" type="${type}" value="${esc(value)}" ${extra}></label>`;
 export const area = (name: string, title: string, value = '', extra = 'required') => `<label class="f-wide">${esc(title)}<textarea name="${esc(name)}" rows="3" ${extra}>${esc(value)}</textarea></label>`;
-export const check = (name: string, title: string, required = true) => `<label class="f-check f-wide"><input type="checkbox" name="${esc(name)}" ${required ? 'required' : ''}>${esc(title)}</label>`;
+export const check = (name: string, title: string, required = true, checked = false) => `<label class="f-check f-wide"><input type="checkbox" name="${esc(name)}" ${required ? 'required' : ''} ${checked ? 'checked' : ''}>${esc(title)}</label>`;
 export const button = (action: string, title: string, id = '', primary = false) => `<button type="button" class="${primary ? 'f-primary' : ''}" data-action="${esc(action)}" data-id="${esc(id)}">${esc(title)}</button>`;
 export const form = (action: string, content: string, submit: string, id = '') => `<form data-form="${esc(action)}" data-id="${esc(id)}"><fieldset class="f-fields">${content}<div class="f-wide"><button class="f-primary" type="submit">${esc(submit)}</button></div><p class="f-form-message f-wide" role="status"></p></fieldset></form>`;
 export function skillOptions(skills:Skill[],query='',selected='') {

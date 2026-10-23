@@ -7,8 +7,8 @@ import {faroPgFixture} from '../src/tests/faro-pg-fixture.js';
 async function tabTo(page:Page,target:Locator,backwards=false){
   for(let i=0;i<180;i++){
     if(await target.evaluate(el=>el===document.activeElement)){
-      const focus=await target.evaluate(el=>{const style=getComputedStyle(el),r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {outline:style.outlineStyle,width:parseFloat(style.outlineWidth),visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight&&Boolean(hit&&(hit===el||el.contains(hit)))};});
-      expect(focus.outline).not.toBe('none');expect(focus.width).toBeGreaterThan(0);expect(focus.visible).toBe(true);return;
+      const focus=await target.evaluate(el=>{const style=getComputedStyle(el),r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {outline:style.outlineStyle,width:parseFloat(style.outlineWidth),rect:{top:r.top,bottom:r.bottom,left:r.left,right:r.right},viewport:innerHeight,hit:hit?.tagName,visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight&&Boolean(hit&&(hit===el||el.contains(hit)))};});
+      expect(focus.outline).not.toBe('none');expect(focus.width).toBeGreaterThan(0);expect(focus.visible,JSON.stringify(focus)).toBe(true);return;
     }
     await page.keyboard.press(backwards?'Shift+Tab':'Tab');
   }
@@ -26,6 +26,12 @@ test('K062: candidate keyboard login, navigation, server error recovery, disclos
   const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
   try{
     const candidate=await f.user('KeyboardCandidate');await keyboardLogin(page,f.base,candidate.email);
+    await expect(page.getByRole('heading',{name:'Zobacz, dokąd prowadzą Twoje umiejętności.',exact:true})).toBeVisible();
+    const skip=page.getByRole('link',{name:'Przejdź do treści',exact:true});await tabTo(page,skip,true);await page.keyboard.press('Enter');await expect(page.locator('#f-content')).toBeFocused();
+    await expect(page).toHaveURL(`${f.base}/#offers`);
+    const unknown=page.getByRole('checkbox',{name:'Pokaż też oferty z nieznanymi warunkami',exact:true});
+    await tabTo(page,unknown);await page.keyboard.press('Space');await tabTo(page,page.getByRole('button',{name:'Filtruj',exact:true}));await page.keyboard.press('Enter');
+    await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');await expect(unknown).toBeChecked();
     await keyboardLink(page,'Profil');const profile=page.locator('[data-form=profile]'),name=profile.locator('[name=firstName]');
     await tabTo(page,name);await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('   ');
     await tabTo(page,profile.getByRole('button',{name:'Zapisz profil',exact:true}));await page.keyboard.press('Enter');
@@ -38,7 +44,7 @@ test('K062: candidate keyboard login, navigation, server error recovery, disclos
     await tabTo(page,page.getByRole('button',{name:'Pobierz moje dane',exact:true}));
     expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
     await info.attach('keyboard-coverage',{body:JSON.stringify({scope:'ENGINEERING_ONLY',backend:process.env.FARO_PG_BROWSER==='1'?'postgresql':'sqlite',keyboard:'real Tab/Shift+Tab/Enter/text',screenReader:'NOT_TESTED',independentAcceptance:'MISSING'}),contentType:'application/json'});
-  }finally{await page.goto('about:blank');await f.close();}
+  }finally{try{await page.goto('about:blank');}finally{await f.close();}}
 });
 
 test('K062: employer keyboard role switch, offer editor and 320 CSS-pixel reflow with enlarged text',async({page},info)=>{
@@ -63,7 +69,7 @@ test('K062: employer keyboard role switch, offer editor and 320 CSS-pixel reflow
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
     await info.attach('reflow',{body:await page.screenshot({path:info.outputPath('organization-reflow.png'),fullPage:true}),contentType:'image/png'});
-  }finally{await page.goto('about:blank');await f.close();}
+  }finally{try{await page.goto('about:blank');}finally{await f.close();}}
 });
 
 test('K062: projection dialog has an accessible name, contains keyboard focus and Escape returns to its trigger',async({page})=>{
@@ -88,7 +94,7 @@ test('K062: projection dialog has an accessible name, contains keyboard focus an
     expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
     await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
     expect((await f.request<{processes:unknown[]}>('/api/faro/processes',candidate.cookie)).processes).toHaveLength(0);
-  }finally{await page.goto('about:blank');await f.close();}
+  }finally{try{await page.goto('about:blank');}finally{await f.close();}}
 });
 
 test('K062: a delayed anonymous session read cannot erase a newer successful keyboard login',async({page})=>{
@@ -106,5 +112,25 @@ test('K062: a delayed anonymous session read cannot erase a newer successful key
     releaseCurrent();await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');
     await keyboardLink(page,'Profil');await expect(page.locator('[data-form=profile] [name=firstName]')).toHaveValue('Anna');
     await expect(page.locator('#authView')).toBeHidden();
-  }finally{release();releaseCurrent();await page.goto('about:blank');await f.close();}
+  }finally{release();releaseCurrent();try{await page.goto('about:blank');}finally{await f.close();}}
+});
+
+test('K062: the initial anonymous session check preserves credentials being typed before submit',async({page})=>{
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
+  let release=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});let first=true,status=0,returned=false;
+  try{
+    const candidate=await f.user('TypingCandidate');
+    await page.route('**/api/me',async route=>{
+      if(!first){await route.continue();return;}first=false;
+      const response=await route.fetch();status=response.status();await held;
+      try{await route.fulfill({response});}finally{returned=true;}
+    });
+    await page.goto(f.base);await expect.poll(()=>status).toBe(401);
+    const email=page.locator('#loginForm [name=email]'),password=page.locator('#loginForm [name=password]');
+    await tabTo(page,email);await page.keyboard.type(candidate.email);await page.keyboard.press('Tab');await expect(password).toBeFocused();await page.keyboard.type('Bezpieczne123');
+    release();await expect.poll(()=>returned).toBe(true);await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    await expect(email).toHaveValue(candidate.email);await expect(password).toHaveValue('Bezpieczne123');await expect(password).toBeFocused();
+    await expect(page.locator('#authMessage')).toBeEmpty();
+    await page.keyboard.press('Tab');await page.keyboard.press('Enter');await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');
+  }finally{release();try{await page.goto('about:blank');}finally{await f.close();}}
 });

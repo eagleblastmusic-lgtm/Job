@@ -27,6 +27,10 @@ Mechaniczny Impeccable detector odnotował dwie zastane uwagi stylistyczne `side
 
 ## Weryfikacja
 
+Etap94b7bc2 zakończony: [FARO39988429533](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39988429533) i [CI39988428650](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39988428650) SUCCESS;213 Node bez failures/skips,60/60 SQLite,50/50 PostgreSQL na każdym Node22/24, bez flaky/retry; native restore/current authority, migracje i container readiness PASS. To dowód dla tego etapu, nie późniejszej delty wizualnej.
+
+Następne jawne zlecenie użytkownika: [dopracowanie UI z Impeccable](UI_POLISH_2026_10_23.md). Zawiera również odtworzoną wcześniejszą fazę race przed submit i poprawkę pełnej widoczności focusu. Regresje przed poprawką zawiodły; targeted retest6/6 PASS. Nowy pełny zakres62/52 i jego CI pozostają w toku do zapisania faktycznych wyników.
+
 Lokalnie build/lint/typecheck/38 migracji PASS,213/213 Node PASS bez skips/failures; targeted K0626/6 desktop/mobile PASS. SQLite pomiar:4 czytelników/80 żądań,0 errors; p95 health21.075ms,me6.515ms,profile6.346ms,offers6.742ms; signals OK przy NOT_CONFIGURED delivery. To konkretny lokalny pomiar, nie produkcyjna obietnica. Natywna weryfikacja PostgreSQL i pełne zestawy przeglądarkowe/nowe CI są w toku; nie przypisywać starych wyników zmienionemu buildowi.
 
 Uzupełnienie etapu97da106: lokalne58/58 SQLite oraz ponowione48/48 PostgreSQL18.6/Node24 browsers PASS, cluster STOPPED/CLEANUP_PASS. Wcześniejszy native rehearsal/actual restore/current authority PASS; pomiarPG p95 health19.620/me25.048/profile26.832/offers31.283ms,0 errors, signalsOK. Dokładne [FARO39986251894](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39986251894) i [CI39986251395](https://github.com/eagleblastmusic-lgtm/Job/actions/runs/39986251395) SUCCESS; PG22 miał jedną flaky próbę logowania opisaną powyżej. Nie uznano retry za brak błędu.

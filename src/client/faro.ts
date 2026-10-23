@@ -1,5 +1,5 @@
 import type { User, Profile, Skill, Offer, OfferData, Process, Organization, Attempt, Economics, Projection, Interview, AssessmentDefinition, Reliability } from './faroTypes.js';
-import { esc, label, salary, scenarioSalary, money, date, chip, empty, input, select, area, check, form, button, projection,skillOptions } from './faroUi.js';
+import { esc, label, salary, scenarioSalary, money, date, chip, empty, input, select, area, check, form, button, projection,skillOptions,directionIcon } from './faroUi.js';
 import { profileView, offerForm, offerDetail, processDetail, economicsView, attemptView, assessmentEditor, assessmentTask, requirementFields, assessmentReview, reliabilityView } from './faroViews.js';
 import { AssessmentAutosave } from './assessmentAutosave.js';
 
@@ -30,7 +30,7 @@ root.addEventListener('input',event=>{
   status.textContent=results.count?`Wyników: ${results.count}. Pokazujemy do 50. Wybierz właściwe pojęcie.`:'Brak wyników. Spróbuj innej nazwy.';
 });
 
-async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal): Promise<T> {
+async function api<T>(path: string, method = 'GET', body?: unknown, signal = controller.signal, anonymousProbe = false): Promise<T> {
   let r: Response;
   try {
     r = await fetch(path.startsWith('/api/') ? path : `/api/faro${path}`, { method, signal, credentials: 'same-origin', headers: body === undefined ? {} : { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store' });
@@ -40,7 +40,7 @@ async function api<T>(path: string, method = 'GET', body?: unknown, signal = con
   }
   const data = await r.json() as T & { error?: { message?: string; code?: string } };
   if(signal.aborted)throw new DOMException('Żądanie anulowane.','AbortError');
-  if (r.status === 401 && data?.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
+  if (r.status === 401 && data?.error?.code !== 'REAUTH_FAILED' && !anonymousProbe) { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
   if(data?.error?.code==='MFA_REQUIRED') {keyDraft=null;compared.clear();offers=[];currentOffer=null;currentProcess=null;currentAttempt=null;navigate('security');}
   if (!r.ok) throw Object.assign(new Error(data?.error?.message ?? `Błąd ${r.status}`),{status:r.status,code:data?.error?.code});
   return data;
@@ -68,25 +68,26 @@ function loggedOut() { includeUnknown=false;keyDraft=null;
 }
 function shell() {
   root.className = 'faro'; document.body.classList.add('faro-session'); $('#authView').classList.add('hidden');
-  root.innerHTML = `<a class="f-skip" href="#f-content">Przejdź do treści</a><header class="f-header"><a class="f-brand" href="#offers" aria-label="Faro — możliwości"><span aria-hidden="true">↗</span> FARO<span class="f-brand-note">Twój następny krok.</span></a><div class="f-session"><label class="f-role-label">Przestrzeń<select id="f-role"><option value="candidate" ${role === 'candidate' ? 'selected' : ''}>Kandydat</option><option value="employer" ${role === 'employer' ? 'selected' : ''}>Pracodawca</option></select></label>${button('logout', 'Wyloguj')}</div></header>
+  root.innerHTML = `<a class="f-skip" href="#f-content">Przejdź do treści</a><header class="f-header"><a class="f-brand" href="#offers" aria-label="Faro — możliwości">${directionIcon} FARO<span class="f-brand-note">Twój następny krok.</span></a><div class="f-session"><label class="f-role-label">Przestrzeń<select id="f-role"><option value="candidate" ${role === 'candidate' ? 'selected' : ''}>Kandydat</option><option value="employer" ${role === 'employer' ? 'selected' : ''}>Pracodawca</option></select></label>${button('logout', 'Wyloguj')}</div></header>
   <div class="f-shell"><nav class="f-nav" aria-label="Workspace Faro">${(role === 'candidate' ? [['offers','Możliwości'],['watches','Obserwowane'],['processes','Moje procesy'],['profile','Profil'],['compare','Porównanie'],['attempts','Assessmenty']] : [['employer','Oferty'],['organization','Organizacja']]).concat([['notifications','Dzisiaj'],['cases','Zgłoszenia'],['privacy','Prywatność'],['security','Bezpieczeństwo']]).map(([path,title]) => `<a href="#${path}" ${location.hash.split('/')[0] === `#${path}` ? 'aria-current="page"' : ''}>${title}</a>`).join('')}<p class="f-nav-note">Cała Polska.<br>Kompetencje przede wszystkim.<br><strong>Bezpłatnie.</strong></p></nav><div class="f-main"><p id="f-status" role="status" aria-live="polite"></p><div id="f-content" tabindex="-1" aria-busy="true"><p class="f-loading">Wczytuję Twoją przestrzeń…</p></div></div></div>`;
 }
 function navigate(path: string) { if (location.hash === `#${path}`) void render(); else location.hash = path; }
-async function bootstrap() {
+async function bootstrap(initial = false) {
   try {
 
-    const me = await api<{ user: User }>('/api/me'); user = me.user;
+    const me = await api<{ user: User }>('/api/me','GET',undefined,controller.signal,initial); user = me.user;
     await render();
-  } catch (e) { if ((e as Error).name !== 'AbortError') { loggedOut(); $('#authMessage').textContent = (e as Error).message; } }
+  } catch (e) { if(initial&&(e as {status?:number}).status===401)return;if ((e as Error).name !== 'AbortError') { loggedOut(); $('#authMessage').textContent = (e as Error).message; } }
 }
 function split(list: string, detail: string, selected: boolean, back: string) {
   return `<div class="f-split ${selected ? 'f-selected' : ''}"><aside class="f-list" aria-label="Lista">${list}</aside><section class="f-detail" aria-label="Szczegóły">${selected ? `<a class="f-back" href="#${esc(back)}">← Wróć do listy</a>` : ''}${detail}</section></div>`;
 }
 function card(o: Offer, base: string, selected: string) {
-  return `<a class="f-offer-card ${selected === o.id ? 'f-active' : ''}" href="#${base}/${o.id}" ${selected === o.id ? 'aria-current="true"' : ''}><span class="f-company-mark" aria-hidden="true">${esc(o.company.slice(0,1))}</span><div><p class="f-muted">${esc(o.company)}</p><h2>${esc(o.data.role)}</h2><p class="f-card-money">${esc(salary(o.data.salary[0]!))}</p><div class="f-chips">${chip(label(o.data.workModel))}${o.hasUnknownConditions?chip('Warunki częściowo nieznane'):''}${chip(o.data.location)}${role === 'employer' ? chip(label(o.status)) : ''}</div></div><span aria-hidden="true">↗</span></a>`;
+  return `<a class="f-offer-card ${selected === o.id ? 'f-active' : ''}" href="#${base}/${o.id}" ${selected === o.id ? 'aria-current="true"' : ''}><span class="f-company-mark" aria-hidden="true">${esc(o.company.slice(0,1))}</span><div><p class="f-muted">${esc(o.company)}</p><h2>${esc(o.data.role)}</h2><p class="f-card-money">${esc(salary(o.data.salary[0]!))}</p><div class="f-chips">${chip(label(o.data.workModel))}${o.hasUnknownConditions?chip('Warunki częściowo nieznane'):''}${chip(o.data.location)}${role === 'employer' ? chip(label(o.status)) : ''}</div></div>${directionIcon}</a>`;
 }
 async function render() {
   if (!user) return;
+  if(!location.hash)history.replaceState(null,'','#offers');
   const previous=answerAutosave;
   if(previous){
     try{await previous.flush();}catch(error){if(user){history.replaceState(null,'',`#attempts/${previous.id}`);role='candidate';notify((error as Error).message,true);}return;}
@@ -118,8 +119,8 @@ async function render() {
         if (mine !== epoch) return;
         currentOffer = chosen;
         const filtered = offers.filter(o => `${o.data.role} ${o.company} ${o.data.location}`.toLocaleLowerCase('pl').includes(filter.toLocaleLowerCase('pl')) && (!modelFilter || o.data.workModel === modelFilter));
-        html = `<div class="f-page-heading"><p class="f-kicker">${employer ? 'PRZESTRZEŃ PRACODAWCY' : 'MOŻLIWOŚCI · CAŁA POLSKA'}</p><h1>${employer ? 'Dobra rekrutacja zaczyna się od jasnych warunków.' : 'Zobacz, dokąd prowadzą Twoje umiejętności.'}</h1><p>${employer ? 'Oferty, ludzie i kolejne kroki w jednym miejscu.' : 'Jawne wynagrodzenie. Konkretne kompetencje. Miejsce na naukę.'}</p>${employer ? `<a class="f-button f-primary" href="#offer-create">Utwórz ofertę</a>` : '<a href="#profile">Ustaw prywatne granice warunków pracy</a>'}</div>
-        <form class="f-filter" data-form="filter"><label>Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label>Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label>${!employer&&page==='offers'?check('includeUnknown','Pokaż też oferty z nieznanymi warunkami',includeUnknown):''}<button type="submit">Filtruj</button><span>${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id),watchAlerts.get(chosen.id)!==false) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
+        html = `<div class="f-page-heading"><h1>${employer ? 'Dobra rekrutacja zaczyna się od jasnych warunków.' : 'Zobacz, dokąd prowadzą Twoje umiejętności.'}</h1><p>${employer ? 'Oferty, ludzie i kolejne kroki w jednym miejscu.' : 'Jawne wynagrodzenie. Konkretne kompetencje. Miejsce na naukę.'}</p>${employer ? `<a class="f-button f-primary" href="#offer-create">Utwórz ofertę</a>` : '<a href="#profile">Ustaw prywatne granice warunków pracy</a>'}</div>
+        <form class="f-filter ${!employer&&page==='offers'?'f-filter-options':''}" data-form="filter"><label class="f-filter-query">Szukaj ofert<input name="query" value="${esc(filter)}" placeholder="Rola, firma lub miejscowość"></label><label class="f-filter-model">Model pracy<select name="model"><option value="">Wszystkie</option>${['REMOTE','HYBRID','ONSITE'].map(m => `<option value="${m}" ${modelFilter === m ? 'selected' : ''}>${esc(label(m))}</option>`).join('')}</select></label>${!employer&&page==='offers'?check('includeUnknown','Pokaż też oferty z nieznanymi warunkami',false,includeUnknown):''}<button type="submit">Filtruj</button><span class="f-filter-count">${filtered.length} ofert · od najnowszych</span></form>` + split(filtered.map(o => card(o,page,id)).join('') || empty('Jeszcze nic tutaj nie ma', 'Zmień filtry lub wróć później. Pokazujemy wyłącznie rzeczywiste oferty.'), chosen ? offerDetail(chosen, skills, employer, watchIds.has(chosen.id),watchAlerts.get(chosen.id)!==false) : empty('Wybierz swój następny krok', 'Otwórz ofertę, by poznać warunki, wymagania i drogę do tej pracy.'), Boolean(id),page);
       }
     } else if (page === 'profile') html = profileView(await api<Profile>('/profile'), skills);
     else if (page === 'offer-create' || page === 'offer-edit') {
@@ -127,7 +128,7 @@ async function render() {
       const o = id ? await api<Offer>(`/offers/${id}`) : undefined; currentOffer = o ?? null;
       html = offerForm(skills, user.id, o);
     } else if (page === 'organization') {
-      html = `<h1>Twoja organizacja</h1><p>Publikacja jest dostępna po weryfikacji organizacji. Wybór przestrzeni nie nadaje uprawnień do danych innych firm.</p>${organizations.length ? `<label>Aktywna organizacja<select id="f-org">${organizations.map(o => `<option value="${esc(o.id)}" ${orgId === o.id ? 'selected' : ''}>${esc(o.name)} · ${esc(label(o.verification))} · ${esc(label(o.role))}</option>`).join('')}</select></label>` : ''}<div class="f-grid"><section class="f-card"><h2>Utwórz organizację</h2>${form('organization',input('name','Nazwa organizacji','','text','required maxlength="150"'),'Utwórz')}</section><section class="f-card"><h2>Dołącz z zaproszenia</h2>${form('accept-invite',input('token','Kod zaproszenia'),'Dołącz')}</section>${orgId ? `<section class="f-card"><h2>Zaproś współpracownika</h2>${form('invite', input('email','E-mail','','email') + select('role','Rola',['RECRUITER','HIRING_MANAGER','ADMIN']),'Utwórz kod zaproszenia',orgId)}</section>` : ''}${user.role === 'ADMIN' ? `<section class="f-card"><h2>Weryfikacja organizacji</h2>${form('verify-org',input('organizationId','Identyfikator organizacji',orgId) + area('note','Uzasadnienie weryfikacji','','required minlength="10"'),'Potwierdź weryfikację')}</section>` : ''}</div><p class="f-muted">Identyfikator wybranej organizacji: ${esc(orgId)}</p><a href="#restrictions/${esc(orgId)}">Ograniczenia i ręczne przywrócenie</a>`;
+      html = `<h1>Twoja organizacja</h1><p>Publikacja jest dostępna po weryfikacji organizacji. Wybór przestrzeni nie nadaje uprawnień do danych innych firm.</p>${organizations.length ? `<label>Aktywna organizacja<select id="f-org">${organizations.map(o => `<option value="${esc(o.id)}" ${orgId === o.id ? 'selected' : ''}>${esc(o.name)} · ${esc(label(o.verification))} · ${esc(label(o.role))}</option>`).join('')}</select></label>` : ''}<div class="f-grid"><section class="f-card"><h2>Utwórz organizację</h2>${form('organization',input('name','Nazwa organizacji','','text','required maxlength="150"'),'Utwórz')}</section><section class="f-card"><h2>Dołącz z zaproszenia</h2>${form('accept-invite',input('token','Kod zaproszenia'),'Dołącz')}</section>${orgId ? `<section class="f-card"><h2>Zaproś współpracownika</h2>${form('invite', input('email','E-mail','','email') + select('role','Rola',['RECRUITER','HIRING_MANAGER','ADMIN']),'Utwórz kod zaproszenia',orgId)}</section>` : ''}${user.role === 'ADMIN' ? `<section class="f-card"><h2>Weryfikacja organizacji</h2>${form('verify-org',input('organizationId','Identyfikator organizacji',orgId) + area('note','Uzasadnienie weryfikacji','','required minlength="10"'),'Potwierdź weryfikację')}</section>` : ''}</div>${orgId ? `<p class="f-muted">Identyfikator wybranej organizacji: ${esc(orgId)}</p><a href="#restrictions/${esc(orgId)}">Ograniczenia i ręczne przywrócenie</a>` : ''}`;
       if (orgId && ['OWNER','ADMIN'].includes(organizations.find(o=>o.id===orgId)?.role ?? '')) {
         html+=reliabilityView(await api<Reliability>(`/organizations/${orgId}/reliability`));
         const {members} = await api<{members:Array<{user_id:string;email:string;role:string;active:number}>}>(`/organizations/${orgId}/members`);
@@ -379,4 +380,4 @@ window.addEventListener('offline',()=>notify('Jesteś offline. Zmiany wymagają 
 window.addEventListener('beforeunload',event=>{if(answerAutosave?.pending){event.preventDefault();event.returnValue='';}});
 window.addEventListener('pagehide',()=>{answerAutosave?.dispose();answerAutosave=null;controller.abort();clearInterval(timer);});
 if('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(()=>{});
-root.replaceChildren(); void bootstrap();
+root.replaceChildren(); void bootstrap(true);
