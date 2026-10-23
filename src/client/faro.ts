@@ -276,15 +276,15 @@ root.addEventListener('click', event => {
       if (action === 'preview' || action === 'interest-preview') {
         const p = await api<{projection:Projection;confirmationToken:string}>('/profile/preview-confirmation'); if (mine !== epoch) return;
         const previous=currentOffer?.ownInterest;
-        const content = `<h2>Tak wygląda Twój profil dla pracodawcy</h2>${projection(p.projection)}${action === 'interest-preview' ? form('interest',`<input type="hidden" name="confirmationToken" value="${esc(p.confirmationToken)}">`+check('projectionConfirmed','Potwierdzam udostępnienie powyższych danych w tej rekrutacji.')+(previous?`<input type="hidden" name="previousInterestId" value="${esc(previous.id)}">`+check('renewalConfirmed','Rozpoczynam nowy proces. Poprzednie zgłoszenie i historia pozostają zapisane.'):'') ,'Zgłoś zainteresowanie',id) : ''}`;
-        const dialog = document.createElement('dialog'); dialog.className='faro f-dialog'; dialog.innerHTML = `<div>${button('close-dialog','Zamknij')}${content}</div>`; root.append(dialog); dialog.showModal(); dialog.addEventListener('close',()=>dialog.remove(),{once:true}); return;
+        const content = `<h2 id="f-projection-title">Tak wygląda Twój profil dla pracodawcy</h2>${projection(p.projection)}${action === 'interest-preview' ? form('interest',`<input type="hidden" name="confirmationToken" value="${esc(p.confirmationToken)}">`+check('projectionConfirmed','Potwierdzam udostępnienie powyższych danych w tej rekrutacji.')+(previous?`<input type="hidden" name="previousInterestId" value="${esc(previous.id)}">`+check('renewalConfirmed','Rozpoczynam nowy proces. Poprzednie zgłoszenie i historia pozostają zapisane.'):'') ,'Zgłoś zainteresowanie',id) : ''}`;
+        const dialog = document.createElement('dialog'); dialog.className='faro f-dialog'; dialog.setAttribute('aria-labelledby','f-projection-title');dialog.innerHTML = `<div>${button('close-dialog','Zamknij')}${content}</div>`; root.append(dialog); dialog.showModal(); dialog.addEventListener('close',()=>{dialog.remove();if(el.isConnected&&!el.disabled)el.focus();},{once:true}); return;
       }
       if (action === 'close-dialog') { el.closest('dialog')?.close(); return; }
       if(action==='grant-phone') {
         const p=await api<{phone:string;confirmationToken:string}>(`/processes/${id}/phone-preview`);if(mine!==epoch)return;
         const dialog=document.createElement('dialog');dialog.className='faro f-dialog';dialog.setAttribute('aria-labelledby','f-phone-title');
         dialog.innerHTML=`<div>${button('close-dialog','Zamknij')}<h2 id="f-phone-title">Udostępnij telefon tej rekrutacji</h2><p>Pracodawca otrzyma numer: <strong>${esc(p.phone)}</strong></p><p>Możesz cofnąć dostęp. Zmiana numeru w profilu wycofa dotychczasowe zgody; nowy numer wymaga osobnego potwierdzenia.</p>${form('phone-grant',`<input type="hidden" name="confirmationToken" value="${esc(p.confirmationToken)}">`+check('phoneConfirmed','Potwierdzam udostępnienie powyższego numeru w tej rekrutacji.'),'Potwierdź udostępnienie',id)}</div>`;
-        root.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove(),{once:true});return;
+        root.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>{dialog.remove();if(el.isConnected&&!el.disabled)el.focus();},{once:true});return;
       }
       if(action==='revoke-phone')await api(`/processes/${id}/phone-grant`,'DELETE',{});
       if (action === 'read-phone') { const data = await api<{phone:string}>(`/processes/${id}/phone`); if (mine === epoch) notify(`Udostępniony numer: ${data.phone}`); return; }
@@ -360,7 +360,7 @@ root.addEventListener('submit', event => {
       if(action==='key-apply') {if(!keyDraft||keyDraft.id!==id)throw new Error('Najpierw wykonaj podgląd.');await api(`/assessments/${id}/versions/${keyDraft.version}/key-correction`,'POST',{reason:keyDraft.reason,acceptedOptions:keyDraft.acceptedOptions,previewToken:keyDraft.preview.token,confirmed:f.has('confirmed'),replaceIndividualAmendments:f.has('replaceIndividualAmendments'),idempotencyKey:crypto.randomUUID()});keyDraft=null;destination='attempts';}
       if (mine !== epoch) return;
       if(destination) navigate(destination); else { await render(); notify('Zapisano.'); }
-    } catch(e) { if(mine === epoch && (e as Error).name !== 'AbortError') { const message=el.querySelector('.f-form-message'); if(message) message.textContent=(e as Error).message; else notify((e as Error).message,true); } }
+    } catch(e) { if(mine === epoch && (e as Error).name !== 'AbortError') { const message=el.querySelector<HTMLElement>('.f-form-message'); if(message) {message.setAttribute('role','alert');message.setAttribute('aria-atomic','true');message.tabIndex=-1;message.textContent=(e as Error).message;if(fields)fields.disabled=false;message.focus();} else notify((e as Error).message,true); } }
     finally { if(fields) fields.disabled=false; }
   })();
 });

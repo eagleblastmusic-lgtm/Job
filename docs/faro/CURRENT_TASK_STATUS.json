@@ -1,6 +1,6 @@
 {
   "schemaVersion": "faro-current-task-status-v1",
-  "asOf": "2026-10-18",
+  "asOf": "2026-10-23",
   "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "latestEngineeringAcceptance": {
     "commit": "1e8d7041cbbfcf7551a91176bd98e92549f9ac3e",
@@ -503,16 +503,16 @@
       "requirement": "WCAG krytycznych ścieżek",
       "checkpoint": "CP08",
       "status": "EXTERNAL_BLOCKED",
-      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
-      "technicalEvidence": "faro.ts / faroViews.ts / faro.css; desktop/mobile/axe/session contracts"
+      "reason": "Technical keyboard/error/dialog/reflow controls extended with real-browser regressions; independent manual screen-reader/native-zoom/physical-mobile acceptance remains missing.",
+      "technicalEvidence": "REVIEW_ACCESSIBILITY.md; INDEPENDENT_READINESS_2026_10_23.md; e2e/faro-accessibility.spec.ts and existing critical flows; exact new CI pending"
     },
     {
       "id": "K063",
       "requirement": "Performance i obserwowalność",
       "checkpoint": "CP11",
       "status": "EXTERNAL_BLOCKED",
-      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
-      "technicalEvidence": "PostgreSQL/recovery/privacy/storage/runtime proofs; operational custody separate"
+      "reason": "Synthetic p95 proof and tested safe failure/invalid/stale signals implemented; production load/budget and actual alert delivery/owner acceptance remain unassigned.",
+      "technicalEvidence": "scripts/faro-performance-proof.mjs; real HTTP503 and privacy regression; REVIEW_OPERATIONS.md; native and SQLite evidence; exact new CI pending"
     },
     {
       "id": "K064",
@@ -583,8 +583,8 @@
       "requirement": "Regularny review rynku i jakości dowodów",
       "checkpoint": "CP12",
       "status": "EXTERNAL_BLOCKED",
-      "reason": "Real independent legal/research/expert/provider/production/operator evidence or accountable owner required; see external acceptance packet.",
-      "technicalEvidence": "External acceptance and canonical post-MVP register"
+      "reason": "Current primary-source market review cycle completed2026-10-23; accountable owner/cadence and regular process acceptance remain unassigned.",
+      "technicalEvidence": "MARKET_REVIEW_2026_10_23.md; dated primary-source observations, counterevidence, limitations; founder lock unchanged"
     },
     {
       "id": "K073",

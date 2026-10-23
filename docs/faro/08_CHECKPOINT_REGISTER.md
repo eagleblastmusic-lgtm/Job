@@ -1,5 +1,9 @@
 # CHECKPOINT REGISTER
 
+## K072/K062/K063 and review preparation — 2026-10-23
+
+[Execution/evidence](INDEPENDENT_READINESS_2026_10_23.md): current market review cycle, technical keyboard/error/modal/reflow fixes, actual performance signals and negative503 evidence; [all28 prepared review materials](REVIEW_HANDOFF_INDEX.md), decisions/owners unassigned. Statuses unchanged44/0/28/14. These outputs do not close missing external reviews; exact new suites/CI must be recorded before acceptance of changed code. No founder decision or independent acceptance criterion altered.
+
 ## Audit remediation — current override, 2026-10-18
 
 Confirmed001–004 are now FIXED_VERIFIED after exact1e8d704 FARO39166787707/CI39166787717 SUCCESS. [Remediation](FARO_AUDIT_REMEDIATION_2026.md) records causes/files/commits/counterproofs. Build/lint/typecheck/38 migrations,212 Node with zero skips/failures,52 SQLite browsers,42 native PostgreSQL browsers per Node22/24, real backup/restore/current authority, cleanup rollback and container smoke PASS. K039/K047/K048 bounded technical acceptance closes only on these new results; K077 technical OSRM closes while separate provider terms/data/retention stays EXTERNAL_BLOCKED.44 DONE/0 DELTA_REQUIRED/28 EXTERNAL_BLOCKED/14 DEFERRED are explicit reviewed classifications, validated without default DONE. Historical entries supply no independent production acceptance.

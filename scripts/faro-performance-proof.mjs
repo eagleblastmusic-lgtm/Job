@@ -7,11 +7,23 @@ import {pathToFileURL} from 'node:url';
 import {createFaroApp} from '../dist/server/faroApp.js';
 
 const policy=Object.freeze({version:'synthetic-read-load-v1',concurrency:4,requests:80,warmup:8,p95BudgetMs:2000,deadlineMs:10000});
+const routes=['/api/health','/api/me','/api/faro/profile','/api/faro/offers'];
+/** Local evaluation only: no delivery, credentials, identities, raw errors or production SLA. */
+export function performanceSignals(evidence,now=Date.now()){
+ const unknown=()=>({schema:'faro-performance-signals-v1',scope:'SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY',state:'UNKNOWN',codes:['EVIDENCE_INVALID'],delivery:'NOT_CONFIGURED',owner:'UNASSIGNED'});
+ if(!evidence||evidence.schema!=='faro-performance-evidence-v1'||evidence.scope!=='SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY'||!['sqlite','postgresql'].includes(evidence.backend)||!Number.isFinite(now)||!Number.isFinite(Date.parse(evidence.observedAt))||Date.parse(evidence.observedAt)>now+1000||!evidence.policy||JSON.stringify(Object.keys(evidence.policy).sort())!==JSON.stringify(Object.keys(policy).sort())||Object.entries(policy).some(([key,value])=>evidence.policy[key]!==value)||!Number.isSafeInteger(evidence.errors)||evidence.errors<0||!Array.isArray(evidence.measurements)||evidence.measurements.length!==routes.length)return unknown();
+ if(evidence.measurements.some(row=>!row||typeof row!=='object'||Array.isArray(row))||new Set(evidence.measurements.map(row=>row.route)).size!==routes.length||evidence.measurements.some(row=>!routes.includes(row.route)||row.n!==20||!['p50Ms','p95Ms','maxMs'].every(key=>Number.isFinite(row[key])&&row[key]>=0)||row.p50Ms>row.p95Ms||row.p95Ms>row.maxMs))return unknown();
+ const codes=[];
+ if(now-Date.parse(evidence.observedAt)>300000)codes.push('EVIDENCE_STALE');
+ if(evidence.errors>0)codes.push('REQUEST_FAILURE');
+ if(evidence.measurements.some(row=>row.p95Ms>policy.p95BudgetMs))codes.push('READ_P95_BUDGET');
+ return {schema:'faro-performance-signals-v1',scope:'SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY',backend:evidence.backend,state:codes.length?'ALERT':'OK',codes,delivery:'NOT_CONFIGURED',owner:'UNASSIGNED'};
+}
 /** Synthetic engineering threshold, never a production capacity/SLA or population measurement. */
 export async function provePerformance(base,cookie,backend){
  const origin=new URL(base);
  if(origin.protocol!=='http:'||origin.hostname!=='127.0.0.1'||!['sqlite','postgresql'].includes(backend))throw new Error('Disposable loopback performance scope required.');
- const routes=['/api/health','/api/me','/api/faro/profile','/api/faro/offers'],samples=new Map(routes.map(route=>[route,[]]));
+ const samples=new Map(routes.map(route=>[route,[]]));
  let errors=0,next=0;
  async function call(route,measured){
   const started=performance.now();
@@ -28,7 +40,7 @@ export async function provePerformance(base,cookie,backend){
  const passed=errors===0&&measurements.every(row=>row.n===20&&row.p95Ms<=policy.p95BudgetMs);
  const evidence={schema:'faro-performance-evidence-v1',scope:'SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY',backend,observedAt:new Date().toISOString(),node:process.version,
   policy,errors,elapsedMs:Number(elapsed.toFixed(3)),requestsPerSecond:Number((policy.requests*1000/elapsed).toFixed(3)),eventLoopP95Ms:Number((lag.percentile(95)/1000000).toFixed(3)),measurements,result:passed?'PASS':'FAIL'};
- console.log(JSON.stringify(evidence));
+ console.log(JSON.stringify(evidence));console.log(JSON.stringify(performanceSignals(evidence)));
  if(!passed)throw new Error('FARO_SYNTHETIC_PERFORMANCE_BUDGET_FAILED');
  return evidence;
 }

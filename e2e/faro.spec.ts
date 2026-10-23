@@ -16,6 +16,8 @@ async function login(page: Page, base: string, email: string) {
   await expect(page.locator('#f-content')).toHaveAttribute('aria-busy', 'false');
 }
 test('Faro real candidate and employer process, private watch, economics and responsive workspace', async ({ page }, info) => {
+  // This complete two-role journey has over 200 interactions plus snapshots and native DB teardown.
+  test.setTimeout(60_000);
   const f = process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture(); f.app.config.appOrigin = f.base;
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   const retired: string[] = []; page.on('request', r => { if (/\/api\/(cv|career-truth|billing|applications|job-search)/.test(r.url())) retired.push(r.url()); });
