@@ -39,6 +39,7 @@ async function api<T>(path: string, method = 'GET', body?: unknown, signal = con
     throw new Error(navigator.onLine ? 'Nie można połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie.' : 'Jesteś offline. Zmiany wymagają połączenia z serwerem.');
   }
   const data = await r.json() as T & { error?: { message?: string; code?: string } };
+  if(signal.aborted)throw new DOMException('Żądanie anulowane.','AbortError');
   if (r.status === 401 && data?.error?.code !== 'REAUTH_FAILED') { loggedOut(); $('#authMessage').textContent='Sesja wygasła. Zaloguj się ponownie.'; throw new Error('Sesja wygasła. Zaloguj się ponownie.'); }
   if(data?.error?.code==='MFA_REQUIRED') {keyDraft=null;compared.clear();offers=[];currentOffer=null;currentProcess=null;currentAttempt=null;navigate('security');}
   if (!r.ok) throw Object.assign(new Error(data?.error?.message ?? `Błąd ${r.status}`),{status:r.status,code:data?.error?.code});
@@ -370,7 +371,7 @@ document.querySelectorAll<HTMLElement>('[data-auth-tab]').forEach(tab=>tab.addEv
 }));
 for(const id of ['loginForm','registerForm']) $<HTMLFormElement>(`#${id}`).addEventListener('submit',event=>{
   event.preventDefault(); const el=event.currentTarget as HTMLFormElement, f=new FormData(el), submit=el.querySelector<HTMLButtonElement>('button[type=submit]')!;
-  if(submit.disabled)return; submit.disabled=true; $('#authMessage').textContent='Trwa logowanie…';
+  if(submit.disabled)return;epoch++;controller.abort();controller=new AbortController();submit.disabled=true; $('#authMessage').textContent='Trwa logowanie…';
   void (async()=>{try{await api(`/api/auth/${id==='loginForm'?'login':'register'}`,'POST',{email:value(f,'email'),password:value(f,'password'),name:value(f,'name'),acceptTerms:f.has('acceptTerms'),acceptPrivacy:f.has('acceptPrivacy'),analyticsConsent:f.has('analyticsConsent')}); el.reset(); $('#authMessage').textContent=''; await bootstrap();}catch(e){$('#authMessage').textContent=(e as Error).message;}finally{submit.disabled=false;}})();
 });
 window.addEventListener('hashchange',()=>{if(user)void render();});

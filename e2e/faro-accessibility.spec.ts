@@ -14,11 +14,11 @@ async function tabTo(page:Page,target:Locator,backwards=false){
   }
   throw new Error('Keyboard target unreachable within bounded traversal');
 }
-async function keyboardLogin(page:Page,base:string,email:string){
+async function keyboardLogin(page:Page,base:string,email:string,settle=true){
   await page.goto(base);await tabTo(page,page.locator('#loginForm [name=email]'));await page.keyboard.type(email);
   await page.keyboard.press('Tab');await expect(page.locator('#loginForm [name=password]')).toBeFocused();await page.keyboard.type('Bezpieczne123');
   await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'Zaloguj się',exact:true})).toBeFocused();await page.keyboard.press('Enter');
-  await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');await expect(page.locator('#f-content')).toBeFocused();
+  if(settle){await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');await expect(page.locator('#f-content')).toBeFocused();}
 }
 async function keyboardLink(page:Page,name:string){await tabTo(page,page.getByRole('link',{name,exact:true}),true);await page.keyboard.press('Enter');await expect(page.locator('#f-content')).toBeFocused();}
 
@@ -53,6 +53,9 @@ test('K062: employer keyboard role switch, offer editor and 320 CSS-pixel reflow
     // Text scaling is a separate injected stylesheet, not a claim of native browser zoom/AT testing.
     await page.setViewportSize({width:320,height:880});
     await page.addStyleTag({content:'.faro {font-size:30px !important;line-height:1.6 !important}.faro label {font-size:28px !important}.faro h1 {font-size:50px !important}.faro h2 {font-size:46px !important}'});
+    const clipped=await page.locator('.faro input:not([type=checkbox]):not([type=radio]),.faro select').evaluateAll(fields=>fields.filter(field=>{const r=field.getBoundingClientRect(),s=getComputedStyle(field);return r.width>0&&r.height>0&&r.height+.5<parseFloat(s.fontSize)+parseFloat(s.paddingTop)+parseFloat(s.paddingBottom)+parseFloat(s.borderTopWidth)+parseFloat(s.borderBottomWidth);}).map(field=>field.getAttribute('name')??field.id));
+    expect(clipped).toEqual([]);
+    await page.locator('.f-header').screenshot({path:info.outputPath('header-textscale.png')});
     await info.attach('offer-reflow',{body:await page.screenshot({path:info.outputPath('offer-reflow.png'),fullPage:true}),contentType:'image/png'});
     const overflow=await page.evaluate(()=>Array.from(document.querySelectorAll('.faro *')).filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&(r.right>innerWidth+1||r.left<0)&&!el.closest('.f-nav');}).map(el=>({tag:el.tagName,cls:el.className,text:el.textContent?.slice(0,80)})));
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify(overflow)).toBe(true);
@@ -86,4 +89,22 @@ test('K062: projection dialog has an accessible name, contains keyboard focus an
     await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
     expect((await f.request<{processes:unknown[]}>('/api/faro/processes',candidate.cookie)).processes).toHaveLength(0);
   }finally{await page.goto('about:blank');await f.close();}
+});
+
+test('K062: a delayed anonymous session read cannot erase a newer successful keyboard login',async({page})=>{
+  const f=process.env.FARO_PG_BROWSER==='1'?await faroPgFixture():await faroFixture();f.app.config.appOrigin=f.base;
+  let release=()=>{},releaseCurrent=()=>{};const held=new Promise<void>(resolve=>{release=resolve;}),heldCurrent=new Promise<void>(resolve=>{releaseCurrent=resolve;});let first=true,anonymousStatus=0,authenticatedStatus=0,released=false;
+  try{
+    const candidate=await f.user('KeyboardRaceCandidate');await f.request('/api/faro/profile',candidate.cookie,'PUT',{firstName:'Anna',expectedVersion:0,availability:{kind:'IMMEDIATE'}});
+    await page.route('**/api/me',async route=>{
+      const initial=first;first=false;const response=await route.fetch();
+      if(initial){anonymousStatus=response.status();await held;}else{authenticatedStatus=response.status();await heldCurrent;}
+      try{await route.fulfill({response});}catch{/* Either delayed request can be aborted by session replacement. */}finally{if(initial)released=true;}
+    });
+    await keyboardLogin(page,f.base,candidate.email,false);await expect.poll(()=>authenticatedStatus).toBe(200);expect(anonymousStatus).toBe(401);release();await expect.poll(()=>released).toBe(true);
+    await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    releaseCurrent();await expect(page.locator('#f-content')).toHaveAttribute('aria-busy','false');
+    await keyboardLink(page,'Profil');await expect(page.locator('[data-form=profile] [name=firstName]')).toHaveValue('Anna');
+    await expect(page.locator('#authView')).toBeHidden();
+  }finally{release();releaseCurrent();await page.goto('about:blank');await f.close();}
 });

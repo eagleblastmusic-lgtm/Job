@@ -1,0 +1,261 @@
+{
+  "schemaVersion": "faro-independent-readiness-evidence-v1",
+  "asOf": "2026-10-23",
+  "baseline": "24be6a36ffe23d0c283c9071900fd22f0a483e23",
+  "implementationCommit": "97da106f5db5be060ebe88e58c6cd2c3ae4186f1",
+  "scope": "Synthetic disposable local/CI; primary-source research and prepared review material; no external acceptance",
+  "classification": {
+    "DONE": 44,
+    "DELTA_REQUIRED": 0,
+    "EXTERNAL_BLOCKED": 28,
+    "DEFERRED": 14
+  },
+  "reviewMaterials": {
+    "count": 28,
+    "decisions": null,
+    "owners": "UNASSIGNED",
+    "returnedEvidence": [],
+    "validation": "PASS"
+  },
+  "local": {
+    "node": "v24.19.0",
+    "postgres": "18.6",
+    "build": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "migrations": 38,
+    "nodeTests": 213,
+    "nodeFail": 0,
+    "nodeSkip": 0,
+    "keyboardTargeted": 8,
+    "sqliteBrowser": 58,
+    "nativeRehearsalRestore": "PASS",
+    "nativeInitialBrowser": "FAIL:30s full journey deadline during final screenshot/cleanup; assertions throughline216 passed; one journey given60s, assertions unchanged",
+    "nativeFinalBrowser": "48/48 PASS on earlier97da106 stage after journey timeout correction",
+    "nativeInitialClusterCleanup": "PASS",
+    "nativeFinalClusterCleanup": "PASS STOPPED/CLEANUP_PASS",
+    "screenReader": "NOT_TESTED",
+    "nativeBrowserZoom": "NOT_TESTED",
+    "physicalMobile": "NOT_TESTED",
+    "alertDelivery": "NOT_CONFIGURED",
+    "productionLoadOwner": "UNASSIGNED",
+    "finalLoginRaceCounterproof": "FAIL desktop/mobile before fix; PASS both after context cancellation fix",
+    "finalTextScale": "PASS scoped automatic field height, content/padding/border assertion and visual desktop/mobile header verification",
+    "visualProof": [
+      "FARO_K062_TEXTSCALE_MOBILE_20261023.png",
+      "FARO_K062_TEXTSCALE_DESKTOP_20261023.png"
+    ]
+  },
+  "performance": [
+    {
+      "schema": "faro-performance-evidence-v1",
+      "scope": "SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY",
+      "backend": "sqlite",
+      "observedAt": "2026-10-23T16:02:49.205Z",
+      "node": "v24.19.0",
+      "policy": {
+        "version": "synthetic-read-load-v1",
+        "concurrency": 4,
+        "requests": 80,
+        "warmup": 8,
+        "p95BudgetMs": 2000,
+        "deadlineMs": 10000
+      },
+      "errors": 0,
+      "elapsedMs": 131.546,
+      "requestsPerSecond": 608.154,
+      "eventLoopP95Ms": 10.732,
+      "measurements": [
+        {
+          "route": "/api/health",
+          "n": 20,
+          "p50Ms": 14.541,
+          "p95Ms": 21.075,
+          "maxMs": 26.653
+        },
+        {
+          "route": "/api/me",
+          "n": 20,
+          "p50Ms": 3.104,
+          "p95Ms": 6.515,
+          "maxMs": 7.959
+        },
+        {
+          "route": "/api/faro/profile",
+          "n": 20,
+          "p50Ms": 3.103,
+          "p95Ms": 6.346,
+          "maxMs": 8.333
+        },
+        {
+          "route": "/api/faro/offers",
+          "n": 20,
+          "p50Ms": 3.496,
+          "p95Ms": 6.742,
+          "maxMs": 8.866
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "schema": "faro-performance-evidence-v1",
+      "scope": "SYNTHETIC_DISPOSABLE_LOOPBACK_ONLY",
+      "backend": "postgresql",
+      "observedAt": "2026-10-23T16:13:34.574Z",
+      "node": "v24.19.0",
+      "policy": {
+        "version": "synthetic-read-load-v1",
+        "concurrency": 4,
+        "requests": 80,
+        "warmup": 8,
+        "p95BudgetMs": 2000,
+        "deadlineMs": 10000
+      },
+      "errors": 0,
+      "elapsedMs": 425.943,
+      "requestsPerSecond": 187.819,
+      "eventLoopP95Ms": 10.281,
+      "measurements": [
+        {
+          "route": "/api/health",
+          "n": 20,
+          "p50Ms": 12.43,
+          "p95Ms": 19.62,
+          "maxMs": 20.317
+        },
+        {
+          "route": "/api/me",
+          "n": 20,
+          "p50Ms": 20.197,
+          "p95Ms": 25.048,
+          "maxMs": 25.424
+        },
+        {
+          "route": "/api/faro/profile",
+          "n": 20,
+          "p50Ms": 23.26,
+          "p95Ms": 26.832,
+          "maxMs": 28.962
+        },
+        {
+          "route": "/api/faro/offers",
+          "n": 20,
+          "p50Ms": 26.058,
+          "p95Ms": 31.283,
+          "maxMs": 32.211
+        }
+      ],
+      "result": "PASS"
+    }
+  ],
+  "ci": {
+    "faroRun": "39986251894",
+    "generalRun": "39986251395",
+    "status": "SUCCESS first97da106; follow-up session-race/text-height fix requires new exact CI",
+    "firstRunFlaky": "One PG22 open-answer login retry; deterministic counterproof/fix added, not accepted as no-issue"
+  },
+  "remaining": "Independent legal/AI/privacy/assessment/user/manual-AT/security/production/provider/operator owners and decisions remain missing",
+  "staging": "No new deployment in this continuation; last accepted1e8d704",
+  "logHashes": [
+    {
+      "file": "build-final.log",
+      "sha256": "bdc496d0fb7bbe392372829218c730dbc63b85339ebead58c0462018154459cd"
+    },
+    {
+      "file": "build-latest.log",
+      "sha256": "bdc496d0fb7bbe392372829218c730dbc63b85339ebead58c0462018154459cd"
+    },
+    {
+      "file": "build.log",
+      "sha256": "bdc496d0fb7bbe392372829218c730dbc63b85339ebead58c0462018154459cd"
+    },
+    {
+      "file": "ci-faro-97da106.log",
+      "sha256": "74b00583741603443e7bd438d2be1aad4044aeeedb28f72b3e1fd043c9998642"
+    },
+    {
+      "file": "ci-faro-watch.log",
+      "sha256": "b81d3fe467727029bb5a7d40fee1de08e8017fc945b66bc3fa3f594c36a4b3ae"
+    },
+    {
+      "file": "ci-general-97da106.log",
+      "sha256": "70368806bd301d94ed3e7dff8849ae79e7637aaab815a60e9f06f210b71e1137"
+    },
+    {
+      "file": "ci-general-watch.log",
+      "sha256": "76263b28cf13ee87456db1b27df77c4335904ecd567530b00d77d64849d100fe"
+    },
+    {
+      "file": "impeccable-detector.log",
+      "sha256": "5911d89d3ecae6a38f69dd3f9a75105a42e7849f22365943bb976595a1177d90"
+    },
+    {
+      "file": "k062-before.log",
+      "sha256": "ebfa4dfc4baca6ce9cd148e7e05301dfbc9a4e72e9e06f7c537a4182ffc65444"
+    },
+    {
+      "file": "k062-final.log",
+      "sha256": "39358115ede788dee485ce1f6b62cf81965bd66f735e921ea4f6cc746b68c879"
+    },
+    {
+      "file": "k062-fix.log",
+      "sha256": "48c5662c614012be6edafa6460388ab7e74d59624b0f0d6a532549b2623f4d55"
+    },
+    {
+      "file": "k062-latest.log",
+      "sha256": "6954672eb86004111860fe821fd8b818270e695b0362820bd5467b56b0e8848e"
+    },
+    {
+      "file": "k063-signals.log",
+      "sha256": "28c77c2955b427f57a757338cc49e8fb786cd9dc1d6d352b09011c8bf5f7b5a9"
+    },
+    {
+      "file": "k063-sqlite.log",
+      "sha256": "250712cfd4350a3c7477d059ca824febbe1600193cf61872b6aacd291f4bd9a8"
+    },
+    {
+      "file": "lint-latest.log",
+      "sha256": "19d77478f8609a76178226cfb448d72964c72b0ce96f95172a7cc3f04e16b7f4"
+    },
+    {
+      "file": "lint.log",
+      "sha256": "19d77478f8609a76178226cfb448d72964c72b0ce96f95172a7cc3f04e16b7f4"
+    },
+    {
+      "file": "login-race-after-render-control.log",
+      "sha256": "9d6dfddd7c5f1aa421408418bef57f5d564800315c26992f55eeb6649e92e3fd"
+    },
+    {
+      "file": "login-race-before.log",
+      "sha256": "7e8b8e379a2b1ff95089f8eeca4153b65d4c14a402ff48f8de6bd7ca1a096e07"
+    },
+    {
+      "file": "migrations.log",
+      "sha256": "09260a44c5a3c7c06222ea131edd6734a63e8bbbc84e7d4ffd6cd228ea11382f"
+    },
+    {
+      "file": "node-full.log",
+      "sha256": "2bb5e47594bdb65e6c3921a251b9959fb14e862da5b43cda43b6127782410c87"
+    },
+    {
+      "file": "postgres-browser-final.log",
+      "sha256": "1611b592bc23ad0a055908f9e270cacef679cdec070d57cd6a5e17a1faea2c34"
+    },
+    {
+      "file": "postgres-full.log",
+      "sha256": "f745e576ce0d6b8b09d2d12fea127b99598954f2b1991f2c14ed3328ee7e0e0e"
+    },
+    {
+      "file": "sqlite-browser-final.log",
+      "sha256": "b07e6a8b00d1dd6a86de24f47eaee69b4e0acd05ce69fcb312282e52a41391d8"
+    },
+    {
+      "file": "typecheck-latest.log",
+      "sha256": "07a95e07a32bb13ddfbc3ce6b1009f67d68f29ad9e81f828eb42726195d1ab87"
+    },
+    {
+      "file": "typecheck.log",
+      "sha256": "07a95e07a32bb13ddfbc3ce6b1009f67d68f29ad9e81f828eb42726195d1ab87"
+    }
+  ]
+}

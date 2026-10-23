@@ -17,6 +17,7 @@
 .faro input[type=checkbox],.faro input[type=radio] { width: 24px; height: 24px; min-width: 24px; max-width: 24px; min-height: 24px; padding: 0; margin: 0; flex-shrink: 0; accent-color: var(--f-gold); }
 .faro textarea { resize: vertical; } .faro label { display: block; color: var(--f-muted); font-size: 14px; }
 .faro input:not([type=checkbox]):not([type=radio]) { color: var(--f-text); background: #0d1525; border-color: var(--f-border); }
+.faro input:not([type=checkbox]):not([type=radio]),.faro select { height: auto; }
 .faro .f-check { display: flex; align-items: flex-start; gap: 10px; min-width: 0; min-height: 44px; overflow-wrap: anywhere; }
 .faro fieldset { min-width: 0; border: 0; padding: 0; margin: 0; background: transparent; }
 .faro fieldset legend { color: var(--f-text); }

@@ -9,6 +9,7 @@
 | Przepływ | Właściwość sprawdzana | Ograniczenie |
 |---|---|---|
 |Login kandydata i powrót do workspace|Kolejność Tab, rzeczywiste Enter, focus po zakończeniu odczytu, outline i brak zasłonięcia punktu centralnego|Nie mierzy odsłuchu czytnika ani wszystkich wariantów przeglądarki.|
+|Opóźnione anonymous401 podczas nowego login/GET200|Rzeczywiste odpowiedzi starej sesji nie usuwają nowej; pending request cancellation/epoch, brak osłabienia bieżącego401|Deterministyczna kolejność jest wstrzyknięta przez opóźnienie realnych odpowiedzi, bez podmiany body/status sukcesu.|
 |Profil → realny server400 → poprawka i zapis|Używalna klawiaturą ścieżka błędu; komunikat role=alert, atomic, fokusowany; następnie poprawny zapis|Generyczny błąd serwera nie jest mapowany na konkretne pole bez dowodu. Nie oznaczono wszystkich pól jako invalid.|
 |Disclosure kompetencji, własna prywatność/eksport|Enter otwiera details, role/name kontrolek, brak pułapki klawiaturowej, axe|Badanie rozumienia informacji pozostaje K007.|
 |Przestrzeń pracodawcy, edytor oferty i organizacja|Zmiana natywnego select klawiaturą; reflow320 CSSpx i powiększony tekst; brak poziomego overflow dokumentu|320 CSSpx to odpowiednik reflow desktop1280 przy400%; nie wykonano natywnego zoom400%. Powiększenie tekstu przez CSS jest jawnie technicznym przybliżeniem200%.|
@@ -17,7 +18,7 @@
 
 Dowody i ostateczne wyniki poleceń: INDEPENDENT_READINESS_2026_10_23.md oraz evidence/independent-readiness-20261023. Wcześniejszy failing run z24be6a3 jest zachowany jako dowód błędu formularza. Reflow z powiększonym tekstem odtworzył overflow f-session; modalny flow wykazał utratę focusu po Escape, ponieważ wywołujący przycisk był czasowo disabled przy otwieraniu. Nie wyłączono reguł axe.
 
-Poprawki ograniczone do przyczyny: fokusowany error alert, aria-labelledby dialogu projekcji, jawny powrót focusu do nadal istniejącego aktywnego triggera w obu modalach, zawijanie sesji/nazw w wąskim widoku. Public-shell cachev3 dostarcza aktualny klient/CSS; API/odpowiedzi nadal nie są trwałym cache.
+Poprawki ograniczone do przyczyny: fokusowany error alert, aria-labelledby dialogu projekcji, jawny powrót focusu do nadal istniejącego aktywnego triggera w obu modalach, zawijanie sesji/nazw w wąskim widoku. Wizualne sprawdzenie zrzutu powiększonego tekstu ujawniło także odziedziczoną wysokość44px input/select obcinającą litery; scoped height:auto zachowuje min-height44px i skaluje pole do treści. Test kontroluje wysokość fontu+padding+border, nie tylko szerokość dokumentu. Public-shell cachev3 dostarcza aktualny klient/CSS; API/odpowiedzi nadal nie są trwałym cache.
 
 ## Gotowy protokół manualny recenzenta
 
