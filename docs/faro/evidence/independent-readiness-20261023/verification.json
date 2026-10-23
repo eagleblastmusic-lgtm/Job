@@ -2,7 +2,7 @@
   "schemaVersion": "faro-independent-readiness-evidence-v1",
   "asOf": "2026-10-23",
   "baseline": "24be6a36ffe23d0c283c9071900fd22f0a483e23",
-  "implementationCommit": "97da106f5db5be060ebe88e58c6cd2c3ae4186f1",
+  "implementationCommit": "6fae8e72acd982494af6e1d19000454591952687",
   "scope": "Synthetic disposable local/CI; primary-source research and prepared review material; no external acceptance",
   "classification": {
     "DONE": 44,
@@ -15,7 +15,7 @@
     "decisions": null,
     "owners": "UNASSIGNED",
     "returnedEvidence": [],
-    "validation": "PASS"
+    "validation": "PASS exact28 IDs/titles/material files and null owner/reviewer/decision;21 local document links"
   },
   "local": {
     "node": "v24.19.0",
@@ -27,8 +27,8 @@
     "nodeTests": 213,
     "nodeFail": 0,
     "nodeSkip": 0,
-    "keyboardTargeted": 8,
-    "sqliteBrowser": 58,
+    "keyboardTargeted": 10,
+    "sqliteBrowser": 62,
     "nativeRehearsalRestore": "PASS",
     "nativeInitialBrowser": "FAIL:30s full journey deadline during final screenshot/cleanup; assertions throughline216 passed; one journey given60s, assertions unchanged",
     "nativeFinalBrowser": "48/48 PASS on earlier97da106 stage after journey timeout correction",
@@ -43,8 +43,13 @@
     "finalTextScale": "PASS scoped automatic field height, content/padding/border assertion and visual desktop/mobile header verification",
     "visualProof": [
       "FARO_K062_TEXTSCALE_MOBILE_20261023.png",
-      "FARO_K062_TEXTSCALE_DESKTOP_20261023.png"
-    ]
+      "FARO_K062_TEXTSCALE_DESKTOP_20261023.png",
+      "FARO_UI_TEXTSCALE_MOBILE_20261023.png",
+      "FARO_UI_TEXTSCALE_DESKTOP_20261023.png"
+    ],
+    "finalAnonymousProbe": "FAIL desktop/mobile before fix; PASS both after preserving input on initial anonymous401",
+    "finalEntryAndFilter": "PASS initial offers route, native skip-link and checked filter after real keyboard submit",
+    "finalFocus": "PASS strict full viewport/outline/hit assertion, desktop24px scroll margin, mobile100px forms"
   },
   "performance": [
     {
@@ -149,13 +154,75 @@
     }
   ],
   "ci": {
-    "faroRun": "39986251894",
-    "generalRun": "39986251395",
-    "status": "SUCCESS first97da106; follow-up session-race/text-height fix requires new exact CI",
-    "firstRunFlaky": "One PG22 open-answer login retry; deterministic counterproof/fix added, not accepted as no-issue"
+    "commit": "6fae8e72acd982494af6e1d19000454591952687",
+    "faroRun": 39993852956,
+    "faroConclusion": "SUCCESS",
+    "faroAttempt": 2,
+    "firstAttempt": "CANCELLED at10min during slow Azure Ubuntu mirror downloads, before PG22 browser tests; all other jobs SUCCESS",
+    "ciRun": 39993852858,
+    "ciConclusion": "SUCCESS",
+    "node": 213,
+    "sqliteBrowser": 62,
+    "postgres24Browser": 52,
+    "postgres22Browser": 52,
+    "testCriteriaWeakened": false,
+    "flaky": 0,
+    "testRetries": 0,
+    "backupActualRestore": "PASS",
+    "currentAuthority": "PASS",
+    "imageSmoke": "PASS",
+    "migrations": 38,
+    "metadataSha256": "1a107df18ee43a62e40a281fdcac15463c78eda2f0eefec078edea9af2cad320"
   },
   "remaining": "Independent legal/AI/privacy/assessment/user/manual-AT/security/production/provider/operator owners and decisions remain missing",
-  "staging": "No new deployment in this continuation; last accepted1e8d704",
+  "staging": {
+    "schemaVersion": "faro-staging-rollout-v1",
+    "asOf": "2026-10-23",
+    "deployment": "dep-dbdppgt9fdbs7388a2l0",
+    "commit": "6fae8e72acd982494af6e1d19000454591952687",
+    "status": "live",
+    "finishedAt": "2026-10-23T17:44:44.196215Z",
+    "resource": "srv-db3pb9rncjis73banf90",
+    "workspace": "tea-dadn9u2d0e5s73dkborg",
+    "url": "https://faro-free-staging.onrender.com",
+    "servicePlan": "free",
+    "databasePlan": "free",
+    "logs": [
+      {
+        "timestamp": "2026-10-23T17:44:38.008905143Z",
+        "instance": "srv-db3pb9rncjis73banf90-j8brx",
+        "message": "FARO_FREE_STAGING_ACTIVITY_PRACTICE_ALREADY_CURRENT; additive nullable column only."
+      },
+      {
+        "timestamp": "2026-10-23T17:44:38.009010782Z",
+        "instance": "srv-db3pb9rncjis73banf90-j8brx",
+        "message": "FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no data migration or reset."
+      },
+      {
+        "timestamp": "2026-10-23T17:44:38.012337525Z",
+        "instance": "srv-db3pb9rncjis73banf90-j8brx",
+        "message": "FARO_FREE_STAGING_PRIVATE_FILES_ZERO; no referenced private upload can be lost by this deployment."
+      },
+      {
+        "timestamp": "2026-10-23T17:44:39.907151173Z",
+        "instance": "srv-db3pb9rncjis73banf90-j8brx",
+        "message": "Job działa na https://faro-free-staging.onrender.com (port 10000)."
+      }
+    ],
+    "smoke": "PASS",
+    "retainedAccountOriginalSessionChangedConsentFreshLoginOwnExport": "PASS",
+    "cleanup": "PASS",
+    "publicStaticAssets": "7/7 exact accepted-build match, text line endings normalized, PNG binary exact",
+    "autoDeploy": "off",
+    "newResources": 0,
+    "configurationChanges": 0,
+    "release": "NOT_ACCEPTED",
+    "recruitmentGate": "503 RELEASE_GATES_OPEN",
+    "rollbackUsed": false,
+    "preflight": "staging-preflight.json",
+    "databaseExternalAccess": "unchanged empty IP allowlist; hosted SQL read refused, startup emitted fresh PRIVATE_FILES_ZERO",
+    "productionReady": false
+  },
   "logHashes": [
     {
       "file": "build-final.log",
@@ -170,12 +237,44 @@
       "sha256": "bdc496d0fb7bbe392372829218c730dbc63b85339ebead58c0462018154459cd"
     },
     {
+      "file": "ci-faro-6fae8e7-attempt1.log",
+      "sha256": "766c484128aba5c25ea0999b556b649b6f2f007fc73494540707df6a2e4cf60b"
+    },
+    {
+      "file": "ci-faro-6fae8e7-attempt2-watch.log",
+      "sha256": "97956cceadf73a23ce2034c0a03d4343383c8f90b0e37af9ab94739c919ad9c9"
+    },
+    {
+      "file": "ci-faro-6fae8e7-watch.log",
+      "sha256": "d30f23d44478e460a1fcb59c18403d96cf4049a231ddbc1c7f5952acd7b636b9"
+    },
+    {
+      "file": "ci-faro-6fae8e7.log",
+      "sha256": "b52b938e774fefda1d4fd026e3b3f15916ca81e23413bf8018b2eeabef8834fa"
+    },
+    {
+      "file": "ci-faro-94b7bc2.log",
+      "sha256": "c98b15a2756ef09f92b97e379ab8c252a93a5adfab1db1a2298f2ab6d7cf6748"
+    },
+    {
       "file": "ci-faro-97da106.log",
       "sha256": "74b00583741603443e7bd438d2be1aad4044aeeedb28f72b3e1fd043c9998642"
     },
     {
       "file": "ci-faro-watch.log",
       "sha256": "b81d3fe467727029bb5a7d40fee1de08e8017fc945b66bc3fa3f594c36a4b3ae"
+    },
+    {
+      "file": "ci-general-6fae8e7-watch.log",
+      "sha256": "2c35290c0375f467d568723179dbd7ee0111855ce70e524aea119d2199b1f9bf"
+    },
+    {
+      "file": "ci-general-6fae8e7.log",
+      "sha256": "bb4f0595324965384456a1b9ff1b606629dd3ef0a7458f5054d0c8f38d56d856"
+    },
+    {
+      "file": "ci-general-94b7bc2.log",
+      "sha256": "5e950dc90127cfd37cb27b104c8df80361c37844ba658358da38a5503b442405"
     },
     {
       "file": "ci-general-97da106.log",
@@ -186,8 +285,20 @@
       "sha256": "76263b28cf13ee87456db1b27df77c4335904ecd567530b00d77d64849d100fe"
     },
     {
+      "file": "ci-pg22-install-diagnostic.log",
+      "sha256": "00218e0ac1ef6f4f247aff23bc68712f0fcea1e9184309405e5cbbc9d56d5bfb"
+    },
+    {
+      "file": "cleanup-final.log",
+      "sha256": "146265489f1ed9ad9f8afcf8546f184de2e55db2c8f4b0b5a2b5d2ca96f8a8d5"
+    },
+    {
       "file": "impeccable-detector.log",
       "sha256": "5911d89d3ecae6a38f69dd3f9a75105a42e7849f22365943bb976595a1177d90"
+    },
+    {
+      "file": "impeccable-visual-detector.log",
+      "sha256": "640fd70e14b9cebd4bed9c4cfbbce1123a721000568e11e51f56ac9e59e3beea"
     },
     {
       "file": "k062-before.log",
@@ -204,6 +315,10 @@
     {
       "file": "k062-latest.log",
       "sha256": "6954672eb86004111860fe821fd8b818270e695b0362820bd5467b56b0e8848e"
+    },
+    {
+      "file": "k062-visual-final.log",
+      "sha256": "100a483f62cbf2a9e239b88f7638e5694b9076e4c427889a4caf38a296d56b97"
     },
     {
       "file": "k063-signals.log",
@@ -238,6 +353,10 @@
       "sha256": "2bb5e47594bdb65e6c3921a251b9959fb14e862da5b43cda43b6127782410c87"
     },
     {
+      "file": "node-visual.log",
+      "sha256": "851e3d6750104f761057090e7ebe588526f3f0ae0a3bc0043a1a00e5e9802f73"
+    },
+    {
       "file": "postgres-browser-final.log",
       "sha256": "1611b592bc23ad0a055908f9e270cacef679cdec070d57cd6a5e17a1faea2c34"
     },
@@ -246,8 +365,24 @@
       "sha256": "f745e576ce0d6b8b09d2d12fea127b99598954f2b1991f2c14ed3328ee7e0e0e"
     },
     {
+      "file": "scope-final.log",
+      "sha256": "3e380804a9d0a77c1927cdf62b05cc76029091b74ce8b3323762213328ce3897"
+    },
+    {
+      "file": "sqlite-browser-6fae8e7.log",
+      "sha256": "d71160ee220eb3edd6ff3a785c21f2c3062334d2ab8cf3d0dfea1147460ac562"
+    },
+    {
       "file": "sqlite-browser-final.log",
       "sha256": "b07e6a8b00d1dd6a86de24f47eaee69b4e0acd05ce69fcb312282e52a41391d8"
+    },
+    {
+      "file": "sqlite-browser-visual.log",
+      "sha256": "e80f892a17016de4209956194ed058a6dee9b4f5b3ca16ce705e81ba3d65a92f"
+    },
+    {
+      "file": "staging-smoke.log",
+      "sha256": "be4ef38b8528ef29220c7b478a6cb284069c1f764553a2b0e11eb8026bf50f61"
     },
     {
       "file": "typecheck-latest.log",
@@ -256,6 +391,251 @@
     {
       "file": "typecheck.log",
       "sha256": "07a95e07a32bb13ddfbc3ce6b1009f67d68f29ad9e81f828eb42726195d1ab87"
+    },
+    {
+      "file": "typing-focus-before.log",
+      "sha256": "0c2b31634f7bd06c900e1cd3f764849c16a9cbb244bf11d31a30c83e0a73159b"
+    },
+    {
+      "file": "visual-corrected.log",
+      "sha256": "59c07b251b78a33da9c44fa328589639859b2e1efdc74438a3c98bffcf3b3cda"
+    },
+    {
+      "file": "visual-final.log",
+      "sha256": "ec41f7af1078b0e83074779aae624e77f7b0e47e79fc11c20acf8ae1499f5aaf"
+    },
+    {
+      "file": "visual-walkthrough.log",
+      "sha256": "b604198dde16e5fafdb526a0a3d64f53d051d84c6cd09d179f9b1852bcef9fc0"
+    }
+  ],
+  "implementationCommits": [
+    "97da106f5db5be060ebe88e58c6cd2c3ae4186f1",
+    "94b7bc2257f45783243e5a7f76b9522cfb8883ca",
+    "6fae8e72acd982494af6e1d19000454591952687"
+  ],
+  "visual": {
+    "report": "UI_POLISH_2026_10_23.md",
+    "viewports": [
+      320,
+      390,
+      900,
+      1440
+    ],
+    "scope": "synthetic disposable Chromium, both configured projects; no physical-mobile or native-AT claim",
+    "files": [
+      {
+        "file": "faro-visual-before/detail-1440.png",
+        "bytes": 259155,
+        "sha256": "acc9c24794bf64cc20e8b49299649fabf8841fcbf4802a209c8ef95d5d5b76fe"
+      },
+      {
+        "file": "faro-visual-before/detail-320.png",
+        "bytes": 83476,
+        "sha256": "53bbfd2dba4701f0cc677efd4c97f66a4260a83f9d9d10166dd4ce7f6329add7"
+      },
+      {
+        "file": "faro-visual-before/detail-390.png",
+        "bytes": 95081,
+        "sha256": "952a86efb9324a2a91b112abc886917a1be4a744d207eee03ad3dcc4b011ef4e"
+      },
+      {
+        "file": "faro-visual-before/detail-900.png",
+        "bytes": 192205,
+        "sha256": "22697babf70aca37d42c11f552e5d818a95b4d259017701c39cc927a5adc7455"
+      },
+      {
+        "file": "faro-visual-before/empty-1440.png",
+        "bytes": 180895,
+        "sha256": "cb4643533ee584e5ac2e069768ca6150f1c43b8cb38f9bfeac84c835b5b96fee"
+      },
+      {
+        "file": "faro-visual-before/empty-320.png",
+        "bytes": 80109,
+        "sha256": "0c09d1851b84ff2199b4e465496035bc97f8cfb6d95f74da26afcb6533943a88"
+      },
+      {
+        "file": "faro-visual-before/empty-390.png",
+        "bytes": 87826,
+        "sha256": "c6718ccd210e98e3fc38827ae90bed4df2fd1748df755c9e1bfa1f0c974c7833"
+      },
+      {
+        "file": "faro-visual-before/empty-900.png",
+        "bytes": 141532,
+        "sha256": "74d870eef3baf8e65fe97c064d7629671e902e6af611c8700e8e85e6346836c8"
+      },
+      {
+        "file": "faro-visual-before/offers-1440.png",
+        "bytes": 222511,
+        "sha256": "a290e25cff108984d97103ec4d2dca91b779f0de37a474d02dcae49e276e2ed3"
+      },
+      {
+        "file": "faro-visual-before/offers-320.png",
+        "bytes": 98503,
+        "sha256": "f9492b7a4e79ab7fc1c72f367093a2f4e2e1b95dff2c4632b4eac487e936b905"
+      },
+      {
+        "file": "faro-visual-before/offers-390.png",
+        "bytes": 120732,
+        "sha256": "ea959810771431b37ed2fd2d4fd45df5160bfa04199be4a99123618cb361df55"
+      },
+      {
+        "file": "faro-visual-before/offers-900.png",
+        "bytes": 173715,
+        "sha256": "44412ce96273737f75339ec3e6294fa6d8415d2c1b8a8f31e767fa092a14c7ac"
+      },
+      {
+        "file": "faro-visual-before/organization-1440.png",
+        "bytes": 121093,
+        "sha256": "8604e4fb0c88ba85f41697440716ec64616f01ea677973610ec2818214ebc06f"
+      },
+      {
+        "file": "faro-visual-before/organization-390.png",
+        "bytes": 70490,
+        "sha256": "dcbe4ce9e9c868474ce927ebb8885588553796a2893547cdc128e45e45654aa6"
+      },
+      {
+        "file": "faro-visual-before/profile-1440.png",
+        "bytes": 284146,
+        "sha256": "7ae41e4fa0e4c09f9870c83e036cc1770301183c9042d9518035d3b595c2de6d"
+      },
+      {
+        "file": "faro-visual-before/profile-320.png",
+        "bytes": 67024,
+        "sha256": "9a7ed3738619e6eeab5f92e76e5d2e1d1c19ff4eaa0bd96db923bf6b685369df"
+      },
+      {
+        "file": "faro-visual-before/profile-390.png",
+        "bytes": 73123,
+        "sha256": "335a887fe8a47d95a7a3cd3fe53a526a7d481b8d27508b30638fe067f16e2cad"
+      },
+      {
+        "file": "faro-visual-before/profile-900.png",
+        "bytes": 216755,
+        "sha256": "3779f54857d08713362e970e65f7a41825bd27a1bfe57a41b7b9e0ca9c65003b"
+      },
+      {
+        "file": "faro-visual-after/detail-1440.png",
+        "bytes": 204617,
+        "sha256": "3303ba8958672fe57b5a522debe12964b179a73d0bb822e433e0c4526b83b122"
+      },
+      {
+        "file": "faro-visual-after/detail-320.png",
+        "bytes": 65450,
+        "sha256": "326d26ab3e3201265c86accfccb3ff49b3cd922acc3eace64167204d995926cb"
+      },
+      {
+        "file": "faro-visual-after/detail-390.png",
+        "bytes": 67700,
+        "sha256": "6a0de6319b508321501af05a318567a46649a1043f33bd6c30c825f736dd3c9a"
+      },
+      {
+        "file": "faro-visual-after/detail-900.png",
+        "bytes": 156476,
+        "sha256": "f646b350195f74110babc5bbe8809aadfcd102dec0901e14ffd60116026cfce4"
+      },
+      {
+        "file": "faro-visual-after/empty-1440.png",
+        "bytes": 165093,
+        "sha256": "c054d155c58323837a8667d61e42095179dbe035bef9cdfcc353fa3c5a4d8786"
+      },
+      {
+        "file": "faro-visual-after/empty-320.png",
+        "bytes": 81750,
+        "sha256": "14f59e33fc1bf2d046a3761041861a159d73cf4ba27bf1fa6747c32afeb900e6"
+      },
+      {
+        "file": "faro-visual-after/empty-390.png",
+        "bytes": 83197,
+        "sha256": "2d9fa073b81d98acf85d79ba5ec4d280b5af4551eb5a1ee962eaf0d64f952884"
+      },
+      {
+        "file": "faro-visual-after/empty-900.png",
+        "bytes": 136759,
+        "sha256": "c65f37551e29ee9f2942566ac915edf3d0407b0ce22a86af22d9bd5d2df0f9ed"
+      },
+      {
+        "file": "faro-visual-after/offers-1440.png",
+        "bytes": 170920,
+        "sha256": "ac8ab13eb9a8cd889a898129dd575514648b6e5294909549d5411a4550abcab8"
+      },
+      {
+        "file": "faro-visual-after/offers-320.png",
+        "bytes": 85081,
+        "sha256": "c90fc9ffba854a7d3a26741539b3925b1643468ad353820ab1d3d197bb4a76f5"
+      },
+      {
+        "file": "faro-visual-after/offers-390.png",
+        "bytes": 87539,
+        "sha256": "ff86fada93517776fc029c46ab579701c2a8f8eb2529031814b954ec015200e2"
+      },
+      {
+        "file": "faro-visual-after/offers-900.png",
+        "bytes": 139385,
+        "sha256": "37ad14577f22355ad99ef96a977cdec1da8e8b1474e9f3e79360c66bb24915db"
+      },
+      {
+        "file": "faro-visual-after/organization-1440.png",
+        "bytes": 115953,
+        "sha256": "66e28a1c63702de5c5de8e2c4a889a828f993cd463b622126536b40788a31c7c"
+      },
+      {
+        "file": "faro-visual-after/organization-390.png",
+        "bytes": 67126,
+        "sha256": "9b33361090239cb868bdda9eef6043ad334bdfb13145f08e83f192ac444e05b0"
+      },
+      {
+        "file": "faro-visual-after/profile-1440.png",
+        "bytes": 268854,
+        "sha256": "98ef8fbea8f18af78928ea67dd53caa05ccc2e5c20c60a7a57e590f8130e8ce9"
+      },
+      {
+        "file": "faro-visual-after/profile-320.png",
+        "bytes": 65303,
+        "sha256": "1818c3f0ff059aa8eb00b0a1d9bdcdd355c77307c37d3502a1d9016cc5ccf0aa"
+      },
+      {
+        "file": "faro-visual-after/profile-390.png",
+        "bytes": 72587,
+        "sha256": "1bc08f215922e662dfba02d4043f8b54aee082cc9e264c04bf1d058c938638de"
+      },
+      {
+        "file": "faro-visual-after/profile-900.png",
+        "bytes": 210824,
+        "sha256": "ffa13a52cb450a338c97e2ad62081689039220b46125dd8cf06298945e89e44b"
+      }
+    ],
+    "harness": "FARO_VISUAL_WALKTHROUGH_20261023.ts",
+    "harnessSha256": "c191e2f7738785c85daa0cd4108ec5d258dd28498f6c8754599c7f5355611cf3",
+    "detectorException": "Existing f-timeline line connects chronological events; semantic sequence, not a decorative card accent"
+  },
+  "ci94b7bc2": {
+    "faroRun": 39988429533,
+    "ciRun": 39988428650,
+    "conclusion": "SUCCESS",
+    "node": 213,
+    "sqliteBrowser": 60,
+    "postgresBrowserPerNode": 50,
+    "flaky": 0
+  },
+  "ci97da106": {
+    "faroRun": "39986251894",
+    "generalRun": "39986251395",
+    "status": "SUCCESS first97da106; follow-up session-race/text-height fix requires new exact CI",
+    "firstRunFlaky": "One PG22 open-answer login retry; deterministic counterproof/fix added, not accepted as no-issue"
+  },
+  "hostingEvidence": [
+    {
+      "file": "staging-preflight.json",
+      "sha256": "37abd1095b48cfc4d082a0a9137f475e9cd3661608e296e378e07a39df1119df"
+    },
+    {
+      "file": "staging-rollout.json",
+      "sha256": "60ee3e26a7c74f89d8da0af2847486f27e80c107ddc6cdc65ad0a7c1758a42ab"
+    },
+    {
+      "file": "staging-assets.json",
+      "sha256": "3d87df78de5c6163fb1ac43c1783c779678802a1fec7a374aff1790e3a67b2c3"
     }
   ]
 }

@@ -18,7 +18,7 @@
 
 Dowody i ostateczne wyniki poleceń: INDEPENDENT_READINESS_2026_10_23.md oraz evidence/independent-readiness-20261023. Wcześniejszy failing run z24be6a3 jest zachowany jako dowód błędu formularza. Reflow z powiększonym tekstem odtworzył overflow f-session; modalny flow wykazał utratę focusu po Escape, ponieważ wywołujący przycisk był czasowo disabled przy otwieraniu. Nie wyłączono reguł axe.
 
-Poprawki ograniczone do przyczyny: fokusowany error alert, aria-labelledby dialogu projekcji, jawny powrót focusu do nadal istniejącego aktywnego triggera w obu modalach, zawijanie sesji/nazw w wąskim widoku. Wizualne sprawdzenie zrzutu powiększonego tekstu ujawniło także odziedziczoną wysokość44px input/select obcinającą litery; scoped height:auto zachowuje min-height44px i skaluje pole do treści. Test kontroluje wysokość fontu+padding+border, nie tylko szerokość dokumentu. Public-shell cachev3 dostarcza aktualny klient/CSS; API/odpowiedzi nadal nie są trwałym cache.
+Poprawki ograniczone do przyczyny: fokusowany error alert, aria-labelledby dialogu projekcji, jawny powrót focusu do nadal istniejącego aktywnego triggera w obu modalach, zawijanie sesji/nazw w wąskim widoku. Wizualne sprawdzenie zrzutu powiększonego tekstu ujawniło także odziedziczoną wysokość44px input/select obcinającą litery; scoped height:auto zachowuje min-height44px i skaluje pole do treści. Test kontroluje wysokość fontu+padding+border, nie tylko szerokość dokumentu. Public-shell cachev4 dostarcza aktualny klient/CSS; API/odpowiedzi nadal nie są trwałym cache.
 
 ## Gotowy protokół manualny recenzenta
 

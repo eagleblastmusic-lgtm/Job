@@ -1,8 +1,10 @@
 # CHECKPOINT REGISTER
 
+Current hosting2026-10-23: exact6fae8e7 is Live on the existing Free staging as dep-dbdppgt9fdbs7388a2l0. Existing schema and zero private-file references confirmed by new startup; actual HTTPS retained-account/session/changed-consent/fresh-login/export, smoke/cleanup PASS,7 public assets match. Auto-deploy remains off and public recruitment stays503; no new resource/config/secret change. [Rollout evidence](evidence/independent-readiness-20261023/staging-rollout.json). Earlier hosting entries below are historical.
+
 ## K072/K062/K063 and review preparation — 2026-10-23
 
-[Execution/evidence](INDEPENDENT_READINESS_2026_10_23.md): current market review cycle, technical keyboard/error/modal/reflow fixes, actual performance signals and negative503 evidence; [all28 prepared review materials](REVIEW_HANDOFF_INDEX.md), decisions/owners unassigned. Statuses unchanged44/0/28/14. These outputs do not close missing external reviews; exact new suites/CI must be recorded before acceptance of changed code. No founder decision or independent acceptance criterion altered.
+[Execution/evidence](INDEPENDENT_READINESS_2026_10_23.md): current source-based market cycle, actual operational signals/real503 negative evidence,10 keyboard/error/modal/reflow/session-entry executions, and [Impeccable UI refinement](UI_POLISH_2026_10_23.md). Local213 Node/62 SQLite browsers PASS; Exact6fae8e7 FARO39993852956 (attempt2) and CI39993852858 SUCCESS:213 Node,62 SQLite browsers,52 PostgreSQL browsers perNode22/24, restore/current authority and image smoke PASS. [All28 prepared review materials](REVIEW_HANDOFF_INDEX.md) retain null decisions/owners/reviewers. Statuses remain44/0/28/14; no independent criterion or founder decision altered.
 
 ## Audit remediation — current override, 2026-10-18
 

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "faro-staging-rollout-v1",
+  "asOf": "2026-10-23",
+  "deployment": "dep-dbdppgt9fdbs7388a2l0",
+  "commit": "6fae8e72acd982494af6e1d19000454591952687",
+  "status": "live",
+  "finishedAt": "2026-10-23T17:44:44.196215Z",
+  "resource": "srv-db3pb9rncjis73banf90",
+  "workspace": "tea-dadn9u2d0e5s73dkborg",
+  "url": "https://faro-free-staging.onrender.com",
+  "servicePlan": "free",
+  "databasePlan": "free",
+  "logs": [
+    {
+      "timestamp": "2026-10-23T17:44:38.008905143Z",
+      "instance": "srv-db3pb9rncjis73banf90-j8brx",
+      "message": "FARO_FREE_STAGING_ACTIVITY_PRACTICE_ALREADY_CURRENT; additive nullable column only."
+    },
+    {
+      "timestamp": "2026-10-23T17:44:38.009010782Z",
+      "instance": "srv-db3pb9rncjis73banf90-j8brx",
+      "message": "FARO_FREE_STAGING_EXISTING_SCHEMA_RETAINED; no data migration or reset."
+    },
+    {
+      "timestamp": "2026-10-23T17:44:38.012337525Z",
+      "instance": "srv-db3pb9rncjis73banf90-j8brx",
+      "message": "FARO_FREE_STAGING_PRIVATE_FILES_ZERO; no referenced private upload can be lost by this deployment."
+    },
+    {
+      "timestamp": "2026-10-23T17:44:39.907151173Z",
+      "instance": "srv-db3pb9rncjis73banf90-j8brx",
+      "message": "Job działa na https://faro-free-staging.onrender.com (port 10000)."
+    }
+  ],
+  "smoke": "PASS",
+  "retainedAccountOriginalSessionChangedConsentFreshLoginOwnExport": "PASS",
+  "cleanup": "PASS",
+  "publicStaticAssets": "7/7 exact accepted-build match, text line endings normalized, PNG binary exact",
+  "autoDeploy": "off",
+  "newResources": 0,
+  "configurationChanges": 0,
+  "release": "NOT_ACCEPTED",
+  "recruitmentGate": "503 RELEASE_GATES_OPEN",
+  "rollbackUsed": false,
+  "preflight": "staging-preflight.json",
+  "databaseExternalAccess": "unchanged empty IP allowlist; hosted SQL read refused, startup emitted fresh PRIVATE_FILES_ZERO",
+  "productionReady": false
+}

@@ -1,0 +1,44 @@
+{
+  "operation": "STAGING_DEPLOYED_ASSET_MATCH",
+  "commit": "6fae8e72acd982494af6e1d19000454591952687",
+  "scope": "public static assets only",
+  "textNormalization": "CRLF to LF; PNG binary exact",
+  "assets": [
+    {
+      "path": "faro.css",
+      "sha256": "e6f536d718b45f2919a279cdd9490f97e486c2f04926da376f644cc546f3cfca",
+      "match": true
+    },
+    {
+      "path": "faro.js",
+      "sha256": "8b0551d612a2b3f73e564b3399446d83032258d09d66047c188459733c81b720",
+      "match": true
+    },
+    {
+      "path": "faroUi.js",
+      "sha256": "50adb3c2ce3e7e497c58c182cbf253018e3193e1794257833e8ce92a6a3cd89f",
+      "match": true
+    },
+    {
+      "path": "faroViews.js",
+      "sha256": "878fd2a41db8bd27db54c14f5b370f668dac2314f0dae96dfa3bb78c351df46d",
+      "match": true
+    },
+    {
+      "path": "assessmentAutosave.js",
+      "sha256": "d3d7af3c421dddbe56935a465eb4608dda08eaf9a06c32a561c712f76e7c2cd6",
+      "match": true
+    },
+    {
+      "path": "sw.js",
+      "sha256": "c2200097fa610f31c876b98876c6b5ebc20191e61c553f035d25f01309def82d",
+      "match": true
+    },
+    {
+      "path": "login-background.png",
+      "sha256": "5c8ba8b88996aee1ad7544437cdcf7e52b90f59bebbd3e61732b23ab7ceb456b",
+      "match": true
+    }
+  ],
+  "result": "PASS"
+}

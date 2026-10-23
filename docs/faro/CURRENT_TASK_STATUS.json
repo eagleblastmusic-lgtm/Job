@@ -3,9 +3,10 @@
   "asOf": "2026-10-23",
   "baseline": "6d0c000ab64489f5abde88e6c87ab1ec3453a1fc",
   "latestEngineeringAcceptance": {
-    "commit": "94b7bc2257f45783243e5a7f76b9522cfb8883ca",
-    "faroRun": "39988429533",
-    "ciRun": "39988428650",
+    "commit": "6fae8e72acd982494af6e1d19000454591952687",
+    "faroRun": "39993852956",
+    "faroAttempt": 2,
+    "ciRun": "39993852858",
     "conclusion": "SUCCESS"
   },
   "scope": "Full task status is distinct from gated release; DONE is never production approval",
@@ -699,5 +700,14 @@
       "reason": "Canonical post-MVP/optional scope; founder native-only decision excludes external job import.",
       "technicalEvidence": "External acceptance and canonical post-MVP register"
     }
-  ]
+  ],
+  "latestStagingAcceptance": {
+    "commit": "6fae8e72acd982494af6e1d19000454591952687",
+    "deployment": "dep-dbdppgt9fdbs7388a2l0",
+    "finishedAt": "2026-10-23T17:44:44.196215Z",
+    "smoke": "PASS",
+    "retainedAccountProof": "PASS",
+    "cleanup": "PASS",
+    "release": "NOT_ACCEPTED"
+  }
 }
